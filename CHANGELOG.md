@@ -8,6 +8,75 @@
 
 ---
 
+## [0.1.1] — ۲۰۲۶-۱۱-۰۷ — اصلاح خطاهای runtime
+
+### 🔧 اصلاحات (Bug Fixes)
+
+#### خطای آپلود فایل با پسوند خالی
+- **علت:** استفاده از `pathinfo($file['name'], PATHINFO_EXTENSION)` در نام فایل‌های فارسی یا
+  دارای کاراکترهای غیر ASCII (مثلاً فایل‌های jpg در XAMPP ویندوز) باعث می‌شد پسوند خالی
+  (`''`) برگردد و کاربر پیام «پسوند فایل «» مجاز نیست» را ببیند.
+- **راه‌حل:** افزودن تابع helper جدید `safe_file_extension(string $filename): string`
+  که با نرمال‌سازی encoding (Windows-1256 → UTF-8)، حذف BOM و کاراکترهای کنترلی،
+  و استفاده از `strrpos` به‌جای `pathinfo` به‌صورت قابل اعتماد پسوند را استخراج می‌کند.
+- **همچنین:** تابع `sanitize_upload_filename()` برای نرمال‌سازی نام فایل در نمایش و ذخیره‌سازی.
+- **فایل‌های اصلاح‌شده:**
+  - `config/helper.php` (افزودن دو تابع کمکی)
+  - `app/Controllers/RegistrationController.php` (۲ نقطه)
+  - `app/Controllers/TrackingController.php` (۲ نقطه)
+  - `app/Controllers/AdminController.php` (۲ نقطه)
+  - `app/Controllers/RevisionController.php` (۲ نقطه)
+  - `app/Controllers/LicenseController.php` (۳ نقطه)
+  - `app/Views/admin/view_application.php` (۳ نقطه — تشخیص تصویر برای پیش‌نمایش)
+  - `app/Views/admin/revision_detail.php` (۱ نقطه + محافظت null)
+
+#### خطای Deprecated: PDO::MYSQL_ATTR_INIT_COMMAND
+- **علت:** در PHP 8.5+ ثابت `PDO::MYSQL_ATTR_INIT_COMMAND` منسوخ شده و هشدار Deprecated نمایش می‌دهد.
+- **راه‌حل:** حذف از آرایه `$options` و استفاده از `charset=utf8mb4` در DSN (که خودش SET NAMES را اجرا می‌کند).
+  سپس با `$this->pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci")` پس از ساخت PDO،
+  collation تنظیم می‌شود.
+- **فایل اصلاح‌شده:** `core/Database.php`
+
+#### Notice: Undefined array key در $_FILES چندفایلی
+- **علت:** در آپلود فیلد `product_photos[]` (آرایه‌ای از فایل‌ها)، دسترسی مستقیم به
+  `$_FILES['product_photos']['tmp_name'][$idx]` بدون null coalescing ممکن است
+  Notice تولید کند اگر اندیس موجود نباشد.
+- **راه‌حل:** استخراج اولیهٔ آرایه‌های `name`, `tmp_name`, `size`, `error` با `?? []`
+  و سپس دسترسی ایمن.
+- **فایل‌های اصلاح‌شده:**
+  - `app/Controllers/RegistrationController.php` (مرحلهٔ ۴ ثبت‌نام)
+  - `app/Controllers/AdminController.php` (ثبت دستی مدیر)
+
+#### محافظت دسترسی به آرایه چندسطحی در Session
+- **علت:** در `Session::clearRegistration()`, مقداردهی `$_SESSION['registration']['service_id']`
+  ممکن است اگر `$_SESSION['registration']` تنظیم نشده باشد، خطا دهد.
+- **راه‌حل:** بررسی `isset` و `is_array` قبل از مقداردهی.
+- **فایل اصلاح‌شده:** `core/Session.php`
+
+#### بهبود امنیت در revision_detail.php
+- استخراج همهٔ اندیس‌های `$nd['doc']` با مقادیر پیش‌فرض (همراه با null coalescing)
+  برای جلوگیری از Notice در صورت نبود کلید.
+- استفاده از `safe_file_extension()` به‌جای `pathinfo()` برای تشخیص تصویری بودن مدرک.
+
+### 🛡️ ابزارهای جدید تست و اسکن
+- `tools/scan-runtime-errors.py` — اسکنر خطاهای Deprecated و توابع حذف‌شده (PHP 8+)
+- `tools/scan-runtime-v2.py` — اسکنر پیشرفته برای Notice/Warning (دسترسی به $_POST/$_GET/$_FILES بدون null coalescing)
+- گزارش JSON ذخیره‌شده: `tests/runtime-errors-scan.json`
+
+### 📊 نتایج اسکن
+- **CRITICAL (Deprecated/Removed):** 0 مورد ✓
+- **HIGH (احتمال Notice/Warning):** 0 مورد ✓
+- **MEDIUM (دسترسی چندسطحی):** 1 مورد (false positive با محافظت isset)
+- **INFO (پیشنهادات سبک):** 9 مورد `@chmod` که عمدی هستند برای suppress warning
+
+### 🎯 سازگاری
+- PHP 8.0 تا 8.5+ ✓
+- MariaDB 10.4+ ✓
+- MySQL 5.7+ ✓
+- XAMPP (آخرین نسخه) ✓
+
+---
+
 ## [0.1.0] — ۲۰۲۶-۱۱-۰۷ — اولین نسخهٔ رسمی
 
 ### ✨ افزوده‌ها

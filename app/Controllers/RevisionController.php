@@ -161,7 +161,7 @@ class RevisionController extends Controller
                 $validator->addError('rev_doc_' . $i, 'خطا در بارگذاری فایل شمارهٔ ' . $i);
                 continue;
             }
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $ext = safe_file_extension((string)$file['name']);
             $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
             if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {
                 $validator->addError('rev_doc_' . $i, 'پسوند فایل شمارهٔ ' . $i . ' مجاز نیست.');
@@ -192,7 +192,7 @@ class RevisionController extends Controller
         $payloadDocs = [];
         foreach ($newDocs as $d) {
             $file = $d['file'];
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $ext = safe_file_extension((string)$file['name']);
             $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
             if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
                 Session::set('revision_error', 'خطا در ذخیرهٔ یکی از فایل‌ها.');
@@ -203,10 +203,10 @@ class RevisionController extends Controller
                 'applicant_id' => $aid,
                 'doc_type' => 'revision_doc',   // نوع موقت تا زمان تأیید مدیر
                 'file_name' => $uniqueName,
-                'original_name' => basename((string)$file['name']),
+                'original_name' => sanitize_upload_filename((string)$file['name']),
                 'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
             ]);
-            $payloadDocs[] = ['doc_id' => $docId, 'doc_type' => $d['type'], 'name' => basename((string)$file['name'])];
+            $payloadDocs[] = ['doc_id' => $docId, 'doc_type' => $d['type'], 'name' => sanitize_upload_filename((string)$file['name'])];
         }
 
         $dynValues = [];

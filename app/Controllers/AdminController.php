@@ -568,11 +568,11 @@ class AdminController extends Controller
             }
             $saveFile = function ($file, $docType) use ($applicantId, $uploadDir) {
                 if (!$file || $file['error'] !== UPLOAD_ERR_OK) return;
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $ext = safe_file_extension((string)$file['name']);
                 $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
                 $destPath = $uploadDir . '/' . $uniqueName;
                 if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                    throw new \RuntimeException('خطا در ذخیره فایل ' . $file['name']);
+                    throw new \RuntimeException('خطا در ذخیره فایل ' . sanitize_upload_filename((string)$file['name']));
                 }
                 $this->documentModel->create([
                     'applicant_id' => $applicantId,
@@ -595,13 +595,17 @@ class AdminController extends Controller
             }
 
             if (!empty($_FILES['product_photos']['name']) && is_array($_FILES['product_photos']['name'])) {
-                foreach ($_FILES['product_photos']['tmp_name'] as $index => $tmpName) {
-                    if ($_FILES['product_photos']['error'][$index] === UPLOAD_ERR_OK) {
+                $ppNames = $_FILES['product_photos']['name'] ?? [];
+                $ppTmpNames = $_FILES['product_photos']['tmp_name'] ?? [];
+                $ppSizes = $_FILES['product_photos']['size'] ?? [];
+                $ppErrors = $_FILES['product_photos']['error'] ?? [];
+                foreach ($ppTmpNames as $index => $tmpName) {
+                    if (($ppErrors[$index] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
                         $file = [
-                            'name' => $_FILES['product_photos']['name'][$index],
+                            'name' => $ppNames[$index] ?? '',
                             'tmp_name' => $tmpName,
-                            'size' => $_FILES['product_photos']['size'][$index],
-                            'error' => $_FILES['product_photos']['error'][$index],
+                            'size' => $ppSizes[$index] ?? 0,
+                            'error' => $ppErrors[$index] ?? UPLOAD_ERR_NO_FILE,
                         ];
                         $saveFile($file, 'product_photos');
                     }
@@ -763,7 +767,7 @@ class AdminController extends Controller
             $this->redirect('/admin/view/' . $applicantId);
         }
 
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $ext = safe_file_extension((string)$file['name']);
         if (!in_array($ext, ALLOWED_EXTENSIONS)) {
             Session::set('errors', ['document' => 'پسوند فایل مجاز نیست. فقط: ' . implode(', ', ALLOWED_EXTENSIONS)]);
             $this->redirect('/admin/view/' . $applicantId);

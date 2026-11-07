@@ -1,0 +1,178 @@
+{
+  "summary": {
+    "critical": 0,
+    "warn": 12,
+    "info": 9,
+    "total": 21
+  },
+  "findings": [
+    {
+      "file": "app/Controllers/TrackingController.php",
+      "line": 339,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($uploadDir . '/' . $uniqueName, 0640);"
+    },
+    {
+      "file": "app/Controllers/RegistrationController.php",
+      "line": 671,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($destPath, 0640);"
+    },
+    {
+      "file": "app/Controllers/SettingController.php",
+      "line": 151,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($dest, 0644); // فایل عمومی است (برندینگ)"
+    },
+    {
+      "file": "app/Controllers/SettingController.php",
+      "line": 167,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@unlink($old);"
+    },
+    {
+      "file": "app/Controllers/AdminController.php",
+      "line": 794,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($destPath, 0640); // حداقل دسترسی ممکن روی فایل ذخیره‌شده"
+    },
+    {
+      "file": "app/Controllers/RevisionController.php",
+      "line": 201,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($uploadDir . '/' . $uniqueName, 0640);"
+    },
+    {
+      "file": "app/Controllers/RevisionController.php",
+      "line": 476,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "if ($fp && $base && str_starts_with($fp, $base) && is_file($fp)) @unlink($fp);"
+    },
+    {
+      "file": "app/Controllers/LicenseController.php",
+      "line": 191,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($uploadDir . '/' . $uniqueName, 0640);"
+    },
+    {
+      "file": "app/Controllers/LicenseController.php",
+      "line": 312,
+      "severity": "INFO",
+      "description": "استفاده از @ برای suppress error (مخفی کردن خطا)",
+      "fix": "بررسی با if و نمایش خطای دقیق به کاربر",
+      "code": "@chmod($uploadDir . '/' . $uniqueName, 0640);"
+    },
+    {
+      "file": "app/Views/layout.php",
+      "line": 8,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);"
+    },
+    {
+      "file": "app/Views/admin/form_field_edit.php",
+      "line": 43,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<?= (int)($field['wizard_step_id'] ?? (int)($_GET['step'] ?? 0)) === (int)$ws['id'] ? 'selected' : '' ?>>"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 6,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input class=\"form-control\" name=\"license_title\" placeholder=\"رشته\" value=\"<?= htmlspecialchars($_GET['license_title'] ?"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 9,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input class=\"form-control\" name=\"province\" placeholder=\"استان\" value=\"<?= htmlspecialchars($_GET['province'] ?? '') ?>\""
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 12,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input class=\"form-control\" name=\"city\" placeholder=\"شهر\" value=\"<?= htmlspecialchars($_GET['city'] ?? '') ?>\">"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 15,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input class=\"form-control\" name=\"village\" placeholder=\"روستا\" value=\"<?= htmlspecialchars($_GET['village'] ?? '') ?>\">"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 21,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<option value=\"<?= $st ?>\" <?= ($_GET['status'] ?? '') === $st ? 'selected' : '' ?>><?= $st ?></option>"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 31,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input type=\"hidden\" name=\"license_title\" id=\"pdf_license\" value=\"<?= htmlspecialchars($_GET['license_title'] ?? '') ?>\""
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 32,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input type=\"hidden\" name=\"province\" id=\"pdf_province\" value=\"<?= htmlspecialchars($_GET['province'] ?? '') ?>\">"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 33,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input type=\"hidden\" name=\"city\" id=\"pdf_city\" value=\"<?= htmlspecialchars($_GET['city'] ?? '') ?>\">"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 34,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input type=\"hidden\" name=\"village\" id=\"pdf_village\" value=\"<?= htmlspecialchars($_GET['village'] ?? '') ?>\">"
+    },
+    {
+      "file": "app/Views/admin/output_general.php",
+      "line": 35,
+      "severity": "WARN",
+      "description": "دسترسی مستقیم به superglobal در view (امنیت: باید از controller به view منتقل شود)",
+      "fix": "عبور داده‌ها به view از طریق متغیرهای محلی",
+      "code": "<input type=\"hidden\" name=\"status\" id=\"pdf_status\" value=\"<?= htmlspecialchars($_GET['status'] ?? '') ?>\">"
+    }
+  ]
+}

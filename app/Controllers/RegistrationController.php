@@ -513,13 +513,17 @@ class RegistrationController extends Controller
         $productPhotos = [];
         if (($sysActive['product_photos'] ?? true)
             && !empty($_FILES['product_photos']['name']) && is_array($_FILES['product_photos']['name'])) {
-            foreach ($_FILES['product_photos']['name'] as $idx => $name) {
-                if (($_FILES['product_photos']['error'][$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+            $ppNames = $_FILES['product_photos']['name'] ?? [];
+            $ppTmpNames = $_FILES['product_photos']['tmp_name'] ?? [];
+            $ppSizes = $_FILES['product_photos']['size'] ?? [];
+            $ppErrors = $_FILES['product_photos']['error'] ?? [];
+            foreach ($ppNames as $idx => $name) {
+                if (($ppErrors[$idx] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
                     $productPhotos[] = [
                         'name' => $name,
-                        'tmp_name' => $_FILES['product_photos']['tmp_name'][$idx],
-                        'size' => $_FILES['product_photos']['size'][$idx],
-                        'error' => $_FILES['product_photos']['error'][$idx],
+                        'tmp_name' => $ppTmpNames[$idx] ?? '',
+                        'size' => $ppSizes[$idx] ?? 0,
+                        'error' => $ppErrors[$idx] ?? UPLOAD_ERR_NO_FILE,
                     ];
                 }
             }
@@ -556,8 +560,8 @@ class RegistrationController extends Controller
         ]);
         $allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
         foreach ($allFiles as $file) {
-            $safeName = htmlspecialchars(basename((string)$file['name']), ENT_QUOTES, 'UTF-8');
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $safeName = htmlspecialchars(sanitize_upload_filename((string)$file['name']), ENT_QUOTES, 'UTF-8');
+            $ext = safe_file_extension((string)$file['name']);
             if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {
                 $errors['files'][] = "پسوند فایل «{$safeName}» مجاز نیست. فقط " . implode(', ', ALLOWED_EXTENSIONS) . " مجاز است.";
                 continue;
@@ -662,18 +666,18 @@ class RegistrationController extends Controller
                 mkdir($uploadDir, 0755, true);
             }
             $saveFile = function ($file, $docType) use ($applicantId, $uploadDir) {
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $ext = safe_file_extension((string)$file['name']);
                 $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
                 $destPath = $uploadDir . '/' . $uniqueName;
                 if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                    throw new \RuntimeException('خطا در ذخیره فایل ' . basename((string)$file['name']));
+                    throw new \RuntimeException('خطا در ذخیره فایل ' . sanitize_upload_filename((string)$file['name']));
                 }
                 @chmod($destPath, 0640);
                 return $this->documentModel->create([
                     'applicant_id' => $applicantId,
                     'doc_type' => $docType,
                     'file_name' => $uniqueName,
-                    'original_name' => basename((string)$file['name']),
+                    'original_name' => sanitize_upload_filename((string)$file['name']),
                     'file_path' => str_replace(UPLOAD_DIR, '', $destPath),
                 ]);
             };

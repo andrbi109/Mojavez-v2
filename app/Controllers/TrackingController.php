@@ -305,7 +305,7 @@ class TrackingController extends Controller
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
             $validator->addError('receipt_file', 'بارگذاری تصویر رسید پرداخت الزامی است.');
         } else {
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $ext = safe_file_extension((string)$file['name']);
             if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {
                 $validator->addError('receipt_file', 'پسوند فایل رسید مجاز نیست (jpg/png/pdf).');
             } elseif ($file['size'] > MAX_UPLOAD_SIZE) {
@@ -330,7 +330,7 @@ class TrackingController extends Controller
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $ext = safe_file_extension((string)$file['name']);
         $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
         if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
             Session::set('payment_error', 'خطا در ذخیرهٔ فایل رسید.');

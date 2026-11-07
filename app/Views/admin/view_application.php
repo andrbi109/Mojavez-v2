@@ -195,7 +195,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                         <?php [$dl, $di] = $docLabels[$doc['doc_type']] ?? [$doc['doc_type'], 'file-text']; ?>
                         <div class="col-6 col-md-4 col-xl-3">
                             <div class="card h-100 p-2 text-center" style="border-style:dashed;">
-                                <?php if (in_array(pathinfo($doc['file_name'], PATHINFO_EXTENSION), ['jpg', 'jpeg', 'png'])): ?>
+                                <?php if (in_array(safe_file_extension((string)$doc['file_name']), ['jpg', 'jpeg', 'png'], true)): ?>
                                     <img src="<?= $base ?>document/thumb/<?= (int)$doc['id'] ?>" class="rounded mb-1" style="height:90px;width:100%;object-fit:cover;" alt="پیش‌نمایش مدرک">
                                 <?php else: ?>
                                     <div class="py-3" style="color:var(--terracotta)"><?= icon('file-text', '', 34) ?></div>
@@ -252,7 +252,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                 <div class="row g-2">
                     <?php foreach ($productPhotos as $doc): ?>
                         <div class="col-4 col-md-2">
-                            <?php if (in_array(pathinfo($doc['file_name'], PATHINFO_EXTENSION), ['jpg', 'jpeg', 'png'])): ?>
+                            <?php if (in_array(safe_file_extension((string)$doc['file_name']), ['jpg', 'jpeg', 'png'], true)): ?>
                                 <img src="<?= $base ?>document/thumb/<?= (int)$doc['id'] ?>" class="img-thumbnail w-100" style="height:84px;object-fit:cover;cursor:pointer" alt="" onclick="this.nextElementSibling.click()">
                             <?php else: ?>
                                 <div class="text-center py-3 border rounded"><?= icon('file-text', '', 24) ?></div>
@@ -399,7 +399,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
             <div class="card-body">
                 <?php if ($licenseFile && $licenseDoc): ?>
                     <div class="d-flex align-items-center gap-3 mb-3 flex-wrap">
-                        <?php if (in_array(pathinfo($licenseDoc['file_name'], PATHINFO_EXTENSION), ['jpg','jpeg','png'])): ?>
+                        <?php if (in_array(safe_file_extension((string)$licenseDoc['file_name']), ['jpg','jpeg','png'], true)): ?>
                             <img src="<?= $base ?>document/thumb/<?= (int)$licenseDoc['id'] ?>" style="width:88px;height:64px;object-fit:cover;border-radius:8px;" alt="">
                         <?php else: ?>
                             <span style="color:var(--persian-green)"><?= icon('file-text', '', 30) ?></span>

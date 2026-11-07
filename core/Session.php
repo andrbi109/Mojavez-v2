@@ -173,6 +173,10 @@ class Session
         $serviceId = $_SESSION['registration']['service_id'] ?? null;
         unset($_SESSION['registration']);
         if ($serviceId !== null) {
+            // اطمینان از وجود آرایه registration قبل از تنظیم اندیس
+            if (!isset($_SESSION['registration']) || !is_array($_SESSION['registration'])) {
+                $_SESSION['registration'] = [];
+            }
             $_SESSION['registration']['service_id'] = $serviceId;
         }
     }

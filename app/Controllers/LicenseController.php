@@ -166,7 +166,7 @@ class LicenseController extends Controller
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
             $validator->addError('receipt_file', 'بارگذاری تصویر رسید الزامی است.');
         } else {
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            $ext = safe_file_extension((string)$file['name']);
             $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
             if (!in_array($ext, ALLOWED_EXTENSIONS, true) || $file['size'] > MAX_UPLOAD_SIZE
                 || !in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
@@ -182,7 +182,7 @@ class LicenseController extends Controller
         // ذخیرهٔ رسید
         $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $ext = safe_file_extension((string)$file['name']);
         $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
         if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
             Session::set('license_message', 'خطا در ذخیرهٔ فایل رسید.');
@@ -194,7 +194,7 @@ class LicenseController extends Controller
             'applicant_id' => (int)$applicant['id'],
             'doc_type' => 'payment_receipt',
             'file_name' => $uniqueName,
-            'original_name' => basename((string)$file['name']),
+            'original_name' => sanitize_upload_filename((string)$file['name']),
             'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
         ]);
 
@@ -294,7 +294,7 @@ class LicenseController extends Controller
             Session::set('errors', ['license' => ['فایل تصویر مجوز را انتخاب کنید.']]);
             $this->redirect('/admin/view/' . $applicantId);
         }
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $ext = safe_file_extension((string)$file['name']);
         $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
         if (!in_array($ext, ALLOWED_EXTENSIONS, true) || $file['size'] > MAX_UPLOAD_SIZE
             || !in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
@@ -315,7 +315,7 @@ class LicenseController extends Controller
             'applicant_id' => $applicantId,
             'doc_type' => 'license_image',
             'file_name' => $uniqueName,
-            'original_name' => basename((string)$file['name']),
+            'original_name' => sanitize_upload_filename((string)$file['name']),
             'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
         ]);
         $this->licenseFileModel->upsert($applicantId, $docId);

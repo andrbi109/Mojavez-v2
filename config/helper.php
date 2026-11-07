@@ -125,6 +125,83 @@ if (!function_exists('build_notify_message')) {
 }
 
 /* =====================================================
+   توابع کمکی فایل و آپلود
+   ===================================================== */
+
+if (!function_exists('safe_file_extension')) {
+    /**
+     * استخراج پسوند فایل به‌صورت قابل اعتماد و امن.
+     *
+     * این تابع بر خلاف pathinfo() در موارد زیر رفتار صحیح دارد:
+     *   - نام فایل فارسی/با کاراکترهای غیر ASCII (UTF-8)
+     *   - نام فایل بدون پسوند (رشتهٔ خالی برمی‌گرداند)
+     *   - نام فایل با چند نقطه (مثل «archive.tar.gz» — آخرین پسوند)
+     *   - نام فایل با نقطه در ابتدا (مثل «.htaccess» — پسوند ندارد)
+     *   - نام فایل با فاصله یا کاراکترهای کنترلی در انتها
+     *
+     * @param string $filename نام فایل (می‌تواند $_FILES['name'] باشد)
+     * @return string پسوند به حروف کوچک، بدون نقطه (مثلاً 'jpg' یا '')
+     */
+    function safe_file_extension(string $filename): string
+    {
+        // نرمال‌سازی: حذف BOM، تبدیل ویندوز-۱۲۵۶ به UTF-8، trim
+        $filename = trim($filename);
+        if ($filename === '') {
+            return '';
+        }
+        // اگر نام فایل از encoding ویندوزی باشد (مثلاً cp1256 برای فارسی)
+        if (!mb_check_encoding($filename, 'UTF-8')) {
+            $converted = @iconv('Windows-1256', 'UTF-8//IGNORE', $filename);
+            if ($converted !== false && $converted !== '') {
+                $filename = $converted;
+            }
+        }
+        // حذف کاراکترهای کنترلی و nul byte
+        $filename = str_replace(["\0", "\r", "\n", "\t"], '', $filename);
+        // گرفتن basename (حذف مسیر در صورت وجود)
+        $filename = basename($filename);
+        // پیدا کردن آخرین نقطه
+        $lastDot = strrpos($filename, '.');
+        if ($lastDot === false || $lastDot === 0) {
+            // نقطه نیست یا فایل با نقطه شروع شده (مثل .htaccess)
+            return '';
+        }
+        $ext = substr($filename, $lastDot + 1);
+        // حذف کاراکترهای غیر ASCII (پسوند فقط باید ASCII باشد)
+        $ext = preg_replace('/[^a-zA-Z0-9]/', '', $ext);
+        return mb_strtolower($ext, 'UTF-8');
+    }
+}
+
+if (!function_exists('sanitize_upload_filename')) {
+    /**
+     * نرمال‌سازی و پاک‌سازی نام فایل آپلودشده برای نمایش امن.
+     *
+     * - حذف BOM و کاراکترهای کنترلی
+     * - تبدیل encoding ویندوزی به UTF-8
+     * - trim فاصله‌ها
+     *
+     * @param string $filename نام فایل خام از $_FILES
+     * @return string نام فایل پاک‌سازی‌شده
+     */
+    function sanitize_upload_filename(string $filename): string
+    {
+        $filename = trim($filename);
+        if ($filename === '') {
+            return '';
+        }
+        if (!mb_check_encoding($filename, 'UTF-8')) {
+            $converted = @iconv('Windows-1256', 'UTF-8//IGNORE', $filename);
+            if ($converted !== false && $converted !== '') {
+                $filename = $converted;
+            }
+        }
+        $filename = str_replace(["\0", "\r", "\n", "\t"], '', $filename);
+        return basename($filename);
+    }
+}
+
+/* =====================================================
    سیستم آیکون SVG درون‌خطی — بدون فونت آیکون خارجی
    همهٔ آیکون‌ها stroke-based به سبک Feather با viewBox 24x24
    ===================================================== */

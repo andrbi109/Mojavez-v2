@@ -70,17 +70,27 @@ $changedCount = count(array_filter($cmp, fn($c) => $c['changed']));
             <div class="card-header"><?= icon('upload', 'me-1') ?> مدارک جدید پیشنهادی</div>
             <div class="card-body">
                 <?php foreach ($newDocs as $nd): ?>
+                <?php
+                    // دفاع: اطمینان از وجود doc قبل از دسترسی به اندیس‌ها
+                    $ndDoc = $nd['doc'] ?? null;
+                    $ndDocId = (int)($ndDoc['id'] ?? 0);
+                    $ndDocName = (string)($ndDoc['file_name'] ?? '');
+                    $ndDocOrigName = (string)($ndDoc['original_name'] ?? '');
+                    $ndType = (string)($nd['type'] ?? 'optional');
+                    $ndExt = safe_file_extension($ndDocName);
+                    $isImage = in_array($ndExt, ['jpg', 'jpeg', 'png'], true);
+                ?>
                 <div class="field-row">
-                    <?php if (in_array(pathinfo($nd['doc']['file_name'], PATHINFO_EXTENSION), ['jpg','jpeg','png'])): ?>
-                        <img src="<?= $base ?>document/thumb/<?= (int)$nd['doc']['id'] ?>" style="width:52px;height:40px;object-fit:cover;border-radius:6px;" alt="">
+                    <?php if ($isImage && $ndDocId > 0): ?>
+                        <img src="<?= $base ?>document/thumb/<?= $ndDocId ?>" style="width:52px;height:40px;object-fit:cover;border-radius:6px;" alt="">
                     <?php else: ?>
                         <span style="color:var(--terracotta)"><?= icon('file-text', '', 22) ?></span>
                     <?php endif; ?>
                     <div class="flex-grow-1">
-                        <strong class="small"><?= $e($docTypeLabels[$nd['type']] ?? $nd['type']) ?></strong>
-                        <div class="small text-muted text-truncate" dir="ltr"><?= $e($nd['doc']['original_name']) ?></div>
+                        <strong class="small"><?= $e($docTypeLabels[$ndType] ?? $ndType) ?></strong>
+                        <div class="small text-muted text-truncate" dir="ltr"><?= $e($ndDocOrigName) ?></div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn" data-id="<?= (int)$nd['doc']['id'] ?>" data-applicant="<?= (int)$rev['applicant_id'] ?>"><?= icon('eye', '', 13) ?></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn" data-id="<?= $ndDocId ?>" data-applicant="<?= (int)$rev['applicant_id'] ?>"><?= icon('eye', '', 13) ?></button>
                 </div>
                 <?php endforeach; ?>
             </div>
