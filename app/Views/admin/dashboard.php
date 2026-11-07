@@ -20,12 +20,12 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
 <style>
 /* استایل اختصاصی داشبورد */
 .dash-hero {
-    background: linear-gradient(135deg, var(--turquoise) 0%, var(--turquoise-dark) 100%);
+    background: linear-gradient(135deg, var(--navy) 0%, #1B3A5C 50%, #0E7490 100%);
     color: #fff;
     border-radius: 20px;
     padding: 2rem;
     margin-bottom: 1.5rem;
-    box-shadow: 0 8px 24px rgba(0, 180, 216, 0.25);
+    box-shadow: 0 8px 32px rgba(26, 42, 79, 0.3);
     position: relative;
     overflow: hidden;
 }
@@ -36,22 +36,41 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
     inset-inline-end: -20%;
     width: 60%;
     height: 200%;
-    background: radial-gradient(ellipse, rgba(255,255,255,0.15) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(244, 163, 0, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+.dash-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    inset-inline-start: -10%;
+    width: 50%;
+    height: 150%;
+    background: radial-gradient(ellipse, rgba(0, 180, 216, 0.15) 0%, transparent 70%);
     pointer-events: none;
 }
 .dash-hero h1, .dash-hero h2, .dash-hero h3, .dash-hero h4, .dash-hero h5, .dash-hero h6 {
     color: #fff !important;
 }
 .dash-hero .display-num {
-    font-size: 3rem;
+    font-size: 2.8rem;
     font-weight: 800;
     line-height: 1;
     margin: 0;
+    color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
 .dash-hero .display-num small {
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 600;
-    opacity: 0.9;
+    opacity: 0.85;
+    color: var(--saffron);
+}
+.dash-hero .display-label {
+    font-size: 0.8rem;
+    opacity: 0.75;
+    margin: 0;
+    color: #B9C4CF;
 }
 
 /* کارت‌های شاخص */
@@ -85,12 +104,13 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
     justify-content: center;
     color: #fff;
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
 }
-.kpi-icon.navy { background: linear-gradient(135deg, #1A2A4F, #2C3E66); }
-.kpi-icon.turquoise { background: linear-gradient(135deg, #00B4D8, #0077B6); }
+.kpi-icon.navy { background: linear-gradient(135deg, var(--navy), #2C3E66); }
+.kpi-icon.turquoise { background: linear-gradient(135deg, var(--turquoise), var(--turquoise-dark)); }
 .kpi-icon.green { background: linear-gradient(135deg, #10B981, #059669); }
 .kpi-icon.red { background: linear-gradient(135deg, #EF5350, #C62828); }
-.kpi-icon.gold { background: linear-gradient(135deg, #F4A300, #D97706); }
+.kpi-icon.gold { background: linear-gradient(135deg, var(--saffron), #D97706); }
 .kpi-icon.purple { background: linear-gradient(135deg, #8B5CF6, #6D28D9); }
 
 .kpi-value {
@@ -105,12 +125,13 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
     margin: 0;
 }
 .kpi-trend {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     padding: 0.15rem 0.5rem;
     border-radius: 999px;
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
+    font-weight: 600;
 }
 .kpi-trend.up { background: rgba(16, 185, 129, 0.15); color: #059669; }
 .kpi-trend.down { background: rgba(239, 68, 68, 0.15); color: #DC2626; }
@@ -251,23 +272,23 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
 <div class="dash-hero">
     <div class="row align-items-center g-3">
         <div class="col-md-8">
-            <div class="mb-2 opacity-75">به سامانهٔ مدیریت مجوزهای صنایع دستی خوش آمدید 👋</div>
+            <div class="mb-2 display-label">به سامانهٔ مدیریت مجوزهای صنایع دستی خوش آمدید 👋</div>
             <div class="row g-4">
                 <div class="col-6 col-md-3">
                     <p class="display-num"><?= (int)$total ?></p>
-                    <p class="mb-0 opacity-75">کل پرونده‌ها</p>
+                    <p class="display-label mb-0">کل پرونده‌ها</p>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="display-num"><?= (int)$pending ?></p>
-                    <p class="mb-0 opacity-75">در انتظار رسیدگی</p>
+                    <p class="display-label mb-0">در انتظار رسیدگی</p>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="display-num"><?= $issued ?></p>
-                    <p class="mb-0 opacity-75">مجوز صادرشده</p>
+                    <p class="display-label mb-0">مجوز صادرشده</p>
                 </div>
                 <div class="col-6 col-md-3">
                     <p class="display-num"><?= $successRate ?><small>٪</small></p>
-                    <p class="mb-0 opacity-75">نرخ موفقیت</p>
+                    <p class="display-label mb-0">نرخ موفقیت</p>
                 </div>
             </div>
         </div>

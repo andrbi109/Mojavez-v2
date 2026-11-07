@@ -449,6 +449,9 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 /* ========== پنل مدیریت ========== */
 .admin-body { background-color: var(--cream); }
 
+/* =====================================================================
+   نوار بالای موبایل — مدرن و تمیز
+   ===================================================================== */
 .admin-topbar {
   position: sticky; top: 0; z-index: 1030;
   display: flex; align-items: center; gap: .75rem;
@@ -457,72 +460,204 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
 }
 
+/* =====================================================================
+   نوار کناری (Sidebar) — بازطراحی کامل با ریسپانسیو
+   ===================================================================== */
 .admin-sidebar {
   background: linear-gradient(180deg, var(--navy) 0%, #101E2E 100%);
+  width: 280px;
+  max-width: 100%;
   min-height: 100vh;
   color: #B9C4CF;
-  width: 264px;
   position: fixed;
-  right: 0; top: 0; bottom: 0;
+  inset-inline-end: 0; top: 0; bottom: 0;
   z-index: 1000;
   overflow-y: auto;
-  padding-top: 1rem;
-  border-left: 1px solid rgba(217,164,65,.18);
+  overflow-x: hidden;
+  padding-top: 0;
+  border-inline-start: 1px solid rgba(217,164,65,.18);
+  display: flex;
+  flex-direction: column;
+  /* اسکرول‌بار ظریف */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217,164,65,.3) transparent;
 }
+.admin-sidebar::-webkit-scrollbar { width: 6px; }
+.admin-sidebar::-webkit-scrollbar-track { background: transparent; }
+.admin-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(217,164,65,.3);
+  border-radius: 3px;
+}
+.admin-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(217,164,65,.5); }
+
+/* هدر سایدبار */
 .admin-sidebar .sidebar-header {
-  padding: .6rem 1.4rem 1rem;
+  padding: 1.2rem 1.2rem .8rem;
   font-size: 1.12rem;
   font-weight: 800;
   color: #fff;
   border-bottom: 1px solid rgba(255,255,255,.08);
-  margin-bottom: .8rem;
+  margin-bottom: 0;
   display: flex; align-items: center; gap: .5rem;
+  flex-shrink: 0;
 }
 .admin-sidebar .sidebar-header .brand-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; font-size: 1rem;
+  width: 36px; height: 36px; font-size: 1.1rem;
   background: linear-gradient(135deg, var(--turquoise), var(--turquoise-dark));
   border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,180,216,.3);
 }
+
+/* بخش کاربر سایدبار */
+.admin-sidebar .sidebar-user {
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  padding: .6rem .8rem;
+  display: flex; flex-direction: column; line-height: 1.6;
+  color: #fff;
+  margin: .8rem 1rem;
+  flex-shrink: 0;
+}
+.admin-sidebar .sidebar-user small { color: var(--saffron); }
+
+/* ناوبری سایدبار */
+.admin-sidebar .nav {
+  flex-grow: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(217,164,65,.2) transparent;
+}
+.admin-sidebar .nav::-webkit-scrollbar { width: 4px; }
+.admin-sidebar .nav::-webkit-scrollbar-thumb { background: rgba(217,164,65,.2); border-radius: 2px; }
+
 .admin-sidebar .nav-link {
   color: #B9C4CF;
   border-radius: 10px;
-  margin: 2px 12px;
-  padding: .58rem 1rem;
-  display: flex; align-items: center; gap: .5rem;
-  transition: all .15s;
-  font-size: .92rem;
+  margin: 2px .8rem;
+  padding: .55rem .9rem;
+  display: flex; align-items: center; gap: .55rem;
+  transition: all .15s ease;
+  font-size: .88rem;
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.admin-sidebar .nav-link:hover { color: #fff; background-color: rgba(255,255,255,.06); }
+.admin-sidebar .nav-link:hover {
+  color: #fff;
+  background-color: rgba(255,255,255,.06);
+}
 .admin-sidebar .nav-link.active {
   color: #fff;
-  background: linear-gradient(to left, rgba(14,124,123,.35), rgba(14,124,123,.12));
+  background: linear-gradient(to left, rgba(0,180,216,.25), rgba(0,180,216,.08));
+  font-weight: 600;
 }
 .admin-sidebar .nav-link.active::before {
   content: '';
-  position: absolute; right: -12px; top: 15%; bottom: 15%;
-  width: 4px; border-radius: 4px;
+  position: absolute;
+  inset-inline-end: -.8rem;
+  top: 15%; bottom: 15%;
+  width: 4px;
+  border-radius: 4px;
   background: var(--saffron);
 }
+.admin-sidebar .nav-link .badge {
+  margin-inline-start: auto;
+  font-size: .7rem;
+}
+
+/* گروه‌های قابل جمع‌شدن */
 .admin-sidebar .sidebar-group {
   color: var(--saffron);
   font-size: .82rem;
   cursor: pointer; user-select: none;
-  margin-top: .6rem;
+  margin-top: .8rem;
   text-transform: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sidebar-user {
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 12px;
-  padding: .55rem .8rem;
-  display: flex; flex-direction: column; line-height: 1.6;
-  color: #fff;
+.admin-sidebar .sidebar-group[aria-expanded="true"] .icon-chevron {
+  transform: rotate(180deg);
 }
-.sidebar-user small { color: var(--saffron); }
+.admin-sidebar .sidebar-group .icon-chevron {
+  transition: transform .2s ease;
+}
 
-.admin-main { margin-right: 264px; padding: 1.5rem; }
+/* زیرمنوها */
+.admin-sidebar .collapse .nav-link {
+  font-size: .84rem;
+  padding-inline-start: 2.2rem;
+  position: relative;
+}
+.admin-sidebar .collapse .nav-link::after {
+  content: '•';
+  position: absolute;
+  inset-inline-start: 1.4rem;
+  color: var(--muted);
+  opacity: .5;
+}
+
+/* فوتر سایدبار */
+.admin-sidebar > footer {
+  padding: .8rem 1rem;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,.07);
+  background: rgba(0,0,0,.15);
+}
+
+/* محتوای اصلی */
+.admin-main {
+  margin-inline-end: 280px;
+  padding: 1.5rem;
+  min-width: 0; /* جلوگیری از overflow افقی */
+}
+
+/* =====================================================================
+   ریسپانسیو سایدبار
+   ===================================================================== */
+/* دسکتاپ بزرگ */
+@media (min-width: 1400px) {
+  .admin-sidebar { width: 300px; }
+  .admin-main { margin-inline-end: 300px; padding: 2rem; }
+}
+
+/* لپ‌تاپ */
+@media (min-width: 992px) and (max-width: 1399.98px) {
+  .admin-sidebar { width: 260px; }
+  .admin-main { margin-inline-end: 260px; padding: 1.25rem; }
+}
+
+/* تبلت و موبایل — سایدبار به offcanvas تبدیل می‌شود */
+@media (max-width: 991.98px) {
+  .admin-sidebar {
+    width: 100% !important;
+    max-width: 320px;
+  }
+  .admin-main {
+    margin-inline-end: 0 !important;
+    padding: 1rem;
+    width: 100%;
+  }
+}
+
+/* موبایل کوچک */
+@media (max-width: 575.98px) {
+  .admin-main { padding: .75rem; }
+  .admin-sidebar { max-width: 280px; }
+  .admin-topbar { padding: .5rem .75rem; }
+}
+
+/* چاپ */
+@media print {
+  .no-print, .admin-topbar, .admin-sidebar-wrap, .site-navbar, .site-footer,
+  .theme-toggle, .print-toolbar { display: none !important; }
+  .admin-main { margin: 0 !important; padding: 0 !important; }
+}
 
 /* کارت‌های آمار داشبورد */
 .stat-card {
@@ -631,10 +766,8 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 }
 
 /* ========== واکنش‌گرایی (موبایل و تبلت) ========== */
+/* نکته: سایدبار در @media بالا هندل شده است، اینجا فقط موارد دیگر */
 @media (max-width: 991.98px) {
-  .admin-sidebar-wrap { width: 285px !important; background: var(--navy); }
-  .admin-sidebar { position: static !important; width: 100% !important; min-height: 100%; }
-  .admin-main { margin-right: 0 !important; padding: 1rem; width: 100%; }
   .btn { padding: .55rem 1rem; }
   .table td, .table th { padding: .55rem .4rem; font-size: .84rem; }
   .hero { padding: 2rem 1.2rem; border-radius: 14px; }
