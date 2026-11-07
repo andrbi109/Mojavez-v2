@@ -50,7 +50,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
                             <span class="icon-sun"><?= icon('sun', '', 16) ?></span><span class="icon-moon"><?= icon('moon', '', 16) ?></span>
                         </button>
                         <?php if (Session::get('user_logged_in')): ?>
-                            <a href="<?= $base ?>dashboard" class="btn btn-primary btn-sm px-3"><?= icon('user', '', 15) ?> پنل کاربری</a>
+                            <a href="<?= $base ?>panel" class="btn btn-primary btn-sm px-3"><?= icon('user', '', 15) ?> پنل کاربری</a>
                         <?php else: ?>
                             <a href="<?= $base ?>login" class="btn btn-outline-primary btn-sm px-3">ورود</a>
                             <a href="<?= $base ?>signup" class="btn btn-gold btn-sm px-3">ثبت‌نام</a>

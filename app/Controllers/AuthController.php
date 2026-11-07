@@ -27,7 +27,7 @@ class AuthController extends Controller
     {
         // اگر کاربر قبلاً وارد شده → هدایت به داشبورد
         if (Session::get('user_logged_in')) {
-            $this->redirect('/dashboard');
+            $this->redirect("/panel");
         }
         $this->render('auth/signup', [
             'title' => 'ثبت‌نام در سامانه',
@@ -95,7 +95,7 @@ class AuthController extends Controller
             // ورود خودکار پس از ثبت‌نام
             $this->setUserSession($accountId);
             Session::set('signup_success', 'حساب کاربری شما با موفقیت ایجاد شد. خوش آمدید!');
-            $this->redirect('/dashboard');
+            $this->redirect("/panel");
         } catch (\Throwable $e) {
             Session::set('signup_errors', ['system' => ['خطا در ایجاد حساب. لطفاً دوباره تلاش کنید.']]);
             Session::set('signup_form', $data);
@@ -147,7 +147,7 @@ class AuthController extends Controller
     public function loginForm(): void
     {
         if (Session::get('user_logged_in')) {
-            $this->redirect('/dashboard');
+            $this->redirect("/panel");
         }
         $this->render('auth/login', [
             'title' => 'ورود به سامانه',
@@ -196,7 +196,7 @@ class AuthController extends Controller
         // ورود موفق
         $this->userModel->updateLastLogin((int)$user['id']);
         $this->setUserSession((int)$user['id']);
-        $this->redirect('/dashboard');
+        $this->redirect("/panel");
     }
 
     /* ==================== خروج ==================== */

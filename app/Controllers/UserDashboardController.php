@@ -93,7 +93,7 @@ class UserDashboardController extends Controller
     private function requireUserLogin(): void
     {
         if (!Session::get('user_logged_in')) {
-            Session::set('redirect_after_login', '/dashboard');
+            Session::set('redirect_after_login', '/panel');
             Session::set('login_error', 'برای دسترسی به پنل کاربری، ابتدا وارد شوید.');
             $this->redirect('/login');
         }

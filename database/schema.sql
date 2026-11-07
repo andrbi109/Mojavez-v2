@@ -965,3 +965,21 @@ SET @ddl_pay = IF(@col_pay = 0,
 PREPARE stmt_pay FROM @ddl_pay;
 EXECUTE stmt_pay;
 DEALLOCATE PREPARE stmt_pay;
+
+-- =================================================================
+-- اعلان‌های کاربر (نظام اعلان دیده‌شده/دیده‌نشده)
+-- =================================================================
+CREATE TABLE IF NOT EXISTS user_notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_account_id INT NOT NULL,
+    applicant_id INT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body TEXT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    INDEX idx_notif_user (user_account_id),
+    INDEX idx_notif_unread (user_account_id, is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

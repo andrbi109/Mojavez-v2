@@ -70,8 +70,17 @@ $router->get('/login', ['AuthController', 'loginForm']);
 $router->post('/login', ['AuthController', 'login']);
 $router->get('/logout', ['AuthController', 'logout']);
 
-// داشبورد کاربر (مدل فروشگاهی)
-$router->get('/dashboard', ['UserDashboardController', 'index']);
+// پنل کاربری (مدل فروشگاهی — سایدبار + محتوا)
+$router->get('/panel', ['UserPanelController', 'index']);
+$router->get('/panel/profile', ['UserPanelController', 'profile']);
+$router->post('/panel/profile', ['UserPanelController', 'updateProfile']);
+$router->post('/panel/avatar', ['UserPanelController', 'uploadAvatar']);
+$router->get('/panel/requests', ['UserPanelController', 'requests']);
+$router->get('/panel/payments', ['UserPanelController', 'payments']);
+$router->get('/panel/licenses', ['UserPanelController', 'licenses']);
+$router->get('/panel/notifications', ['UserPanelController', 'notifications']);
+$router->post('/panel/notifications/read', ['UserPanelController', 'markAllRead']);
+$router->get('/panel/tracking', ['UserPanelController', 'tracking']);
 
 // خدمات (مدل فروشگاهی — کارت‌های محصول)
 $router->get('/services', ['ServiceController', 'index']);
