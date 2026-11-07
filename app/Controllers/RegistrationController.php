@@ -78,6 +78,20 @@ class RegistrationController extends Controller
     {
         // انتخاب نوع خدمت (فاز ۹) — اگر بیش از یک سرویس فعال باشد
         $services = (new ServiceType())->getActive();
+
+        // درخواست صریح «تغییر نوع خدمت» از کاربر (لینک در step1.php)
+        $changeRequested = isset($_GET['change']) && $_GET['change'] === 'service';
+        if ($changeRequested && count($services) > 1) {
+            // پاک‌سازی انتخاب قبلی و داده‌های ویزارد برای شروع پاک
+            $this->clearWizardData();
+            unset($_SESSION['registration']['service_id']);
+            $this->render('registration/select_service', [
+                'title' => 'انتخاب نوع خدمت',
+                'services' => $services,
+            ]);
+            return;
+        }
+
         if (count($services) > 1 && $this->selectedServiceId() === null) {
             $this->render('registration/select_service', [
                 'title' => 'انتخاب نوع خدمت',
@@ -108,10 +122,29 @@ class RegistrationController extends Controller
         }
         Session::setStep('service_id', (int)$service['id']);
         // پاک‌سازی دادهٔ مراحل پیشین برای شروع پاک با سرویس جدید
-        foreach (['step1', 'step2', 'step3'] as $k) {
-            if (Session::getStep($k)) Session::remove('registration_' . $k);
-        }
+        // داده‌ها در $_SESSION['registration'][$key] ذخیره می‌شوند
+        // کلیدهای ممکن: step1..step4 (سیستمی) و wiz_{id} (سفارشی)
+        $this->clearWizardData();
         $this->redirect('/register');
+    }
+
+    /**
+     * پاک‌سازی کامل دادهٔ ویزارد (به‌جز service_id اگر نگه داشته شود)
+     * هنگام تغییر سرویس یا شروع ثبت‌نام جدید فراخوانی می‌شود.
+     */
+    private function clearWizardData(bool $keepServiceId = false): void
+    {
+        if (!isset($_SESSION['registration']) || !is_array($_SESSION['registration'])) {
+            return;
+        }
+        $preserve = $keepServiceId ? ['service_id'] : [];
+        foreach (array_keys($_SESSION['registration']) as $key) {
+            if (in_array($key, $preserve, true)) continue;
+            // پاک‌سازی کلیدهای سیستمی (step1..step4) و سفارشی (wiz_*)
+            if (preg_match('/^step[1-4]$/', $key) || str_starts_with($key, 'wiz_')) {
+                unset($_SESSION['registration'][$key]);
+            }
+        }
     }
 
     /**

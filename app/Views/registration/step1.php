@@ -13,7 +13,7 @@ try {
     <span class="badge bg-info fs-6 p-2">
         <?= icon('grid', '', 14) ?> <?= htmlspecialchars($selectedService['title']) ?>
     </span>
-    <a href="<?= BASE_URL ?>register" class="small text-muted">تغییر نوع خدمت</a>
+    <a href="<?= BASE_URL ?>register?change=service" class="small text-muted">تغییر نوع خدمت</a>
 </div>
 <?php endif; ?>
 
@@ -284,6 +284,7 @@ document.querySelector('select[name="marital_status"]').addEventListener('change
 document.getElementById('physical_condition').addEventListener('change', function() {
     document.getElementById('disability-details-wrapper').style.display = this.value === 'معلولیت' ? 'block' : 'none';
 });
+</script>
 <script>
 // جابه‌جایی بین فرم حقیقی/حقوقی (فاز ۱۰)
 function toggleApplicantType() {
