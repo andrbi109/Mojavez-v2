@@ -1,27 +1,45 @@
 <?php
 /**
- * صفحهٔ اصلی — طراحی «ایرانی مدرن»
+ * صفحهٔ اصلی — بازطراحی‌شده برای مدل فروشگاهی
+ * ---------------------------------------------------
+ * طراحی «ایرانی مدرن» با گرادیان navy→فیروزه‌ای
+ * کارت‌های خدمت، فراخوان به ثبت‌نام/ورود، و نمایش برندهای سامانه
  */
 $base = rtrim(BASE_URL, '/') . '/';
+$userLoggedIn = Session::get('user_logged_in', false);
+$userName = Session::get('user_name', '');
+$services = [];
+try {
+    $services = (new ServiceType())->getActive();
+} catch (\Throwable $e) {}
 ?>
 
 <!-- هیرو -->
 <section class="hero text-center">
     <div style="position:relative; z-index:1;">
-        <span class="owner-chip mb-3 d-inline-flex">👤 به مدیریت <?= htmlspecialchars(owner_name()) ?></span>
+        <?php if (!empty($userName)): ?>
+            <span class="owner-chip mb-3 d-inline-flex">👋 <?= htmlspecialchars($userName) ?> خوش آمدید</span>
+        <?php else: ?>
+            <span class="owner-chip mb-3 d-inline-flex">👤 به مدیریت <?= htmlspecialchars(owner_name()) ?></span>
+        <?php endif; ?>
         <h1>ثبت درخواست مجوز صنایع دستی، ساده و شفاف</h1>
         <p class="lead mb-4">
-            از پر کردن فرم چندمرحله‌ای تا بارگذاری مدارک و پیگیری لحظه‌به‌لحظهٔ پرونده —
+            از انتخاب خدمت تا بارگذاری مدارک و پیگیری لحظه‌به‌لحظهٔ پرونده —
             همه‌چیز در چند دقیقه، بدون مراجعهٔ حضوری.
         </p>
         <div class="d-flex justify-content-center flex-wrap gap-2">
-            <a href="<?= $base ?>register" class="btn btn-gold btn-lg px-4"><?= icon('edit', '', 17) ?> شروع ثبت‌نام</a>
-            <a href="<?= $base ?>tracking" class="btn btn-outline-light btn-lg px-4"><?= icon('search', '', 17) ?> پیگیری پرونده</a>
+            <?php if ($userLoggedIn): ?>
+                <a href="<?= $base ?>services" class="btn btn-gold btn-lg px-4"><?= icon('shopping-cart', '', 17) ?> مشاهدهٔ خدمات</a>
+                <a href="<?= $base ?>dashboard" class="btn btn-outline-light btn-lg px-4"><?= icon('dashboard', '', 17) ?> داشبورد من</a>
+            <?php else: ?>
+                <a href="<?= $base ?>signup" class="btn btn-gold btn-lg px-4"><?= icon('user', '', 17) ?> ثبت‌نام کنید</a>
+                <a href="<?= $base ?>services" class="btn btn-outline-light btn-lg px-4"><?= icon('grid', '', 17) ?> مشاهدهٔ خدمات</a>
+            <?php endif; ?>
         </div>
     </div>
 </section>
 
-<!-- کارت‌های سرویس -->
+<!-- کارت‌های شاخص -->
 <div class="row g-3 g-md-4 mb-5">
     <div class="col-12 col-md-4">
         <div class="service-card">
@@ -31,7 +49,7 @@ $base = rtrim(BASE_URL, '/') . '/';
                 اطلاعات هویتی، شغلی و ملک را گام‌به‌گام وارد کنید و مدارک را بارگذاری نمایید.
                 در پایان <strong>کد رهگیری یکتا</strong> دریافت می‌کنید.
             </p>
-            <a href="<?= $base ?>register" class="btn btn-primary">ورود به فرم ثبت‌نام</a>
+            <a href="<?= $base ?>services" class="btn btn-primary">شروع ثبت‌نام</a>
         </div>
     </div>
     <div class="col-12 col-md-4">
@@ -58,90 +76,77 @@ $base = rtrim(BASE_URL, '/') . '/';
     </div>
 </div>
 
-<!-- نوار مراحل -->
-<div class="card p-4 mb-5">
-    <div class="section-heading">
-        <span class="ornament">❖</span><h5 class="fw-bold mb-0"><?= icon('list', '', 19) ?> مراحل ثبت درخواست مجوز</h5>
+<!-- پیش‌نمایش خدمات -->
+<?php if (!empty($services)): ?>
+<div class="mb-5">
+    <div class="text-center mb-4">
+        <h3 class="fw-bold" style="color:var(--navy)">خدمات ما</h3>
+        <p class="text-muted small mb-0">مجوز مورد نیاز خود را انتخاب کنید</p>
     </div>
-    <div class="row g-3 text-center">
-        <div class="col-6 col-md-3">
-            <div class="p-3 rounded-3" style="background:var(--turquoise-light)">
-                <div class="fs-3 mb-1">🪪</div>
-                <strong class="small">۱. اطلاعات هویتی</strong>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="p-3 rounded-3" style="background:var(--saffron-light)">
-                <div class="fs-3 mb-1">🏺</div>
-                <strong class="small">۲. اطلاعات شغلی</strong>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="p-3 rounded-3" style="background:var(--turquoise-light)">
-                <div class="fs-3 mb-1">🏠</div>
-                <strong class="small">۳. اطلاعات ملک</strong>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="p-3 rounded-3" style="background:var(--saffron-light)">
-                <div class="fs-3 mb-1">📎</div>
-                <strong class="small">۴. بارگذاری مدارک</strong>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- اطلاع‌رسانی مهم -->
-<div class="card p-4 mb-5" style="border-right:5px solid var(--saffron);">
-    <div class="d-flex flex-column flex-md-row align-items-md-center gap-3">
-        <div style="color:var(--saffron)"><?= icon('megaphone', '', 40) ?></div>
-        <div class="flex-grow-1">
-            <h5 class="fw-bold mb-1" style="color:var(--saffron-dark);">پس از دریافت کد رهگیری، به ما پیام دهید!</h5>
-            <p class="text-muted small mb-2">
-                برای اطلاع مدیر سامانه از ثبت درخواست خود، پس از اخذ کد رهگیری به آیدی
-                <strong>@<?= htmlspecialchars(setting('owner_username', 'Derogaramin')) ?></strong>
-                در شبکه‌های اجتماعی <strong>ایتا، روبیکا و بله</strong> پیام دهید
-                (قالب آمادهٔ پیام در صفحهٔ موفقیت و راهنما موجود است).
-            </p>
-            <div class="d-flex flex-wrap gap-2">
-                <?php foreach (social_links() as $net => $link): ?>
-                    <a class="social-chip <?= $net ?>" href="<?= htmlspecialchars($link['url']) ?>" target="_blank" rel="noopener">
-                        <span class="dot"></span> <?= $link['label'] ?>
-                    </a>
-                <?php endforeach; ?>
-                <a href="<?= $base ?>guide" class="social-chip"><?= icon('book', '', 16) ?> مشاهدهٔ قالب پیام</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- دربارهٔ مدیر سامانه -->
-<div class="row g-3 align-items-center">
-    <div class="col-md-8">
-        <div class="card p-4 h-100">
-            <div class="section-heading">
-                <span class="ornament">❖</span><h5 class="fw-bold mb-0">دربارهٔ سامانه</h5>
-            </div>
-            <p class="text-muted small mb-2">
-                این سامانه فرآیند درخواست مجوز صنایع دستی را از ثبت‌نام اولیه تا صدور مجوز مدیریت می‌کند:
-                پروندهٔ الکترونیکی، تایم‌لاین شفاف رویدادها، لغو خودکار درخواست‌های راکد و گزارش‌گیری دقیق.
-            </p>
-            <a href="<?= $base ?>about" class="btn btn-outline-primary btn-sm align-self-start"><?= icon('info', '', 15) ?> دربارهٔ ما</a>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card p-4 text-center h-100" style="background:linear-gradient(135deg,#16283C,#22374E); color:#fff; border:none;">
-            <?php $ownerImg = setting('owner_image', ''); ?>
-            <?php if ($ownerImg !== ''): ?>
-                <div class="owner-avatar" style="width:72px;height:72px;border-color:rgba(255,255,255,.3);">
-                    <img src="<?= $base . htmlspecialchars($ownerImg) ?>" alt="مدیر سامانه">
+    <div class="row g-3 g-md-4">
+        <?php foreach (array_slice($services, 0, 3) as $sv): ?>
+            <div class="col-12 col-md-4">
+                <div class="service-card">
+                    <div class="service-icon <?= ($sv['id'] ?? 1) % 2 === 0 ? 'gold' : '' ?>"><span><?= icon('vase', '', 26) ?></span></div>
+                    <h5 class="fw-bold"><?= htmlspecialchars($sv['title']) ?></h5>
+                    <p class="text-muted small mb-3">
+                        <?= htmlspecialchars(mb_substr($sv['description'] ?? '', 0, 100)) ?><?= mb_strlen($sv['description'] ?? '') > 100 ? '...' : '' ?>
+                    </p>
+                    <a href="<?= $base ?>services" class="btn btn-outline-primary">مشاهده و شروع</a>
                 </div>
-            <?php else: ?>
-                <div class="fs-1 mb-2">🧑‍💼</div>
-            <?php endif; ?>
-            <strong><?= htmlspecialchars(owner_name()) ?></strong>
-            <small style="color:var(--saffron)">@<?= htmlspecialchars(setting('owner_username', 'Derogaramin')) ?></small>
-            <small class="mt-2" style="color:#B9C4CF">طراح، توسعه‌دهنده و مدیر سامانه</small>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <?php if (count($services) > 3): ?>
+        <div class="text-center mt-3">
+            <a href="<?= $base ?>services" class="btn btn-link">مشاهدهٔ همهٔ خدمات (<?= count($services) ?>) ←</a>
         </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- آمار سریع -->
+<div class="row g-3 mb-5 text-center">
+    <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3" style="background:var(--turquoise-light)">
+            <h3 class="fw-bold mb-0" style="color:var(--turquoise-dark)"><?= icon('clock', '', 24) ?></h3>
+            <p class="small text-muted mb-0 mt-1">چند دقیقه‌ای</p>
+            <p class="fw-bold small mb-0">زمان ثبت‌نام</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3" style="background:var(--saffron-light)">
+            <h3 class="fw-bold mb-0" style="color:var(--saffron-dark)"><?= icon('shield', '', 24) ?></h3>
+            <p class="small text-muted mb-0 mt-1">امن و شفاف</p>
+            <p class="fw-bold small mb-0">محافظت داده</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3" style="background:var(--turquoise-light)">
+            <h3 class="fw-bold mb-0" style="color:var(--turquoise-dark)"><?= icon('phone', '', 24) ?></h3>
+            <p class="small text-muted mb-0 mt-1">آنی</p>
+            <p class="fw-bold small mb-0">اطلاع‌رسانی</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="p-3 rounded-3" style="background:var(--saffron-light)">
+            <h3 class="fw-bold mb-0" style="color:var(--saffron-dark)"><?= icon('check-circle', '', 24) ?></h3>
+            <p class="small text-muted mb-0 mt-1">رایگان</p>
+            <p class="fw-bold small mb-0">حساب کاربری</p>
+        </div>
+    </div>
+</div>
+
+<!-- فراخوان نهایی -->
+<div class="text-center py-4 mb-3">
+    <h4 class="fw-bold mb-2" style="color:var(--navy)">آماده شروع هستید؟</h4>
+    <p class="text-muted mb-3">همین حالا حساب کاربری رایگان بسازید و اولین درخواست خود را ثبت کنید</p>
+    <div class="d-flex justify-content-center flex-wrap gap-2">
+        <?php if ($userLoggedIn): ?>
+            <a href="<?= $base ?>services" class="btn btn-primary btn-lg px-4"><?= icon('shopping-cart', '', 17) ?> مشاهدهٔ خدمات</a>
+        <?php else: ?>
+            <a href="<?= $base ?>signup" class="btn btn-gold btn-lg px-4"><?= icon('user', '', 17) ?> ثبت‌نام کنید</a>
+            <a href="<?= $base ?>login" class="btn btn-outline-primary btn-lg px-4">ورود</a>
+        <?php endif; ?>
     </div>
 </div>
