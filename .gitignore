@@ -1,0 +1,17 @@
+# فایل‌های بارگذاری‌شدهٔ کاربران (هرگز در گیت ذخیره نشوند)
+uploads/*
+!uploads/.htaccess
+
+# فایل‌های محیط توسعه
+dev-server.sh
+tests/tmp/
+*.log
+
+# وابستگی‌های سیستم‌عامل
+.DS_Store
+Thumbs.db
+
+# پشتیبان‌ها
+*.bak
+*.sql.gz
+backup/

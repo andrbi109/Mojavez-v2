@@ -1,0 +1,33 @@
+# =====================================================
+# محافظت کامل از پوشهٔ uploads
+# این پوشه بیرون از document root است؛ این فایل لایهٔ دفاع دوم است.
+# =====================================================
+
+# Apache 2.4+ (XAMPP/Laragon جدید و سرورهای مدرن)
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+# Apache 2.2 (سازگاری با سرورهای قدیمی‌تر)
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
+
+# غیرفعال کردن کامل موتور PHP در این پوشه (در صورت دسترسی تصادفی)
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+
+# جلوگیری از لیست شدن پوشه
+Options -Indexes -ExecCGI
+
+# مسدودسازی اجرای هر نوع اسکریپت
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phar|pl|py|cgi|sh|asp|aspx|jsp)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>

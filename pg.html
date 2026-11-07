@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="سامانهٔ مجوزهای صنایع دستی — ثبت درخواست، پیگیری و صدور مجوز صنایع دستی | مدیریت: امین دروگر بزدی">
+    <title>پیگیری درخواست</title>
+    <link rel="stylesheet" href="/assets/font.css">
+            <link rel="stylesheet" href="/assets/bootstrap.rtl.min.css">
+        <link rel="stylesheet" href="/assets/css/style.css">
+    </head>
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- سربرگ سرمه‌ای با نشان فیروزه‌ای -->
+    <nav class="navbar navbar-expand-md site-navbar mb-4 no-print sticky-top">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <span class="brand-badge">🏺</span>
+                <span>سامانهٔ مجوزهای صنایع دستی</span>
+            </a>
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                    aria-controls="mainNav" aria-expanded="false" aria-label="منوی اصلی">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="mainNav">
+                <ul class="navbar-nav ms-md-auto align-items-md-center gap-md-1 mt-3 mt-md-0">
+                    <li class="nav-item"><a class="nav-link " href="/">خانه</a></li>
+                    <li class="nav-item"><a class="nav-link " href="/register">ثبت‌نام</a></li>
+                    <li class="nav-item"><a class="nav-link active-link" href="/tracking">پیگیری</a></li>
+                    <li class="nav-item"><a class="nav-link " href="/guide">راهنما</a></li>
+                    <li class="nav-item"><a class="nav-link " href="/about">دربارهٔ ما</a></li>
+                    <li class="nav-item ms-md-2 mt-2 mt-md-0">
+                        <a href="/admin/login" class="btn btn-gold btn-sm px-3">🔐 پنل مدیریت</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- محتوای اصلی -->
+    <main class="container pb-5 flex-grow-1">
+        <div class="row justify-content-center mt-4 mt-md-5">
+    <div class="col-11 col-md-6 col-lg-5">
+        <div class="card p-4 text-center">
+            <div class="display-4 mb-3">🔍</div>
+            <h4 class="fw-bold mb-2">پیگیری درخواست</h4>
+            <p class="text-muted small">کد رهگیری دریافتی هنگام ثبت‌نام را وارد کنید</p>
+                        <form method="post" action="/tracking/search">
+                <input type="hidden" name="_csrf" value="72cd4081c5c107e5fd9b3aae4420a2cceba1e1fa7435da13447366d8dffc7862">                <div class="mb-3">
+                    <input type="text" class="form-control form-control-lg text-center" name="tracking_code"
+                           placeholder="مثال: HG-1A2B3C4D" required autofocus
+                           pattern="[A-Za-z]{2}-[A-Za-z0-9]{6,12}" inputmode="latin" maxlength="20"
+                           title="کد رهگیری با دو حرف انگلیسی و خط تیره شروع می‌شود">
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100">جستجو</button>
+            </form>
+            <hr>
+            <p class="small text-muted mb-0">
+                کد رهگیری خود را گم کرده‌اید؟ به آیدی
+                <strong dir="ltr">@Derogaramin</strong>
+                در ایتا، روبیکا یا بله پیام دهید (همراه با کد ملی).
+            </p>
+        </div>
+    </div>
+</div>    </main>
+
+    <!-- فوتر: برندینگ مالک سامانه + شبکه‌های اجتماعی -->
+    <footer class="site-footer no-print">
+        <div class="container">
+            <div class="row g-3 align-items-center">
+                <div class="col-md-5 text-center text-md-start">
+                    <div class="footer-brand mb-1">🏺 سامانهٔ مجوزهای صنایع دستی</div>
+                    <small>
+                        طراحی، توسعه و مدیریت:
+                        <strong class="text-white">امین دروگر بزدی</strong>
+                        <span class="owner-chip ms-1 mt-1">@Derogaramin</span>
+                    </small>
+                </div>
+                <div class="col-md-7">
+                    <div class="d-flex justify-content-center justify-content-md-end flex-wrap gap-2">
+                                                    <a class="social-chip eitaa" href="https://eitaa.com/Derogaramin" target="_blank" rel="noopener">
+                                <span class="dot"></span> ایتا: @Derogaramin                            </a>
+                                                    <a class="social-chip rubika" href="https://rubika.cc/Derogaramin" target="_blank" rel="noopener">
+                                <span class="dot"></span> روبیکا: @Derogaramin                            </a>
+                                                    <a class="social-chip bale" href="https://ble.ir/Derogaramin" target="_blank" rel="noopener">
+                                <span class="dot"></span> بله: @Derogaramin                            </a>
+                                            </div>
+                    <p class="text-center text-md-end small mt-2 mb-0" style="color:#8B98A5;">
+                        © ۱۴۰۵ — کلیهٔ حقوق محفوظ است
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+            <script src="/assets/bootstrap.bundle.min.js"></script>
+    </body>
+</html>

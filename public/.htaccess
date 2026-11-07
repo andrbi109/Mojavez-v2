@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# اگر فایل یا پوشه واقعی نیست، به index.php هدایت کن
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+
+# جلوگیری از لیست شدن پوشه‌ها
+Options -Indexes
