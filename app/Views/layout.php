@@ -41,16 +41,21 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
             <div class="collapse navbar-collapse" id="mainNav">
                 <ul class="navbar-nav ms-md-auto align-items-md-center gap-md-1 mt-3 mt-md-0">
                     <li class="nav-item"><a class="nav-link <?= $path === $base || $path === rtrim($base,'/') ? 'active-link' : '' ?>" href="<?= $base ?>">خانه</a></li>
-                    <li class="nav-item"><a class="nav-link <?= str_contains($path, 'register') ? 'active-link' : '' ?>" href="<?= $base ?>register">ثبت‌نام</a></li>
+                    <li class="nav-item"><a class="nav-link <?= str_contains($path, 'services') ? 'active-link' : '' ?>" href="<?= $base ?>services">خدمات</a></li>
                     <li class="nav-item"><a class="nav-link <?= str_contains($path, 'tracking') ? 'active-link' : '' ?>" href="<?= $base ?>tracking">پیگیری</a></li>
-                    <li class="nav-item"><a class="nav-link <?= str_contains($path, 'my-records') ? 'active-link' : '' ?>" href="<?= $base ?>my-records">سوابق من</a></li>
                     <li class="nav-item"><a class="nav-link <?= str_contains($path, 'guide') ? 'active-link' : '' ?>" href="<?= $base ?>guide">راهنما</a></li>
                     <li class="nav-item"><a class="nav-link <?= str_contains($path, 'about') ? 'active-link' : '' ?>" href="<?= $base ?>about">دربارهٔ ما</a></li>
                     <li class="nav-item ms-md-2 mt-2 mt-md-0 d-flex align-items-md-center gap-2">
                         <button type="button" class="theme-toggle" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب">
                             <span class="icon-sun"><?= icon('sun', '', 16) ?></span><span class="icon-moon"><?= icon('moon', '', 16) ?></span>
                         </button>
-                        <a href="<?= $base ?>admin/login" class="btn btn-gold btn-sm px-3"><?= icon('lock', '', 15) ?> پنل مدیریت</a>
+                        <?php if (Session::get('user_logged_in')): ?>
+                            <a href="<?= $base ?>dashboard" class="btn btn-primary btn-sm px-3"><?= icon('user', '', 15) ?> داشبورد من</a>
+                        <?php else: ?>
+                            <a href="<?= $base ?>login" class="btn btn-outline-primary btn-sm px-3">ورود</a>
+                            <a href="<?= $base ?>signup" class="btn btn-gold btn-sm px-3">ثبت‌نام</a>
+                        <?php endif; ?>
+                        <a href="<?= $base ?>admin/login" class="btn btn-outline-secondary btn-sm px-3"><?= icon('lock', '', 15) ?> مدیریت</a>
                     </li>
                 </ul>
             </div>
@@ -84,7 +89,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
                     </div>
                     <p class="text-center text-md-end small mt-2 mb-0" style="color:#8B98A5;">
                         © <?= jdate('Y') ?> — کلیهٔ حقوق محفوظ است
-                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.1' ?></span>
+                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.2' ?></span>
                     </p>
                 </div>
             </div>

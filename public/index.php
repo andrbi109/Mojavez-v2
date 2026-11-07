@@ -70,6 +70,9 @@ $router->get('/login', ['AuthController', 'loginForm']);
 $router->post('/login', ['AuthController', 'login']);
 $router->get('/logout', ['AuthController', 'logout']);
 
+// داشبورد کاربر (مدل فروشگاهی)
+$router->get('/dashboard', ['UserDashboardController', 'index']);
+
 // Registration — موتور ویزارد پویا (موقعیت‌محور) + نام‌های مستعار قدیمی
 $router->get('/register', ['RegistrationController', 'index']);
 $router->get('/register/service/{id}', ['RegistrationController', 'selectService']);
