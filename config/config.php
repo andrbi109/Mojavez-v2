@@ -8,8 +8,8 @@
 // نسخهٔ فعلی پروژه — در README.md، فوتر پنل و پاسخ‌های JSON بازگردانده می‌شود.
 // الگوی SemVer: MAJOR.MINOR.PATCH
 // این اولین نسخهٔ رسمی است. هر اصلاح یک واحد به PATCH اضافه می‌شود.
-define('APP_VERSION', '0.3.6');
-define('APP_VERSION_NAME', 'اصلاح RTL سایدبار با الگوی Bootstrap');
+define('APP_VERSION', '0.3.7');
+define('APP_VERSION_NAME', 'بازنویسی سایدبار با الگوی Bootstrap 5.3');
 
 // ==================== حالت اشکال‌زدایی ====================
 // در محیط توسعه true و روی سرور واقعی حتماً false باشد.

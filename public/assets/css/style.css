@@ -461,7 +461,8 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 }
 
 /* =====================================================================
-   نوار کناری (Sidebar) — بازطراحی با الگوی Bootstrap 5.3 + RTL صحیح
+   نوار کناری (Sidebar) — الگوی Bootstrap 5.3 Sidebar (RTL)
+   منبع: https://getbootstrap.com/docs/5.3/examples/sidebars/
    ===================================================================== */
 .admin-sidebar {
   background: linear-gradient(180deg, var(--navy) 0%, #101E2E 100%);
@@ -474,143 +475,130 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   z-index: 1000;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-top: 0;
   border-left: 1px solid rgba(217,164,65,.18);
-  display: flex;
-  flex-direction: column;
   scrollbar-width: thin;
   scrollbar-color: rgba(217,164,65,.3) transparent;
 }
-.admin-sidebar::-webkit-scrollbar { width: 6px; }
+.admin-sidebar::-webkit-scrollbar { width: 5px; }
 .admin-sidebar::-webkit-scrollbar-track { background: transparent; }
-.admin-sidebar::-webkit-scrollbar-thumb {
-  background: rgba(217,164,65,.3);
-  border-radius: 3px;
-}
-.admin-sidebar::-webkit-scrollbar-thumb:hover { background: rgba(217,164,65,.5); }
+.admin-sidebar::-webkit-scrollbar-thumb { background: rgba(217,164,65,.25); border-radius: 3px; }
 
-/* هدر سایدبار */
-.admin-sidebar .sidebar-header {
-  padding: 1.2rem 1.2rem .8rem;
-  font-size: 1.12rem;
-  font-weight: 800;
-  color: #fff;
-  border-bottom: 1px solid rgba(255,255,255,.08);
-  margin-bottom: 0;
-  display: flex; align-items: center; gap: .5rem;
-  flex-shrink: 0;
-}
-.admin-sidebar .sidebar-header .brand-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 36px; font-size: 1.1rem;
+/* هدر */
+.sidebar-header { border-bottom: none; }
+.sidebar-header .brand-badge {
+  width: 34px; height: 34px; font-size: 1rem;
   background: linear-gradient(135deg, var(--turquoise), var(--turquoise-dark));
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0,180,216,.3);
 }
 
-/* بخش کاربر سایدبار */
-.admin-sidebar .sidebar-user {
+/* بخش کاربر */
+.sidebar-user {
   background: rgba(255,255,255,.05);
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 12px;
-  padding: .6rem .8rem;
-  display: flex; flex-direction: column; line-height: 1.6;
-  color: #fff;
-  margin: .8rem 1rem;
-  flex-shrink: 0;
+  padding: .5rem .75rem;
 }
-.admin-sidebar .sidebar-user small { color: var(--saffron); }
+.sidebar-user small { color: var(--saffron); }
 
-/* ناوبری سایدبار — الگوی Bootstrap: nav nav-pills flex-column */
-.admin-sidebar .nav {
-  flex-grow: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: .5rem .75rem 1rem;
+/* ناحیه اسکرول ناوبری */
+.sidebar-nav {
   scrollbar-width: thin;
   scrollbar-color: rgba(217,164,65,.2) transparent;
 }
-.admin-sidebar .nav::-webkit-scrollbar { width: 4px; }
-.admin-sidebar .nav::-webkit-scrollbar-thumb { background: rgba(217,164,65,.2); border-radius: 2px; }
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(217,164,65,.15); border-radius: 2px; }
 
-/* لینک‌های منو — الگوی Bootstrap nav-link */
+/* لینک‌های مستقیم منو (داشبورد، خانه، خروج) */
 .admin-sidebar .nav-link {
   color: #B9C4CF;
-  border-radius: 10px;
-  margin: 2px 0;
-  padding: .55rem .9rem;
-  display: flex; align-items: center; gap: .55rem;
+  border-radius: 8px;
+  padding: .5rem .75rem;
+  display: flex; align-items: center; gap: .5rem;
   transition: all .15s ease;
-  font-size: .88rem;
-  position: relative;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: .87rem;
+  text-decoration: none;
+  margin-bottom: 2px;
 }
 .admin-sidebar .nav-link:hover {
   color: #fff;
   background-color: rgba(255,255,255,.06);
+  text-decoration: none;
 }
 .admin-sidebar .nav-link.active {
   color: #fff;
-  background: linear-gradient(to left, rgba(0,180,216,.25), rgba(0,180,216,.08));
+  background: rgba(0,180,216,.18);
   font-weight: 600;
 }
-.admin-sidebar .nav-link.active::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 15%; bottom: 15%;
-  width: 4px;
-  border-radius: 4px;
-  background: var(--saffron);
-}
-.admin-sidebar .nav-link .badge {
-  margin-inline-start: auto;
-  font-size: .7rem;
-}
 
-/* گروه‌های قابل جمع‌شدن — الگوی Bootstrap btn-toggle */
-.admin-sidebar .sidebar-group {
+/* =====================================================================
+   btn-toggle — الگوی Bootstrap 5.3 Sidebar Collapsible
+   منبع: sidebars.css
+   ===================================================================== */
+.admin-sidebar .btn-toggle {
+  padding: .5rem .75rem;
+  font-weight: 600;
+  font-size: .87rem;
   color: var(--saffron);
-  font-size: .82rem;
-  cursor: pointer; user-select: none;
-  margin-top: .8rem;
-  text-transform: none;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background-color: transparent;
+  border-radius: 8px;
+  gap: .5rem;
 }
-.admin-sidebar .sidebar-group[aria-expanded="true"] .icon-chevron {
-  transform: rotate(180deg);
+.admin-sidebar .btn-toggle:hover,
+.admin-sidebar .btn-toggle:focus {
+  color: #fff;
+  background-color: rgba(255,255,255,.06);
 }
-.admin-sidebar .sidebar-group .icon-chevron {
-  transition: transform .2s ease;
+/* آیکون chevron با چرخش هنگام باز شدن */
+.admin-sidebar .btn-toggle::before {
+  width: 1.25em;
+  line-height: 0;
+  content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba(244,163,0,.7)' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+  transition: transform .35s ease;
+  transform-origin: .5em 50%;
+  flex-shrink: 0;
+}
+.admin-sidebar .btn-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
 }
 
-/* زیرمنوها — الگوی Bootstrap btn-toggle-nav */
-.admin-sidebar .collapse .nav-link {
-  font-size: .84rem;
-  padding-right: 2.2rem;
-  position: relative;
+/* زیرمنوها — الگوی btn-toggle-nav */
+.admin-sidebar .btn-toggle-nav a {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .5rem .3rem 0;
+  margin-top: 2px;
+  margin-right: 1.5rem;
+  border-radius: 6px;
+  font-size: .82rem;
+  color: #A9B7C4;
+  text-decoration: none;
+  transition: all .15s ease;
 }
-.admin-sidebar .collapse .nav-link::after {
-  content: '•';
-  position: absolute;
-  right: 1.4rem;
-  color: var(--muted);
-  opacity: .5;
+.admin-sidebar .btn-toggle-nav a:hover,
+.admin-sidebar .btn-toggle-nav a:focus {
+  color: #fff;
+  background-color: rgba(255,255,255,.06);
+  text-decoration: none;
+}
+.admin-sidebar .btn-toggle-nav a.active {
+  color: #fff;
+  background: rgba(0,180,216,.15);
+  font-weight: 600;
+}
+.admin-sidebar .btn-toggle-nav a .badge {
+  margin-right: auto;
+  font-size: .65rem;
 }
 
 /* فوتر سایدبار */
-.admin-sidebar > footer {
-  padding: .8rem 1rem;
-  flex-shrink: 0;
+.admin-sidebar > div:last-child {
   border-top: 1px solid rgba(255,255,255,.07);
   background: rgba(0,0,0,.15);
 }
 
-/* محتوای اصلی — margin-right برای RTL صحیح */
+/* محتوای اصلی — margin-right صریح برای RTL */
 .admin-main {
   margin-right: 280px;
   padding: 1.5rem;
@@ -618,41 +606,25 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 }
 
 /* =====================================================================
-   ریسپانسیو سایدبار
+   ریسپانسیو
    ===================================================================== */
-/* دسکتاپ بزرگ */
 @media (min-width: 1400px) {
   .admin-sidebar { width: 300px; }
   .admin-main { margin-right: 300px; padding: 2rem; }
 }
-
-/* لپ‌تاپ */
 @media (min-width: 992px) and (max-width: 1399.98px) {
   .admin-sidebar { width: 260px; }
   .admin-main { margin-right: 260px; padding: 1.25rem; }
 }
-
-/* تبلت و موبایل — سایدبار به offcanvas تبدیل می‌شود */
 @media (max-width: 991.98px) {
-  .admin-sidebar {
-    width: 100% !important;
-    max-width: 320px;
-  }
-  .admin-main {
-    margin-right: 0 !important;
-    padding: 1rem;
-    width: 100%;
-  }
+  .admin-sidebar { width: 100% !important; max-width: 320px; }
+  .admin-main { margin-right: 0 !important; padding: 1rem; width: 100%; }
 }
-
-/* موبایل کوچک */
 @media (max-width: 575.98px) {
   .admin-main { padding: .75rem; }
   .admin-sidebar { max-width: 280px; }
   .admin-topbar { padding: .5rem .75rem; }
 }
-
-/* چاپ */
 @media print {
   .no-print, .admin-topbar, .admin-sidebar-wrap, .site-navbar, .site-footer,
   .theme-toggle, .print-toolbar { display: none !important; }

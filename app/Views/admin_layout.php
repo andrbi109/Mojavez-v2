@@ -2,10 +2,26 @@
 /**
  * قالب پنل مدیریت
  * -------------------------------------------------------------
- * - منوی معنایی HTML5 (nav/ul/li) با آیکون‌های SVG درون‌خطی
- * - رفع باگ ناوبری: data-bs-dismiss از لینک‌ها حذف شده و بستن
- *   منوی موبایل با جاوااسکریپت انجام می‌شود (بدون preventDefault)
- * - کلید تم روز/شب + اسکریپت زودهنگام ضد پرش رنگ
+ * بازنویسی سایدبار با الگوی Bootstrap 5.3 Sidebars Example
+ * https://getbootstrap.com/docs/5.3/examples/sidebars/
+ *
+ * الگو:
+ *   <div class="d-flex flex-column flex-shrink-0 p-3" style="width: 280px;">
+ *     <a class="d-flex align-items-center mb-3 text-decoration-none">...</a>
+ *     <hr>
+ *     <ul class="nav nav-pills flex-column mb-auto">
+ *       <li class="nav-item"><a class="nav-link active">...</a></li>
+ *       <li><a class="nav-link">...</a></li>
+ *     </ul>
+ *     <hr>
+ *     <div class="dropdown">...</div>
+ *   </div>
+ *
+ * برای گروه‌های قابل جمع‌شدن از btn-toggle استفاده می‌شود:
+ *   <button class="btn btn-toggle" data-bs-toggle="collapse">...</button>
+ *   <div class="collapse">
+ *     <ul class="btn-toggle-nav list-unstyled">...</ul>
+ *   </div>
  */
 $role = Session::get('admin_role', 'admin');
 $admin = ($role === 'admin');
@@ -14,9 +30,7 @@ $base = rtrim(BASE_URL, '/') . '/';
 $cp = $currentPage ?? '';
 
 $pendingPostalCount = 0;
-try {
-    $pendingPostalCount = (new PostalCodeChange())->countPending();
-} catch (\Throwable $e) { /* مهاجرت انجام نشده */ }
+try { $pendingPostalCount = (new PostalCodeChange())->countPending(); } catch (\Throwable $e) {}
 
 $roleLabels = ['admin' => 'مدیر کل', 'expert' => 'کارشناس', 'document_uploader' => 'متصدی مدارک'];
 $nav = fn(string $page) => $cp === $page ? 'active' : '';
@@ -29,7 +43,6 @@ $ownerImg = setting('owner_image', '');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= Session::csrfToken() ?>">
     <title><?= htmlspecialchars($title ?? 'پنل مدیریت') ?></title>
-    <!-- تم زودهنگام (ضد پرش رنگ) -->
     <script src="<?= $base ?>assets/js/theme-init.js"></script>
     <link rel="stylesheet" href="<?= $base ?>assets/font.css">
     <?php if (USE_CDN): ?>
@@ -52,190 +65,208 @@ $ownerImg = setting('owner_image', '');
     </button>
 </header>
 
-<!-- نوار کناری -->
+<!-- نوار کناری — الگوی Bootstrap 5.3 Sidebar -->
 <div class="offcanvas-lg offcanvas-end admin-sidebar-wrap" tabindex="-1" id="adminSidebar" aria-labelledby="adminSidebarLabel">
-    <nav class="admin-sidebar h-100 d-flex flex-column" aria-label="منوی اصلی پنل مدیریت">
-        <header class="sidebar-header d-flex justify-content-between align-items-center">
-            <span id="adminSidebarLabel" class="d-flex align-items-center gap-2">
-                <span class="brand-badge">🏺</span> پنل مدیریت
-            </span>
-            <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#adminSidebar" aria-label="بستن"></button>
-        </header>
+<nav class="admin-sidebar h-100 d-flex flex-column" aria-label="منوی اصلی پنل مدیریت">
 
-        <div class="px-3 mb-2">
-            <div class="sidebar-user">
-                <strong><?= htmlspecialchars($displayName) ?></strong>
-                <small><?= htmlspecialchars($roleLabels[$role] ?? $role) ?></small>
+    <!-- هدر: لوگو + دکمه بستن (موبایل) -->
+    <div class="sidebar-header d-flex align-items-center justify-content-between px-3 py-3 flex-shrink-0">
+        <a href="<?= $base ?>admin/dashboard" class="d-flex align-items-center gap-2 text-white text-decoration-none">
+            <span class="brand-badge d-flex align-items-center justify-content-center">🏺</span>
+            <span class="fs-5 fw-bold" id="adminSidebarLabel">پنل مدیریت</span>
+        </a>
+        <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#adminSidebar" aria-label="بستن"></button>
+    </div>
+
+    <!-- اطلاعات کاربر -->
+    <div class="px-3 pb-2 flex-shrink-0">
+        <div class="sidebar-user d-flex align-items-center gap-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:rgba(255,255,255,.1);font-size:.9rem;flex-shrink:0">
+                <?= htmlspecialchars(mb_substr($displayName, 0, 1)) ?>
+            </div>
+            <div class="flex-grow-1 overflow-hidden">
+                <strong class="d-block text-truncate" style="font-size:.85rem"><?= htmlspecialchars($displayName) ?></strong>
+                <small class="d-block text-truncate"><?= htmlspecialchars($roleLabels[$role] ?? $role) ?></small>
             </div>
         </div>
+    </div>
 
-        <ul class="nav flex-column list-unstyled pb-4 mb-0 flex-grow-1 overflow-auto">
-            <li class="nav-item">
-                <a class="nav-link <?= $nav('dashboard') ?>" href="<?= $base ?>admin/dashboard">
-                    <?= icon('dashboard') ?> داشبورد
+    <hr class="mx-3 my-0" style="border-color:rgba(255,255,255,.08)">
+
+    <!-- ناوبری اصلی — الگوی Bootstrap: list-unstyled ps-0 -->
+    <div class="sidebar-nav flex-grow-1 overflow-y-auto overflow-x-hidden px-2 py-2">
+
+        <ul class="list-unstyled ps-0 mb-0">
+            <!-- داشبورد -->
+            <li class="mb-1">
+                <a href="<?= $base ?>admin/dashboard" class="nav-link <?= $nav('dashboard') ?>">
+                    <?= icon('dashboard', '', 16) ?> داشبورد
                 </a>
             </li>
 
-            <!-- دستهٔ پرونده‌ها -->
-            <li class="nav-item">
-                <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                        type="button" data-bs-toggle="collapse" data-bs-target="#filesMenu" aria-expanded="<?= in_array($cp, ['tasks', 'applications', 'postal-requests', 'license-requests', 'register'], true) ? 'true' : 'false' ?>" aria-controls="filesMenu">
-                    <?= icon('folder') ?> پرونده‌ها <?= icon('chevron-down', 'ms-auto', 15) ?>
+            <!-- ===== گروه: پرونده‌ها ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#filesMenu"
+                        aria-expanded="<?= in_array($cp, ['tasks','applications','postal-requests','license-requests','register'], true) ? 'true' : 'false' ?>">
+                    <?= icon('folder', '', 16) ?>
+                    <span class="me-auto">پرونده‌ها</span>
                 </button>
-                <div class="collapse <?= in_array($cp, ['tasks', 'applications', 'postal-requests', 'license-requests', 'register'], true) ? 'show' : '' ?>" id="filesMenu">
-                    <ul class="nav flex-column list-unstyled">
-                        <li class="nav-item"><a class="nav-link me-3 <?= $nav('tasks') ?>" href="<?= $base ?>admin/my-tasks"><?= icon('task', '', 16) ?> وظایف من</a></li>
+                <div class="collapse <?= in_array($cp, ['tasks','applications','postal-requests','license-requests','register'], true) ? 'show' : '' ?>" id="filesMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/my-tasks" class="d-inline-flex text-decoration-none rounded <?= $nav('tasks') ?>"><?= icon('task', '', 14) ?> وظایف من</a></li>
                         <?php if ($admin): ?>
-                            <li class="nav-item"><a class="nav-link me-3 <?= $nav('applications') ?>" href="<?= $base ?>admin/applications"><?= icon('list', '', 16) ?> همهٔ درخواست‌ها</a></li>
-                            <li class="nav-item"><a class="nav-link me-3 <?= $nav('register') ?>" href="<?= $base ?>admin/register"><?= icon('plus', '', 16) ?> ثبت‌نام دستی متقاضی</a></li>
+                            <li><a href="<?= $base ?>admin/applications" class="d-inline-flex text-decoration-none rounded <?= $nav('applications') ?>"><?= icon('list', '', 14) ?> همهٔ درخواست‌ها</a></li>
+                            <li><a href="<?= $base ?>admin/register" class="d-inline-flex text-decoration-none rounded <?= $nav('register') ?>"><?= icon('plus', '', 14) ?> ثبت‌نام دستی</a></li>
                         <?php endif; ?>
-                        <li class="nav-item">
-                            <a class="nav-link me-3 <?= $nav('postal-requests') ?>" href="<?= $base ?>admin/postal-requests">
-                                <?= icon('mail', '', 16) ?> تغییر کد پستی
-                                <?php if ($pendingPostalCount > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-auto"><?= (int)$pendingPostalCount ?></span>
-                                <?php endif; ?>
-                            </a>
-                        </li>
+                        <li><a href="<?= $base ?>admin/postal-requests" class="d-inline-flex text-decoration-none rounded <?= $nav('postal-requests') ?>">
+                            <?= icon('mail', '', 14) ?> تغییر کد پستی
+                            <?php if ($pendingPostalCount > 0): ?><span class="badge bg-warning text-dark"><?= (int)$pendingPostalCount ?></span><?php endif; ?>
+                        </a></li>
                         <?php if ($admin): ?>
-                        <li class="nav-item">
-                            <a class="nav-link me-3 <?= $nav('revisions') ?>" href="<?= $base ?>admin/revisions">
-                                <?= icon('edit', '', 16) ?> بازبینی پرونده‌ها
-                                <?php $pendingRevCount = ApplicantRevision::pendingBadge(); if ($pendingRevCount > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-auto"><?= (int)$pendingRevCount ?></span>
-                                <?php endif; ?>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link me-3 <?= $nav('sms') ?>" href="<?= $base ?>admin/sms">
-                                <?= icon('phone', '', 16) ?> پیامک‌های وضعیت
-                                <?php
-                                $pendingSmsCount = 0;
-                                try { $pendingSmsCount = (new UserSmsEntry())->countPending(); } catch (\Throwable $e) {}
-                                if ($pendingSmsCount > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-auto"><?= (int)$pendingSmsCount ?></span>
-                                <?php endif; ?>
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link me-3 <?= $nav('license-requests') ?>" href="<?= $base ?>admin/license-requests">
-                                <?= icon('award', '', 16) ?> درخواست‌های تصویر مجوز
-                                <?php
-                                $pendingLicense = 0;
-                                try { $pendingLicense = (new LicenseAccessRequest())->countPending(); } catch (\Throwable $e) {}
-                                if ($pendingLicense > 0): ?>
-                                    <span class="badge bg-warning text-dark ms-auto"><?= (int)$pendingLicense ?></span>
-                                <?php endif; ?>
-                            </a>
-                        </li>
+                            <?php $pendingRevCount = ApplicantRevision::pendingBadge(); ?>
+                            <li><a href="<?= $base ?>admin/revisions" class="d-inline-flex text-decoration-none rounded <?= $nav('revisions') ?>">
+                                <?= icon('edit', '', 14) ?> بازبینی پرونده‌ها
+                                <?php if ($pendingRevCount > 0): ?><span class="badge bg-warning text-dark"><?= (int)$pendingRevCount ?></span><?php endif; ?>
+                            </a></li>
+                            <?php $pendingSmsCount = 0; try { $pendingSmsCount = (new UserSmsEntry())->countPending(); } catch (\Throwable $e) {} ?>
+                            <li><a href="<?= $base ?>admin/sms" class="d-inline-flex text-decoration-none rounded <?= $nav('sms') ?>">
+                                <?= icon('phone', '', 14) ?> پیامک‌های وضعیت
+                                <?php if ($pendingSmsCount > 0): ?><span class="badge bg-warning text-dark"><?= (int)$pendingSmsCount ?></span><?php endif; ?>
+                            </a></li>
+                            <?php $pendingLicense = 0; try { $pendingLicense = (new LicenseAccessRequest())->countPending(); } catch (\Throwable $e) {} ?>
+                            <li><a href="<?= $base ?>admin/license-requests" class="d-inline-flex text-decoration-none rounded <?= $nav('license-requests') ?>">
+                                <?= icon('award', '', 14) ?> درخواست‌های تصویر مجوز
+                                <?php if ($pendingLicense > 0): ?><span class="badge bg-warning text-dark"><?= (int)$pendingLicense ?></span><?php endif; ?>
+                            </a></li>
                         <?php endif; ?>
                     </ul>
                 </div>
             </li>
 
             <?php if ($admin): ?>
-                <!-- دستهٔ گزارش‌ها -->
-                <li class="nav-item">
-                    <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#reportsMenu" aria-expanded="<?= $cp === 'reports' ? 'true' : 'false' ?>" aria-controls="reportsMenu">
-                        <?= icon('chart') ?> گزارش‌ها <?= icon('chevron-down', 'ms-auto', 15) ?>
-                    </button>
-                    <div class="collapse <?= $cp === 'reports' ? 'show' : '' ?>" id="reportsMenu">
-                        <ul class="nav flex-column list-unstyled">
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/reports/by-province">• بر اساس استان</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/reports/by-city">• بر اساس شهر</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/reports/by-village">• بر اساس روستا</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/reports/by-license">• بر اساس رشته</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/reports/by-date">• بر اساس زمان ثبت‌نام</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/output/grouped">• گروه‌بندی‌شده</a></li>
-                        </ul>
-                    </div>
-                </li>
+            <!-- ===== گروه: گزارش‌ها ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#reportsMenu"
+                        aria-expanded="<?= $cp === 'reports' ? 'true' : 'false' ?>">
+                    <?= icon('chart', '', 16) ?>
+                    <span class="me-auto">گزارش‌ها</span>
+                </button>
+                <div class="collapse <?= $cp === 'reports' ? 'show' : '' ?>" id="reportsMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/reports/by-province" class="d-inline-flex text-decoration-none rounded">بر اساس استان</a></li>
+                        <li><a href="<?= $base ?>admin/reports/by-city" class="d-inline-flex text-decoration-none rounded">بر اساس شهر</a></li>
+                        <li><a href="<?= $base ?>admin/reports/by-village" class="d-inline-flex text-decoration-none rounded">بر اساس روستا</a></li>
+                        <li><a href="<?= $base ?>admin/reports/by-license" class="d-inline-flex text-decoration-none rounded">بر اساس رشته</a></li>
+                        <li><a href="<?= $base ?>admin/reports/by-date" class="d-inline-flex text-decoration-none rounded">بر اساس زمان</a></li>
+                        <li><a href="<?= $base ?>admin/output/grouped" class="d-inline-flex text-decoration-none rounded">گروه‌بندی‌شده</a></li>
+                    </ul>
+                </div>
+            </li>
 
-                <!-- دستهٔ خروجی‌ها -->
-                <li class="nav-item">
-                    <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#outputMenu" aria-expanded="<?= $cp === 'outputs' ? 'true' : 'false' ?>" aria-controls="outputMenu">
-                        <?= icon('download') ?> دریافت خروجی <?= icon('chevron-down', 'ms-auto', 15) ?>
-                    </button>
-                    <div class="collapse <?= $cp === 'outputs' ? 'show' : '' ?>" id="outputMenu">
-                        <ul class="nav flex-column list-unstyled">
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/output/general">• گزارش کلی (CSV/چاپ)</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="#" onclick="promptTrackingCode(); return false;">• پروندهٔ متقاضی خاص</a></li>
-                        </ul>
-                    </div>
-                </li>
+            <!-- ===== گروه: خروجی‌ها ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#outputMenu"
+                        aria-expanded="<?= $cp === 'outputs' ? 'true' : 'false' ?>">
+                    <?= icon('download', '', 16) ?>
+                    <span class="me-auto">دریافت خروجی</span>
+                </button>
+                <div class="collapse <?= $cp === 'outputs' ? 'show' : '' ?>" id="outputMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/output/general" class="d-inline-flex text-decoration-none rounded">گزارش کلی (CSV/چاپ)</a></li>
+                        <li><a href="#" onclick="promptTrackingCode(); return false;" class="d-inline-flex text-decoration-none rounded">پروندهٔ متقاضی خاص</a></li>
+                    </ul>
+                </div>
+            </li>
 
-                <!-- دستهٔ مالی (فاز ۴ نقشهٔ راه) -->
-                <li class="nav-item">
-                    <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#financeMenu" aria-expanded="<?= in_array($cp, ['payments'], true) ? 'true' : 'false' ?>" aria-controls="financeMenu">
-                        <?= icon('money') ?> مالی <?= icon('chevron-down', 'ms-auto', 15) ?>
-                        <?php
-                        $pendingPayments = 0;
-                        try { $pendingPayments = (int)(new Payment())->stats()['pendingCount']; } catch (\Throwable $e) {}
-                        if ($pendingPayments > 0): ?>
-                            <span class="badge bg-danger ms-1"><?= $pendingPayments ?></span>
-                        <?php endif; ?>
-                    </button>
-                    <div class="collapse <?= in_array($cp, ['payments'], true) ? 'show' : '' ?>" id="financeMenu">
-                        <ul class="nav flex-column list-unstyled">
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('payments') ?>" href="<?= $base ?>admin/payments"><?= icon('chart', '', 16) ?> درآمد و پرداخت‌ها</a></li>
-                        </ul>
-                    </div>
-                </li>
+            <!-- ===== گروه: مالی ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#financeMenu"
+                        aria-expanded="<?= $cp === 'payments' ? 'true' : 'false' ?>">
+                    <?= icon('money', '', 16) ?>
+                    <span class="me-auto">مالی</span>
+                    <?php $pendingPayments = 0; try { $pendingPayments = (int)(new Payment())->stats()['pendingCount']; } catch (\Throwable $e) {} ?>
+                    <?php if ($pendingPayments > 0): ?><span class="badge bg-danger ms-1"><?= $pendingPayments ?></span><?php endif; ?>
+                </button>
+                <div class="collapse <?= $cp === 'payments' ? 'show' : '' ?>" id="financeMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/payments" class="d-inline-flex text-decoration-none rounded <?= $nav('payments') ?>"><?= icon('chart', '', 14) ?> درآمد و پرداخت‌ها</a></li>
+                    </ul>
+                </div>
+            </li>
 
-                <!-- دستهٔ فرم‌ها، فهرست‌ها و صفحات -->
-                <li class="nav-item">
-                    <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#contentMenu" aria-expanded="<?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'fee-tariff', 'settings'], true) ? 'true' : 'false' ?>" aria-controls="contentMenu">
-                        <?= icon('form') ?> فرم‌ها و صفحات <?= icon('chevron-down', 'ms-auto', 15) ?>
-                    </button>
-                    <div class="collapse <?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'fee-tariff', 'settings'], true) ? 'show' : '' ?>" id="contentMenu">
-                        <ul class="nav flex-column list-unstyled">
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('form-fields') ?>" href="<?= $base ?>admin/form-fields"><?= icon('grid', '', 16) ?> مدیریت فیلدهای فرم</a></li>
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('wizard-steps') ?>" href="<?= $base ?>admin/wizard-steps"><?= icon('task', '', 16) ?> مراحل ثبت‌نام</a></li>
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('license-titles') ?>" href="<?= $base ?>admin/license-titles"><?= icon('vase', '', 16) ?> مدیریت رشته‌ها</a></li>
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('service-types') ?>" href="<?= $base ?>admin/service-types"><?= icon('grid', '', 16) ?> انواع خدمات</a></li>
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('fee-tariff') ?>" href="<?= $base ?>admin/fee-tariff"><?= icon('wallet', '', 16) ?> نرخ‌نامه و تعرفه‌ها</a></li>
-                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('settings') ?>" href="<?= $base ?>admin/settings"><?= icon('settings', '', 16) ?> تنظیمات و دربارهٔ ما</a></li>
-                        </ul>
-                    </div>
-                </li>
+            <!-- ===== گروه: فرم‌ها و صفحات ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#contentMenu"
+                        aria-expanded="<?= in_array($cp, ['form-fields','wizard-steps','license-titles','service-types','fee-tariff','settings'], true) ? 'true' : 'false' ?>">
+                    <?= icon('form', '', 16) ?>
+                    <span class="me-auto">فرم‌ها و صفحات</span>
+                </button>
+                <div class="collapse <?= in_array($cp, ['form-fields','wizard-steps','license-titles','service-types','fee-tariff','settings'], true) ? 'show' : '' ?>" id="contentMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/form-fields" class="d-inline-flex text-decoration-none rounded <?= $nav('form-fields') ?>"><?= icon('grid', '', 14) ?> فیلدهای فرم</a></li>
+                        <li><a href="<?= $base ?>admin/wizard-steps" class="d-inline-flex text-decoration-none rounded <?= $nav('wizard-steps') ?>"><?= icon('task', '', 14) ?> مراحل ثبت‌نام</a></li>
+                        <li><a href="<?= $base ?>admin/license-titles" class="d-inline-flex text-decoration-none rounded <?= $nav('license-titles') ?>"><?= icon('vase', '', 14) ?> رشته‌ها</a></li>
+                        <li><a href="<?= $base ?>admin/service-types" class="d-inline-flex text-decoration-none rounded <?= $nav('service-types') ?>"><?= icon('grid', '', 14) ?> انواع خدمات</a></li>
+                        <li><a href="<?= $base ?>admin/fee-tariff" class="d-inline-flex text-decoration-none rounded <?= $nav('fee-tariff') ?>"><?= icon('wallet', '', 14) ?> نرخ‌نامه</a></li>
+                        <li><a href="<?= $base ?>admin/settings" class="d-inline-flex text-decoration-none rounded <?= $nav('settings') ?>"><?= icon('settings', '', 14) ?> تنظیمات</a></li>
+                    </ul>
+                </div>
+            </li>
 
-                <!-- دستهٔ کاربران -->
-                <li class="nav-item">
-                    <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#userMenu" aria-expanded="<?= $cp === 'users' ? 'true' : 'false' ?>" aria-controls="userMenu">
-                        <?= icon('users') ?> کاربران <?= icon('chevron-down', 'ms-auto', 15) ?>
-                    </button>
-                    <div class="collapse <?= $cp === 'users' ? 'show' : '' ?>" id="userMenu">
-                        <ul class="nav flex-column list-unstyled">
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/users">• لیست کاربران</a></li>
-                            <li class="nav-item"><a class="nav-link me-4" href="<?= $base ?>admin/users/create">• کاربر جدید</a></li>
-                        </ul>
-                    </div>
-                </li>
+            <!-- ===== گروه: کاربران ===== -->
+            <li class="mb-1">
+                <button class="btn btn-toggle w-100 text-end d-inline-flex align-items-center rounded border-0"
+                        data-bs-toggle="collapse" data-bs-target="#userMenu"
+                        aria-expanded="<?= $cp === 'users' ? 'true' : 'false' ?>">
+                    <?= icon('users', '', 16) ?>
+                    <span class="me-auto">کاربران</span>
+                </button>
+                <div class="collapse <?= $cp === 'users' ? 'show' : '' ?>" id="userMenu">
+                    <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small">
+                        <li><a href="<?= $base ?>admin/users" class="d-inline-flex text-decoration-none rounded">لیست کاربران</a></li>
+                        <li><a href="<?= $base ?>admin/users/create" class="d-inline-flex text-decoration-none rounded">کاربر جدید</a></li>
+                    </ul>
+                </div>
+            </li>
             <?php endif; ?>
 
-            <li class="nav-item"><hr class="border-secondary my-2 mx-3"></li>
-            <li class="nav-item">
-                <a class="nav-link" href="<?= $base ?>" target="_blank" rel="noopener"><?= icon('home') ?> صفحهٔ اصلی سامانه</a>
+            <!-- جداساز -->
+            <li class="border-top my-2 mx-1"></li>
+
+            <!-- لینک‌های پایانی -->
+            <li class="mb-1">
+                <a href="<?= $base ?>" target="_blank" rel="noopener" class="nav-link">
+                    <?= icon('home', '', 16) ?> صفحهٔ اصلی
+                </a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link text-danger" href="<?= $base ?>admin/logout" onclick="return confirm('از پنل مدیریت خارج می‌شوید؟')">
-                    <?= icon('logout') ?> خروج
+            <li class="mb-1">
+                <a href="<?= $base ?>admin/logout" class="nav-link text-danger"
+                   onclick="return confirm('از پنل مدیریت خارج می‌شوید؟')">
+                    <?= icon('logout', '', 16) ?> خروج
                 </a>
             </li>
         </ul>
+    </div>
 
-        <footer class="px-3 py-3 d-flex align-items-center justify-content-between gap-2" style="border-top:1px solid rgba(255,255,255,.07)">
-            <small style="color:#5A6B7D; font-size:.7rem;">مدیریت: <?= htmlspecialchars(owner_name()) ?> · <span style="opacity:.7">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.6' ?></span></small>
-            <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:32px;height:32px;">
-                <span class="icon-sun"><?= icon('sun', '', 15) ?></span><span class="icon-moon"><?= icon('moon', '', 15) ?></span>
-            </button>
-        </footer>
-    </nav>
+    <hr class="mx-3 my-0" style="border-color:rgba(255,255,255,.08)">
+
+    <!-- فوتر -->
+    <div class="px-3 py-2 d-flex align-items-center justify-content-between flex-shrink-0">
+        <small style="color:#5A6B7D; font-size:.7rem;">
+            <?= htmlspecialchars(owner_name()) ?>
+            <span style="opacity:.6">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.7' ?></span>
+        </small>
+        <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:28px;height:28px;">
+            <span class="icon-sun"><?= icon('sun', '', 13) ?></span><span class="icon-moon"><?= icon('moon', '', 13) ?></span>
+        </button>
+    </div>
+
+</nav>
 </div>
 
 <!-- محتوای اصلی -->
@@ -265,8 +296,8 @@ function promptTrackingCode() {
         window.location.href = '<?= $base ?>admin/output/single/' + encodeURIComponent(code.trim());
     }
 }
-// بستن منوی موبایل پس از کلیک روی هر لینک — بدون preventDefault (رفع باگ ناوبری)
-document.querySelectorAll('#adminSidebar a.nav-link[href]').forEach(function (link) {
+// بستن منوی موبایل پس از کلیک روی هر لینک
+document.querySelectorAll('#adminSidebar a[href]').forEach(function (link) {
     link.addEventListener('click', function () {
         if (window.innerWidth < 992 && window.bootstrap) {
             const el = document.getElementById('adminSidebar');
