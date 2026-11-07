@@ -853,6 +853,109 @@ h1, h2, h3, .navbar-brand, .sidebar-header, .hero h1, .stat-value, .display-1, .
 [data-bs-theme="dark"] .page-item.active .page-link { background: var(--turquoise); border-color: var(--turquoise); color: #fff; }
 [data-bs-theme="dark"] .page-item.disabled .page-link { background: #101A23; color: #55667A; }
 [data-bs-theme="dark"] code { color: #F0C877; }
+
+/* =====================================================================
+   اصلاح رنگ متن‌ها در تم شب — جلوگیری از متن سفید روی سفید و تیره روی تیره
+   ===================================================================== */
+/* .text-body در بوت‌استرپ تم شب تیره است → روی پس‌زمینه تیره دیده نمی‌شود */
+[data-bs-theme="dark"] .text-body,
+[data-bs-theme="dark"] .text-dark { color: var(--ink) !important; }
+
+/* .text-white در تم روز سفید است → روی پس‌زمینه سفید دیده نمی‌شود */
+/* اما در تم شب روی پس‌زمینه تیره مشکلی نیست، ولی در کارت‌های روشن باید اصلاح شود */
+[data-bs-theme="dark"] .card.bg-light .text-body,
+[data-bs-theme="dark"] .alert-light .text-body { color: var(--ink) !important; }
+
+/* متن‌های داخل کارت‌های دارای badge رنگی */
+[data-bs-theme="dark"] .badge.bg-light { background-color: #1B2C3C !important; color: var(--ink) !important; }
+[data-bs-theme="dark"] .badge.text-dark { color: #1A2A4F !important; }
+
+/* متن‌های داخل جداول در تم شب */
+[data-bs-theme="dark"] .table td,
+[data-bs-theme="dark"] .table th { color: var(--ink); }
+[data-bs-theme="dark"] .table.text-body td,
+[data-bs-theme="dark"] .table.text-body th { color: var(--ink) !important; }
+
+/* متن‌های داخل مودال */
+[data-bs-theme="dark"] .modal-body,
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer { color: var(--ink); }
+
+/* متن‌های داخل dropdown */
+[data-bs-theme="dark"] .dropdown-menu { background-color: #131F29; border-color: var(--card-border); }
+[data-bs-theme="dark"] .dropdown-item { color: var(--ink); }
+[data-bs-theme="dark"] .dropdown-item:hover,
+[data-bs-theme="dark"] .dropdown-item:focus { background-color: var(--turquoise-light); color: var(--turquoise-dark); }
+[data-bs-theme="dark"] .dropdown-divider { border-color: var(--card-border); }
+
+/* متن‌های داخل alert در تم شب */
+[data-bs-theme="dark"] .alert { color: var(--ink); }
+[data-bs-theme="dark"] .alert-link { color: var(--turquoise-dark); }
+[data-bs-theme="dark"] .alert-info { background-color: #0F2A33; border-color: #1A4A55; color: #B8E4E8; }
+[data-bs-theme="dark"] .alert-success { background-color: #0F2A1A; border-color: #1A4A2A; color: #B8E8C8; }
+[data-bs-theme="dark"] .alert-warning { background-color: #2A2410; border-color: #4A3D1A; color: #F0C877; }
+[data-bs-theme="dark"] .alert-danger { background-color: #2A1010; border-color: #4A1A1A; color: #F0A0A0; }
+
+/* متن‌های داخل list-group در تم شب */
+[data-bs-theme="dark"] .list-group-item { color: var(--ink); }
+
+/* متن‌های داخل nav-link در حالت فعال */
+[data-bs-theme="dark"] .nav-link { color: var(--ink); }
+[data-bs-theme="dark"] .nav-link.active { color: var(--turquoise-dark); }
+
+/* متن‌های داخل progress bar */
+[data-bs-theme="dark"] .progress-bar { background-color: var(--turquoise); color: #fff; }
+
+/* متن‌های داخل badge در تم شب */
+[data-bs-theme="dark"] .badge.bg-primary { background-color: var(--turquoise) !important; color: #fff !important; }
+[data-bs-theme="dark"] .badge.bg-secondary { background-color: #3A4C5C !important; color: #DCE5EC !important; }
+[data-bs-theme="dark"] .badge.bg-success { background-color: #2A6B4A !important; color: #fff !important; }
+[data-bs-theme="dark"] .badge.bg-warning { background-color: #B8860B !important; color: #fff !important; }
+[data-bs-theme="dark"] .badge.bg-danger { background-color: #B91C1C !important; color: #fff !important; }
+[data-bs-theme="dark"] .badge.bg-info { background-color: #0E7490 !important; color: #fff !important; }
+
+/* متن‌های داخل buttons در تم شب */
+[data-bs-theme="dark"] .btn-light { background-color: #1B2C3C; border-color: #2A3E50; color: var(--ink); }
+[data-bs-theme="dark"] .btn-light:hover { background-color: #243750; color: var(--ink); }
+[data-bs-theme="dark"] .btn-outline-light { color: var(--ink); border-color: #3A4C5C; }
+[data-bs-theme="dark"] .btn-outline-light:hover { background-color: #3A4C5C; color: #fff; }
+[data-bs-theme="dark"] .btn-link { color: var(--turquoise-dark); }
+
+/* متن‌های داخل form-label در تم شب */
+[data-bs-theme="dark"] .form-label,
+[data-bs-theme="dark"] label { color: var(--ink); }
+
+/* متن‌های داخل small در تم شب */
+[data-bs-theme="dark"] small,
+[data-bs-theme="dark"] .small { color: var(--muted); }
+
+/* متن‌های داخل details/summary */
+[data-bs-theme="dark"] details summary { color: var(--muted); }
+[data-bs-theme="dark"] details[open] summary { color: var(--ink); }
+
+/* متن‌های داخل code در تم شب */
+[data-bs-theme="dark"] code,
+[data-bs-theme="dark"] kbd,
+[data-bs-theme="dark"] samp { color: #F0C877; }
+
+/* متن‌های داخل pre */
+[data-bs-theme="dark"] pre { color: var(--ink); background: #0F1A24; padding: 1rem; border-radius: 8px; }
+
+/* placeholder رنگ در تم شب */
+[data-bs-theme="dark"] .form-control::placeholder,
+[data-bs-theme="dark"] .form-select::placeholder { color: #6C7F8E; }
+
+/* =====================================================================
+   اصلاح رنگ متن‌ها در تم روز — جلوگیری از متن تیره روی تیره
+   ===================================================================== */
+/* .text-white در تم روز روی کارت‌های تیره */
+.layout-light .stat-icon.navy + div .stat-value,
+.layout-light .stat-icon.navy + div .stat-label { color: var(--ink); }
+
+/* متن‌های داخل hero در تم روز */
+.hero { color: var(--ink); }
+.hero h1, .hero h2, .hero h3, .hero h4, .hero h5, .hero h6 { color: var(--ink); }
+
 /* چاپ همیشه روشن */
 @media print {
   [data-bs-theme="dark"] body, [data-bs-theme="dark"] .print-container { background: #fff !important; color: #111 !important; }

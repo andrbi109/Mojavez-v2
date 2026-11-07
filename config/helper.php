@@ -550,6 +550,7 @@ if (!function_exists('icon_paths')) {
             'megaphone'  => '<path d="m3 11 15-6v14L3 13z"/><path d="M3 11v2a2 2 0 0 0 2 2h1"/><path d="M18 9.5a2.5 2.5 0 0 1 0 5"/><path d="m7 14.5 1 6h2.5l-.8-5"/>',
             'wallet'     => '<path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h5v3h-5a1.5 1.5 0 0 1 0-3z"/>',
             'check-square' => '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+            'trending-up' => '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
         ];
         return $paths;
     }

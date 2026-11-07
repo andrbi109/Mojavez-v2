@@ -230,7 +230,7 @@ $ownerImg = setting('owner_image', '');
         </ul>
 
         <footer class="px-3 py-3 d-flex align-items-center justify-content-between gap-2" style="border-top:1px solid rgba(255,255,255,.07)">
-            <small style="color:#5A6B7D; font-size:.7rem;">مدیریت: <?= htmlspecialchars(owner_name()) ?> · <span style="opacity:.7">v<?= defined('APP_VERSION') ? APP_VERSION : '0.2.2' ?></span></small>
+            <small style="color:#5A6B7D; font-size:.7rem;">مدیریت: <?= htmlspecialchars(owner_name()) ?> · <span style="opacity:.7">v<?= defined('APP_VERSION') ? APP_VERSION : '0.2.3' ?></span></small>
             <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:32px;height:32px;">
                 <span class="icon-sun"><?= icon('sun', '', 15) ?></span><span class="icon-moon"><?= icon('moon', '', 15) ?></span>
             </button>

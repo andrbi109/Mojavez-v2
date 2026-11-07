@@ -89,7 +89,28 @@ class Controller
     protected function verifyCsrf(): void
     {
         $token = $_POST['_csrf'] ?? null;
+        // پشتیبانی از Authorization header برای درخواست‌های AJAX
+        if (!$token && !empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+            $token = $_SERVER['HTTP_X_CSRF_TOKEN'];
+        }
         if (!Session::checkCsrf($token)) {
+            // اگر درخواست AJAX است (Accept: application/json یا X-Requested-With) → پاسخ JSON
+            $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+                && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+            $acceptJson = !empty($_SERVER['HTTP_ACCEPT'])
+                && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json');
+
+            if ($isAjax || $acceptJson) {
+                http_response_code(419);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'نشست منقضی شده — لطفاً صفحه را تازه‌سازی کنید.',
+                    'code' => 'csrf_invalid',
+                ]);
+                exit;
+            }
+
             http_response_code(419);
             header('Content-Type: text/html; charset=utf-8');
             echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'

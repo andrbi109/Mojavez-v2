@@ -8,7 +8,7 @@
  * @Version: 2.76 =>[ 1399/11/28 = 1442/07/04 = 2021/02/16 ]
  */
 
-/*	F	*/
+/*      F       */
 function jdate($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehran', $tr_num = 'fa') {
 
   $T_sec = 0;/* <= رفع خطاي زمان سرور ، با اعداد '+' و '-' بر حسب ثانيه */
@@ -100,7 +100,7 @@ function jdate($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehran',
         $out .= jdate_words(array('rr' => $j_d), ' ');
         break;
 
-      case 'k';
+      case 'k':
         $out .= tr_num(100 - (int) ($doy / ($kab + 365.24) * 1000) / 10, $tr_num);
         break;
 
@@ -224,7 +224,7 @@ function jdate($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehran',
   return ($tr_num != 'en') ? tr_num($out, 'fa', '.') : $out;
 }
 
-/*	F	*/
+/*      F       */
 function jstrftime($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehran', $tr_num = 'fa') {
 
   $T_sec = 0;/* <= رفع خطاي زمان سرور ، با اعداد '+' و '-' بر حسب ثانيه */
@@ -442,7 +442,7 @@ function jstrftime($format, $timestamp = '', $none = '', $time_zone = 'Asia/Tehr
   return ($tr_num != 'en') ? tr_num($out, 'fa', '.') : $out;
 }
 
-/*	F	*/
+/*      F       */
 function jmktime($h = '', $m = '', $s = '', $jm = '', $jd = '', $jy = '', $none = '', $timezone = 'Asia/Tehran') {
   if ($timezone != 'local') date_default_timezone_set($timezone);
   if ($h === '') {
@@ -477,7 +477,7 @@ function jmktime($h = '', $m = '', $s = '', $jm = '', $jd = '', $jy = '', $none 
   }
 }
 
-/*	F	*/
+/*      F       */
 function jgetdate($timestamp = '', $none = '', $timezone = 'Asia/Tehran', $tn = 'en') {
   $ts = ($timestamp === '') ? time() : tr_num($timestamp);
   $jdate = explode('_', jdate('F_G_i_j_l_n_s_w_Y_z', $ts, '', $timezone, $tn));
@@ -496,21 +496,21 @@ function jgetdate($timestamp = '', $none = '', $timezone = 'Asia/Tehran', $tn = 
   );
 }
 
-/*	F	*/
+/*      F       */
 function jcheckdate($jm, $jd, $jy) {
   list($jm, $jd, $jy) = explode('_', tr_num($jm . '_' . $jd . '_' . $jy));
   $l_d = ($jm == 12 and ((($jy + 12) % 33) % 4) != 1) ? 29 : (31 - (int) ($jm / 6.5));
   return ($jm > 12 or $jd > $l_d or $jm < 1 or $jd < 1 or $jy < 1) ? false : true;
 }
 
-/*	F	*/
+/*      F       */
 function tr_num($str, $mod = 'en', $mf = '٫') {
   $num_a = array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.');
   $key_a = array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', $mf);
   return ($mod == 'fa') ? str_replace($num_a, $key_a, $str) : str_replace($key_a, $num_a, $str);
 }
 
-/*	F	*/
+/*      F       */
 function jdate_words($array, $mod = '') {
   foreach ($array as $type => $num) {
     $num = (int) tr_num($num);
@@ -598,7 +598,7 @@ License: GNU/LGPL _ Open Source & Free :: Version: 2.80 : [2020=1399]
 990=30*33 & 12053=(365*33)+(32/4) & 36524=(365*100)+(100/4)-(100/100)
 1461=(365*4)+(4/4) & 146097=(365*400)+(400/4)-(400/100)+(400/400)  */
 
-/*	F	*/
+/*      F       */
 function gregorian_to_jalali($gy, $gm, $gd, $mod = '') {
    list($gy, $gm, $gd) = explode('_', tr_num($gy . '_' . $gm . '_' . $gd));/* <= Extra :اين سطر ، جزء تابع اصلي نيست */
   $g_d_m = array(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334);
@@ -622,7 +622,7 @@ function gregorian_to_jalali($gy, $gm, $gd, $mod = '') {
   return ($mod == '') ? array($jy, $jm, $jd) : $jy . $mod . $jm . $mod . $jd;
 }
 
-/*	F	*/
+/*      F       */
 function jalali_to_gregorian($jy, $jm, $jd, $mod = '') {
    list($jy, $jm, $jd) = explode('_', tr_num($jy . '_' . $jm . '_' . $jd));/* <= Extra :اين سطر ، جزء تابع اصلي نيست */
   $jy += 1595;

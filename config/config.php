@@ -8,8 +8,8 @@
 // نسخهٔ فعلی پروژه — در README.md، فوتر پنل و پاسخ‌های JSON بازگردانده می‌شود.
 // الگوی SemVer: MAJOR.MINOR.PATCH
 // این اولین نسخهٔ رسمی است. هر اصلاح یک واحد به PATCH اضافه می‌شود.
-define('APP_VERSION', '0.2.2');
-define('APP_VERSION_NAME', 'اصلاح sort_order و وضعیت در انتظار رسید');
+define('APP_VERSION', '0.2.3');
+define('APP_VERSION_NAME', 'اصلاح jdf، constructor، CSRF، داشبورد، تم شب');
 
 // ==================== حالت اشکال‌زدایی ====================
 // در محیط توسعه true و روی سرور واقعی حتماً false باشد.

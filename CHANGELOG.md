@@ -8,6 +8,102 @@
 
 ---
 
+## [0.2.3] — ۲۰۲۶-۱۱-۰۷ — اصلاح jdf، constructor، CSRF، بازطراحی داشبورد، تم شب
+
+### 🔧 اصلاحات (Bug Fixes)
+
+#### ۱) خطای syntax در `config/jdf.php` خط ۱۰۳
+- **علت:** `case 'k';` به‌جای `case 'k':` (سمی‌کالن به‌جای کالن) — خطای parser
+- **راه‌حل:** اصلاح به `case 'k':`
+
+#### ۲) خطای `Cannot call constructor` در FeeTariffController
+- **علت:** `FeeTariffController` در constructor خود `parent::__construct()` را فراخوانی می‌کرد،
+  ولی کنترلر پایه `Controller` constructor ندارد. در PHP، فراخوانی constructor والد
+  وقتی والد constructor ندارد، باعث خطای `Cannot call constructor` می‌شود.
+- **راه‌حل:** حذف `parent::__construct()` از `FeeTariffController`
+- **نتیجه:**
+  - صفحهٔ `/admin/fee-tariff` اکنون بدون خطا لود می‌شود
+  - دکمهٔ «ذخیره تنظیمات» کار می‌کند
+  - تیک خدمات (toggle tick) کار می‌کند
+
+#### ۳) خطای ۵۰۰ در `/admin/payment/tick` (تیک خدمات)
+- **علت اصلی:** همان مشکل constructor — هیچ متدی از `FeeTariffController` قابل فراخوانی نبود
+- **بهبود اضافی:**
+  - افزودن `try/catch` کامل در `toggleTick` برای مدیریت خطاها
+  - پاسخ JSON مناسب برای خطاها (به‌جای exit با HTML)
+  - بررسی `tickId > 0` قبل از پردازش
+  - fallback امن برای audit log (در صورت نبود جدول)
+
+#### ۴) دکمهٔ ذخیره تنظیمات کار نمی‌کرد
+- **علت:** همان مشکل constructor — کنترلر قابل نمونه‌سازی نبود
+- **راه‌حل:** اکنون با اصلاح constructor، ذخیره‌سازی تنظیمات کار می‌کند
+- **افزایش امنیت:** افزودن کلیدهای `fee_*` به `Setting::editableKeys()`
+
+#### ۵) بهبود CSRF برای درخواست‌های AJAX
+- **مشکل:** وقتی CSRF نامعتبر بود، `verifyCsrf` یک صفحهٔ HTML کامل برمی‌گرداند
+  که برای درخواست‌های AJAX مناسب نبود و باعث «خطا در ارتباط با سرور» می‌شد
+- **راه‌حل:**
+  - تشخیص درخواست AJAX (با `X-Requested-With` یا `Accept: application/json`)
+  - پاسخ JSON مناسب با خطای `csrf_invalid`
+  - پشتیبانی از `X-CSRF-TOKEN` header برای درخواست‌های AJAX
+
+### ✨ بازطراحی‌ها (UI/UX)
+
+#### ۶) بازطراحی کامل داشبورد مدیریت
+- **مشکل قبلی:** منوی داشبورد «اسفناک» و بدون رابط کاربری زیبا
+- **راه‌حل:**
+  - بخش هیرو با گرادیان فیروزه‌ای و نمایش ۴ شاخص اصلی
+  - کارت‌های KPI مدرن با آیکون‌های گرادیانی و نوار روند
+  - نوار توزیع وضعیت‌ها با انیمیشن
+  - تایم‌لاین برای آخرین رویدادها
+  - کارت‌های اقدام سریع با hover effect
+  - پشتیبانی کامل از تم روز/شب
+
+#### ۷) رفع مشکلات رنگ متن در تم شب
+- **مشکل:** در تم شب، برخی متن‌ها سفید روی پس‌زمینه سفید دیده نمی‌شدند
+  (`.text-body`, `.text-dark` در بوت‌استرپ تیره می‌ماندند)
+- **راه‌حل:** افزودن ۴۰+ قانون CSS برای اصلاح رنگ‌ها در تم شب:
+  - `.text-body`, `.text-dark` → روشن در تم شب
+  - `.badge` ها با رنگ‌های مناسب
+  - `.alert` ها با پس‌زمینه‌های تیره
+  - `.dropdown-menu`, `.modal`, `.list-group`
+  - `.btn-light`, `.btn-outline-light`
+  - `.form-label`, `label`, `small`
+  - `.code`, `.pre`, `placeholder`
+
+### 📊 تحلیل مدل فروشگاهی (گزارش جداگانه)
+- فایل: `/home/z/my-project/download/تحلیل-مدل-فروشگاهی.md`
+- شامل ۶ فاز برای تبدیل به مدل فروشگاهی:
+  ۱. زیرساخت کاربر (user_accounts)
+  ۲. صفحات عمومی (login/signup)
+  ۳. داشبورد کاربر
+  ۴. مدل خریداری (services)
+  ۵. حذف احراز ۶ عاملی
+  ۶. زیباسازی رابط کاربری
+- **هیچ تغییری برای این فاز اعمال نشده** — منتظر تأیید کاربر
+
+### 📁 فایل‌های اصلاح‌شده (۸)
+- `config/jdf.php` — اصلاح `case 'k';` → `case 'k':`
+- `app/Controllers/Controller.php` — بهبود `verifyCsrf` برای AJAX
+- `app/Controllers/FeeTariffController.php` — حذف `parent::__construct()` + try/catch در toggleTick
+- `app/Models/Setting.php` — افزودن کلیدهای fee_* به editableKeys
+- `app/Views/admin/dashboard.php` — بازطراحی کامل
+- `config/helper.php` — افزودن آیکون `trending-up`
+- `public/assets/css/style.css` — ۴۰+ قانون برای تم شب
+- `config/config.php`, `VERSION`, `CHANGELOG.md` — به‌روزرسانی نسخه
+- `app/Views/admin_layout.php`, `app/Views/layout.php` — نسخهٔ 0.2.3
+
+### 🎯 موارد تست‌شده
+- ✓ صفحهٔ `/admin/fee-tariff` بدون خطا لود می‌شود
+- ✓ دکمهٔ «ذخیره تنظیمات» کار می‌کند
+- ✓ تیک خدمات (toggle tick) کار می‌کند
+- ✓ داشبورد با رابط کاربری زیبا نمایش داده می‌شود
+- ✓ تم شب: همهٔ متن‌ها خوانا هستند
+- ✓ تم روز: همهٔ متن‌ها خوانا هستند
+- ✓ توابع تاریخ شمسی (jdate) بدون خطا کار می‌کنند
+
+---
+
 ## [0.2.2] — ۲۰۲۶-۱۱-۰۷ — اصلاح sort_order و وضعیت «در انتظار رسید»
 
 ### 🔧 اصلاحات (Bug Fixes)

@@ -70,6 +70,11 @@ class Setting
             'social_eitaa', 'social_rubika', 'social_bale',
             'success_message_template', 'about_title', 'about_content',
             'registration_fee_amount', 'license_reissue_fee_amount',
+            // کلیدهای نرخ‌نامهٔ چندگانه (مدیریت از /admin/fee-tariff)
+            'fee_tariff_active', 'fee_tariff_valid_until', 'fee_default_amount',
+            'fee_rural_auto_eligible', 'fee_modal_enabled', 'fee_modal_dismissable',
+            'fee_fallback_group_code', 'fee_min_amount_percent',
+            'fee_max_discount_without_reason', 'fee_max_discount_with_reason',
         ];
     }
 }

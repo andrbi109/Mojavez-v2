@@ -15,7 +15,7 @@ class FeeTariffController extends Controller
 
     public function __construct()
     {
-        parent::__construct();
+        // نکته: کنترلر پایه constructor ندارد، لذا parent::__construct() فراخوانی نمی‌شود
         $this->groupModel = new FeeGroup();
         $this->itemModel = new FeeGroupItem();
     }
@@ -193,64 +193,90 @@ class FeeTariffController extends Controller
     public function toggleTick(): void
     {
         $this->requireRole(['admin']);
-        if (!$this->isPost()) $this->redirect('/admin/dashboard');
-        $this->verifyCsrf();
-
-        $tickId = (int)$this->input('tick_id', 0);
-        $done = $this->input('done', '1') === '1';
-        $reason = (string)$this->input('reason', '');
-        $paymentId = (int)$this->input('payment_id', 0);
-
-        $tickModel = new PaymentServiceTick();
-
-        // ذخیرهٔ tickId قبل از تغییر برای audit
-        $db = Database::getInstance()->getConnection();
-        $stmt = $db->prepare("SELECT * FROM payment_service_ticks WHERE id = :id LIMIT 1");
-        $stmt->execute(['id' => $tickId]);
-        $tick = $stmt->fetch();
-
-        if (!$tick) {
-            http_response_code(404);
-            echo json_encode(['error' => 'تیک یافت نشد']);
+        if (!$this->isPost()) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'متد مجاز نیست.']);
             return;
         }
+        $this->verifyCsrf();
 
-        $tickModel->setDone($tickId, $done, $done ? null : $reason);
+        try {
+            $tickId = (int)$this->input('tick_id', 0);
+            $done = $this->input('done', '1') === '1';
+            $reason = (string)$this->input('reason', '');
 
-        // محاسبهٔ مبلغ نهایی جدید
-        $newFinal = FeeCalculatorService::calculateFinalAmount((int)$tick['payment_id']);
+            if ($tickId <= 0) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'شناسهٔ تیک نامعتبر است.']);
+                return;
+            }
 
-        // ذخیرهٔ final_amount در payments
-        $stmt = $db->prepare("UPDATE payments SET final_amount = :fa WHERE id = :pid");
-        $stmt->execute(['fa' => $newFinal, 'pid' => $tick['payment_id']]);
+            $tickModel = new PaymentServiceTick();
 
-        // اگر دلیل تخفیف داده شده، در payments ذخیره شود
-        if (!$done && $reason) {
-            $stmt = $db->prepare("UPDATE payments SET discount_reason = :dr WHERE id = :pid");
-            $stmt->execute(['dr' => mb_substr($reason, 0, 500), 'pid' => $tick['payment_id']]);
+            // ذخیرهٔ tickId قبل از تغییر برای audit
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare("SELECT * FROM payment_service_ticks WHERE id = :id LIMIT 1");
+            $stmt->execute(['id' => $tickId]);
+            $tick = $stmt->fetch();
+
+            if (!$tick) {
+                header('Content-Type: application/json; charset=utf-8');
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'تیک یافت نشد.']);
+                return;
+            }
+
+            $tickModel->setDone($tickId, $done, $done ? null : $reason);
+
+            // محاسبهٔ مبلغ نهایی جدید
+            $newFinal = FeeCalculatorService::calculateFinalAmount((int)$tick['payment_id']);
+
+            // ذخیرهٔ final_amount در payments
+            $stmt = $db->prepare("UPDATE payments SET final_amount = :fa WHERE id = :pid");
+            $stmt->execute(['fa' => $newFinal, 'pid' => $tick['payment_id']]);
+
+            // اگر دلیل تخفیف داده شده، در payments ذخیره شود
+            if (!$done && $reason) {
+                $stmt = $db->prepare("UPDATE payments SET discount_reason = :dr WHERE id = :pid");
+                $stmt->execute(['dr' => mb_substr($reason, 0, 500), 'pid' => $tick['payment_id']]);
+            }
+
+            // audit log (با try/catch چون ممکن است در دیتابیس قدیمی نباشد)
+            try {
+                $auditModel = new PaymentAuditLog();
+                $auditModel->log(
+                    (int)$tick['payment_id'],
+                    (int)($_SESSION['admin_id'] ?? 0),
+                    'tick_changed',
+                    'is_done',
+                    $tick['is_done'],
+                    $done ? '1' : '0',
+                    'خدمت: ' . $tick['item_label'] . ($reason ? ' — دلیل: ' . $reason : '')
+                );
+            } catch (\Throwable $e) {
+                // audit log شکست خورد ولی عملیات اصلی موفق بود — ادامه می‌دهیم
+            }
+
+            // پاسخ JSON برای AJAX
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => true,
+                'tick_id' => $tickId,
+                'is_done' => $done,
+                'final_amount' => $newFinal,
+                'final_amount_formatted' => number_format($newFinal),
+            ]);
+        } catch (\Throwable $e) {
+            header('Content-Type: application/json; charset=utf-8');
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => 'خطای سرور: ' . $e->getMessage(),
+                'code' => 'server_error',
+            ]);
         }
-
-        // audit log
-        $auditModel = new PaymentAuditLog();
-        $auditModel->log(
-            (int)$tick['payment_id'],
-            (int)($_SESSION['admin_id'] ?? 0),
-            'tick_changed',
-            'is_done',
-            $tick['is_done'],
-            $done ? '1' : '0',
-            'خدمت: ' . $tick['item_label'] . ($reason ? ' — دلیل: ' . $reason : '')
-        );
-
-        // پاسخ JSON برای AJAX
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'success' => true,
-            'tick_id' => $tickId,
-            'is_done' => $done,
-            'final_amount' => $newFinal,
-            'final_amount_formatted' => number_format($newFinal),
-        ]);
     }
 
     /**
