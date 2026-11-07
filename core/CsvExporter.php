@@ -1,9 +1,44 @@
 <?php
 /**
  * کلاس خروجی CSV با پشتیبانی از کاراکترهای فارسی
+ *
+ * نسخهٔ v0.0.5: افزودن sanitizeCsvCell برای مقابله با CSV/Formula Injection
+ * (سلول‌هایی که با =, +, -, @, \t, \r, \n شروع می‌شوند پیشوند ' می‌گیرند).
  */
 class CsvExporter
 {
+    /**
+     * پاک‌سازی یک سلول CSV برای جلوگیری از اجرای فرمول در Excel/LibreOffice.
+     * اگر مقدار با یکی از کاراکترهای خطرناک =, +, -, @, یا CR/LF/TAB شروع شود،
+     * یک آپوستروف پیشوند ('‌) به ابتدای آن افزوده می‌شود تا Excel آن را به‌عنوان
+     * متن خام در نظر بگیرد نه فرمول. آپوستروف در نمایش نهایی پنهان می‌شود.
+     *
+     * @param mixed $value
+     * @return string
+     */
+    public static function sanitizeCell($value): string
+    {
+        // تبدیل به رشته (بدون از بین بردن null/false)
+        if ($value === null) {
+            return '';
+        }
+        if (is_bool($value)) {
+            return $value ? 'TRUE' : 'FALSE';
+        }
+        $str = (string)$value;
+
+        // اگر رشته با کاراکترهای خطرناک فرمول شروع شود → پیشوند ' برای خاموش‌سازی
+        // (پوشش CVE-2014-3524 / OWASP CSV Injection)
+        if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r", "\n"], true)) {
+            // تبصره: اعداد منفی (مثل -12) و اعداد علمی (مثل 1E5) که ممکن است با - یا + شروع شوند
+            // اگر کل رشته یک عدد معتبر باشد، پیشوند ندهیم.
+            if (!is_numeric($str)) {
+                $str = "'" . $str;
+            }
+        }
+        return $str;
+    }
+
     /**
      * تولید و ارسال فایل CSV
      * @param string $filename نام فایل بدون پسوند
@@ -27,12 +62,16 @@ class CsvExporter
         // افزودن BOM برای باز شدن صحیح در Excel
         fprintf($output, "\xEF\xBB\xBF");
 
-        // نوشتن هدرها
-        fputcsv($output, $headers);
+        // نوشتن هدرها (با sanitize برای جلوگیری از injection در عنوان ستون)
+        fputcsv($output, array_map([self::class, 'sanitizeCell'], $headers));
 
-        // نوشتن داده‌ها
+        // نوشتن داده‌ها — هر سلول ابتدا sanitize می‌شود
         foreach ($rows as $row) {
-            fputcsv($output, $row);
+            $sanitizedRow = [];
+            foreach ($row as $cell) {
+                $sanitizedRow[] = self::sanitizeCell($cell);
+            }
+            fputcsv($output, $sanitizedRow);
         }
 
         fclose($output);

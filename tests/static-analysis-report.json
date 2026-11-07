@@ -1,0 +1,118 @@
+{
+  "summary": {
+    "PASS": 16,
+    "WARN": 2,
+    "FAIL": 0,
+    "total": 18
+  },
+  "tests": [
+    {
+      "name": "syntax پایه PHP (تطابق آکولادها و تگ‌ها)",
+      "status": "PASS",
+      "detail": "98 فایل بررسی شد",
+      "icon": "✓"
+    },
+    {
+      "name": "ارجاعات require/include",
+      "status": "PASS",
+      "detail": "0 ارجاع پیدا شد",
+      "icon": "✓"
+    },
+    {
+      "name": "تعریف route ها و تطابق با کنترلرها",
+      "status": "PASS",
+      "detail": "0 مسیر، 109 کل",
+      "icon": "✓"
+    },
+    {
+      "name": "توکن CSRF در فرم‌های POST",
+      "status": "PASS",
+      "detail": "59 فرم POST همگی CSRF دارند",
+      "icon": "✓"
+    },
+    {
+      "name": "htmlspecialchars در خروجی‌ها",
+      "status": "WARN",
+      "detail": "417 مورد مشکوک در: app/Views/_dynamic_values.php, app/Views/_dynamic_values.php, app/Views/admin_layout.php",
+      "icon": "⚠"
+    },
+    {
+      "name": "Prepared Statements",
+      "status": "PASS",
+      "detail": "987 کوئری با prepare/placeholder",
+      "icon": "✓"
+    },
+    {
+      "name": "منطق AutoCancel و Priority",
+      "status": "PASS",
+      "detail": "ثابت AUTO_CANCEL_DAYS استفاده شده؛ محاسبه زمان با TIMESTAMPDIFF/INTERVAL؛ ردیابی زمان تکمیل ثبت‌نام؛ بررسی وضعیت قبل از لغو؛ ثابت PRIORITY_DAYS؛ ردیابی زمان شروع ثبت‌نام برای اولویت؛ به‌روزرسانی پرچم priority؛ متد cancelExpired تعریف شده؛ متد updatePriorities تعریف شده",
+      "icon": "✓"
+    },
+    {
+      "name": "توابع helper و ثابت‌ها و CSRF",
+      "status": "PASS",
+      "detail": "0 تابع، 21 ثابت، CSRF از طریق Session class",
+      "icon": "✓"
+    },
+    {
+      "name": "جدول‌ها و مدل‌ها",
+      "status": "PASS",
+      "detail": "22 جدول، 21 مدل",
+      "icon": "✓"
+    },
+    {
+      "name": "فرم‌های ثبت‌نام و اعتبارسنجی",
+      "status": "PASS",
+      "detail": "step1.php: 15 input، 0 file، 15 required، 4 pattern؛ step2.php: 3 input، 0 file، 2 required، 0 pattern؛ step3.php: 11 input، 0 file، 5 required، 0 pattern؛ step4.php: 8 input، 8 file، 0 required، 0 pattern — Validator/empty در کنترلر: 62 مورد، کد رهگیری یافت شد، 5/۵ فیلد اجباری موجود",
+      "icon": "✓"
+    },
+    {
+      "name": "دکمه‌ها و اکشن‌های فرم‌ها",
+      "status": "PASS",
+      "detail": "44 دکمه submit یافت شد",
+      "icon": "✓"
+    },
+    {
+      "name": "آپلود فایل و امنیت",
+      "status": "PASS",
+      "detail": "محدودیت حجم (MAX_UPLOAD_SIZE)؛ بررسی پسوند (ALLOWED_EXTENSIONS)؛ بررسی MIME واقعی با finfo؛ نام‌گذاری تصادفی (bin2hex/random_bytes)؛ محافظت Path Traversal با realpath؛ chmod فایل (0640)؛ استفاده از move_uploaded_file",
+      "icon": "✓"
+    },
+    {
+      "name": "احراز هویت و نقش‌ها",
+      "status": "PASS",
+      "detail": "بررسی نقش در کنترلر؛ Session regeneration پس از ورود؛ استفاده از password_verify؛ Rate-limiting ورود؛ HttpOnly روی کوکی نشست؛ SameSite روی کوکی نشست",
+      "icon": "✓"
+    },
+    {
+      "name": "خروجی CSV با BOM فارسی",
+      "status": "PASS",
+      "detail": "افزودن BOM (UTF-8)؛ Content-Type صحیح؛ Content-Disposition attachment؛ استفاده از fputcsv؛ encoding UTF-8 صریح",
+      "icon": "✓"
+    },
+    {
+      "name": "نسخه چاپی A4",
+      "status": "PASS",
+      "detail": "تنظیمات @page / @media print؛ اندازهٔ A4 صریح؛ حاشیه استاندارد mm؛ شکست هوشمند صفحات؛ عناصر no-print",
+      "icon": "✓"
+    },
+    {
+      "name": "جلوگیری از CSV Injection",
+      "status": "WARN",
+      "detail": "بررسی دستی توصیه می‌شود — محتوای سلول با =, +, -, @ باید prefix شود",
+      "icon": "⚠"
+    },
+    {
+      "name": "هدرهای امنیتی",
+      "status": "PASS",
+      "detail": "X-Frame-Options؛ X-Content-Type-Options؛ Referrer-Policy؛ Permissions-Policy",
+      "icon": "✓"
+    },
+    {
+      "name": "ثابت APP_VERSION",
+      "status": "PASS",
+      "detail": "APP_VERSION = '0.0.5' در config.php",
+      "icon": "✓"
+    }
+  ]
+}
