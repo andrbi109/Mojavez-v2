@@ -269,6 +269,8 @@ if (!function_exists('icon_paths')) {
             'task'       => '<rect x="3" y="4" width="18" height="16" rx="2"/><polyline points="8 11.5 10.5 14 16 8.5"/>',
             'money'      => '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.8"/><line x1="6" y1="12" x2="6.5" y2="12"/><line x1="17.5" y1="12" x2="18" y2="12"/>',
             'megaphone'  => '<path d="m3 11 15-6v14L3 13z"/><path d="M3 11v2a2 2 0 0 0 2 2h1"/><path d="M18 9.5a2.5 2.5 0 0 1 0 5"/><path d="m7 14.5 1 6h2.5l-.8-5"/>',
+            'wallet'     => '<path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M16 12h5v3h-5a1.5 1.5 0 0 1 0-3z"/>',
+            'check-square' => '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
         ];
         return $paths;
     }

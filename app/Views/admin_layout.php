@@ -188,15 +188,16 @@ $ownerImg = setting('owner_image', '');
                 <!-- دستهٔ فرم‌ها، فهرست‌ها و صفحات -->
                 <li class="nav-item">
                     <button class="nav-link sidebar-group w-100 border-0 bg-transparent text-start d-flex align-items-center gap-2"
-                            type="button" data-bs-toggle="collapse" data-bs-target="#contentMenu" aria-expanded="<?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'settings'], true) ? 'true' : 'false' ?>" aria-controls="contentMenu">
+                            type="button" data-bs-toggle="collapse" data-bs-target="#contentMenu" aria-expanded="<?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'fee-tariff', 'settings'], true) ? 'true' : 'false' ?>" aria-controls="contentMenu">
                         <?= icon('form') ?> فرم‌ها و صفحات <?= icon('chevron-down', 'ms-auto', 15) ?>
                     </button>
-                    <div class="collapse <?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'settings'], true) ? 'show' : '' ?>" id="contentMenu">
+                    <div class="collapse <?= in_array($cp, ['form-fields', 'wizard-steps', 'license-titles', 'service-types', 'fee-tariff', 'settings'], true) ? 'show' : '' ?>" id="contentMenu">
                         <ul class="nav flex-column list-unstyled">
                             <li class="nav-item"><a class="nav-link me-4 <?= $nav('form-fields') ?>" href="<?= $base ?>admin/form-fields"><?= icon('grid', '', 16) ?> مدیریت فیلدهای فرم</a></li>
                             <li class="nav-item"><a class="nav-link me-4 <?= $nav('wizard-steps') ?>" href="<?= $base ?>admin/wizard-steps"><?= icon('task', '', 16) ?> مراحل ثبت‌نام</a></li>
                             <li class="nav-item"><a class="nav-link me-4 <?= $nav('license-titles') ?>" href="<?= $base ?>admin/license-titles"><?= icon('vase', '', 16) ?> مدیریت رشته‌ها</a></li>
                             <li class="nav-item"><a class="nav-link me-4 <?= $nav('service-types') ?>" href="<?= $base ?>admin/service-types"><?= icon('grid', '', 16) ?> انواع خدمات</a></li>
+                            <li class="nav-item"><a class="nav-link me-4 <?= $nav('fee-tariff') ?>" href="<?= $base ?>admin/fee-tariff"><?= icon('wallet', '', 16) ?> نرخ‌نامه و تعرفه‌ها</a></li>
                             <li class="nav-item"><a class="nav-link me-4 <?= $nav('settings') ?>" href="<?= $base ?>admin/settings"><?= icon('settings', '', 16) ?> تنظیمات و دربارهٔ ما</a></li>
                         </ul>
                     </div>
@@ -229,7 +230,7 @@ $ownerImg = setting('owner_image', '');
         </ul>
 
         <footer class="px-3 py-3 d-flex align-items-center justify-content-between gap-2" style="border-top:1px solid rgba(255,255,255,.07)">
-            <small style="color:#5A6B7D; font-size:.7rem;">مدیریت: <?= htmlspecialchars(owner_name()) ?> · <span style="opacity:.7">v<?= defined('APP_VERSION') ? APP_VERSION : '0.1.2' ?></span></small>
+            <small style="color:#5A6B7D; font-size:.7rem;">مدیریت: <?= htmlspecialchars(owner_name()) ?> · <span style="opacity:.7">v<?= defined('APP_VERSION') ? APP_VERSION : '0.2.0' ?></span></small>
             <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:32px;height:32px;">
                 <span class="icon-sun"><?= icon('sun', '', 15) ?></span><span class="icon-moon"><?= icon('moon', '', 15) ?></span>
             </button>

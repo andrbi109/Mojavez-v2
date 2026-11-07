@@ -277,7 +277,8 @@ class AdminController extends Controller
             'dynValues' => $dynValues,
             'payments' => $applicantPayments,
             'paymentRequired' => (int)$applicant['payment_required'] === 1,
-            'feeAmount' => (int)setting('registration_fee_amount', '0'),
+            'feeAmount' => FeeCalculatorService::calculateForApplicant((int)$applicant['id'])['amount'],
+            'feeInfo' => FeeCalculatorService::calculateForApplicant((int)$applicant['id']),
             'licenseFile' => $licenseFile,
             'licenseDoc' => $licenseDoc,
             'person' => $person,
@@ -830,6 +831,24 @@ class AdminController extends Controller
         if (!$applicant) $this->redirect('/admin/dashboard');
 
         $db = Database::getInstance()->getConnection();
+
+        // محاسبهٔ گروه قیمتی و مبلغ (فقط هنگام فعال‌سازی)
+        $feeInfo = null;
+        if ($enable) {
+            $feeInfo = FeeCalculatorService::calculateForApplicant($applicantId);
+            $amount = $feeInfo['amount'];
+            $groupId = $feeInfo['group']['id'] ?? null;
+            $isRural = $feeInfo['is_rural'] ? 1 : 0;
+            $fallback = $feeInfo['fallback_used'] ? 1 : 0;
+            $flags = !empty($feeInfo['suspicion_flags']) ? implode(',', $feeInfo['suspicion_flags']) : null;
+        } else {
+            $amount = 0;
+            $groupId = null;
+            $isRural = 0;
+            $fallback = 0;
+            $flags = null;
+        }
+
         $stmt = $db->prepare(
             "UPDATE applicants SET payment_required = :flag,
                     payment_requested_at = IF(:flag2 = 1, NOW(), NULL)
@@ -837,12 +856,66 @@ class AdminController extends Controller
         );
         $stmt->execute(['flag' => $enable ? 1 : 0, 'flag2' => $enable ? 1 : 0, 'id' => $applicantId]);
 
-        $amount = (int)setting('registration_fee_amount', '0');
+        // اگر فعال‌سازی شده، یک رکورد payments با مبلغ محاسبه‌شده بساز (وضعیت: در انتظار بررسی)
+        if ($enable) {
+            // جلوگیری از ایجاد رکورد تکراری
+            $stmt = $db->prepare(
+                "SELECT id FROM payments
+                 WHERE applicant_id = :aid AND purpose = 'هزینهٔ ثبت‌نام'
+                   AND status = 'در انتظار بررسی'
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute(['aid' => $applicantId]);
+            $existingPaymentId = (int)$stmt->fetchColumn();
+
+            if ($existingPaymentId === 0) {
+                // ایجاد رکورد پرداخت با مبلغ محاسبه‌شده
+                $stmt = $db->prepare(
+                    "INSERT INTO payments
+                        (applicant_id, payment_channel_id, purpose, amount, original_amount,
+                         final_amount, fee_group_id, is_rural_exempt, fallback_used,
+                         suspicion_flags, status, created_at)
+                     VALUES
+                        (:aid, NULL, 'هزینهٔ ثبت‌نام', :amount, :orig,
+                         :final, :gid, :rural, :fallback,
+                         :flags, 'در انتظار بررسی', NOW())"
+                );
+                $stmt->execute([
+                    'aid' => $applicantId,
+                    'amount' => $amount,
+                    'orig' => $amount,
+                    'final' => $amount,
+                    'gid' => $groupId,
+                    'rural' => $isRural,
+                    'fallback' => $fallback,
+                    'flags' => $flags,
+                ]);
+                $paymentId = (int)$db->lastInsertId();
+
+                // ایجاد تیک‌های اولیه برای این پرداخت (همه تیک‌خورده)
+                if ($groupId) {
+                    (new PaymentServiceTick())->createForPayment($paymentId, $groupId);
+                }
+
+                // audit log
+                (new PaymentAuditLog())->log(
+                    $paymentId,
+                    (int)Session::get('admin_id', 0),
+                    'payment_requested',
+                    null,
+                    null,
+                    (string)$amount,
+                    $feeInfo['reason'] ?? 'درخواست پرداخت ایجاد شد'
+                );
+            }
+        }
+
         $this->statusLogModel->create([
             'applicant_id' => $applicantId,
             'status_name' => $enable ? 'درخواست پرداخت هزینه' : 'لغو درخواست پرداخت',
             'description' => $enable
                 ? 'پرداخت هزینهٔ ثبت‌نام (' . number_format($amount) . ' تومان) برای متقاضی فعال شد — توسط ' . Session::get('admin_display_name', 'مدیر')
+                    . ($feeInfo && $feeInfo['group'] ? ' — ' . $feeInfo['group']['name'] : '')
                 : 'درخواست پرداخت توسط مدیر غیرفعال شد.',
         ]);
 

@@ -132,7 +132,7 @@ class TrackingController extends Controller
             'postalChanges' => $postalChanges,
             'pendingPostal' => $pendingPostal,
             'paymentRequired' => (int)$applicant['payment_required'] === 1,
-            'feeAmount' => (int)setting('registration_fee_amount', '0'),
+            'feeAmount' => FeeCalculatorService::calculateForApplicant((int)$applicant['id'])['amount'],
             'paymentChannels' => $this->channelModel->getActive(),
             'latestPayment' => $latestPayment,
             'changePostalError' => Session::get('change_postal_error'),

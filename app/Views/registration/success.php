@@ -80,3 +80,51 @@ function copyText(text, successMsg) {
     }
 }
 </script>
+
+<?php if (!empty($feeGroup) && !empty($feeGroup['message_body'])): ?>
+<!-- مودال پیام حمایتی (نمایش خودکار پس از ۱.۵ ثانیه) -->
+<div class="modal fade" id="feeGroupModal" tabindex="-1" aria-labelledby="feeGroupModalLabel">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background:var(--turquoise); color:white;">
+                <h5 class="modal-title fw-bold" id="feeGroupModalLabel">
+                    <span class="fs-3 me-2"><?= htmlspecialchars($feeGroup['icon'] ?? '') ?></span>
+                    <?= htmlspecialchars($feeGroup['message_title'] ?? 'پیام ما به شما') ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 small text-muted">
+                    گروه قیمتی شما:
+                    <span class="badge bg-info fs-6"><?= htmlspecialchars($feeGroup['icon'] ?? '') ?> <?= htmlspecialchars($feeGroup['name']) ?></span>
+                </p>
+                <p style="line-height:2; white-space:pre-line; text-align:justify;"><?= htmlspecialchars($feeGroup['message_body']) ?></p>
+                <?php if (!empty($feeInfo['is_rural'])): ?>
+                    <div class="alert alert-success py-2 small mb-0">
+                        🌾 شما در گروه حمایتی روستاییان قرار گرفته‌اید. در صورت تأیید مدیر سامانه،
+                        مبلغ نهایی هزینهٔ خدمات با این گروه محاسبه خواهد شد.
+                    </div>
+                <?php endif; ?>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">متوجه شدم</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+// نمایش خودکار مودال پس از ۱.۵ ثانیه (فقط یک بار در هر نشست مرورگر)
+document.addEventListener('DOMContentLoaded', function() {
+    const STORAGE_KEY = 'feeModalShown_<?= md5($trackingCode ?? '') ?>';
+    if (!sessionStorage.getItem(STORAGE_KEY)) {
+        setTimeout(function() {
+            const modalEl = document.getElementById('feeGroupModal');
+            if (modalEl) {
+                new bootstrap.Modal(modalEl).show();
+                sessionStorage.setItem(STORAGE_KEY, '1');
+            }
+        }, 1500);
+    }
+});
+</script>
+<?php endif; ?>

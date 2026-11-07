@@ -352,18 +352,77 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
         <?php endif; ?>
         <!-- پرداخت‌ها -->
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <span><?= icon('money', 'me-1') ?> پرداخت هزینه</span>
-                <form method="post" action="<?= $base ?>admin/request-payment">
-                    <?= Session::csrfField() ?>
-                    <input type="hidden" name="applicant_id" value="<?= (int)$applicant['id'] ?>">
-                    <input type="hidden" name="enable" value="<?= $paymentRequired ? '0' : '1' ?>">
-                    <button type="submit" class="btn btn-sm <?= $paymentRequired ? 'btn-outline-danger' : 'btn-gold' ?>"
-                            onclick="return confirm('<?= $paymentRequired ? 'درخواست پرداخت غیرفعال شود؟' : 'پرداخت هزینهٔ ثبت‌نام (' . number_format((int)$feeAmount) . ' تومان) برای متقاضی فعال شود؟' ?>');">
-                        <?= $paymentRequired ? icon('x', '', 14) . ' لغو درخواست پرداخت' : icon('money', '', 14) . ' درخواست پرداخت هزینه' ?>
-                    </button>
-                </form>
+                <?php
+                // تعیین وضعیت نمایش دکمه‌ها:
+                // - اگر payment_required = 0 → «درخواست پرداخت هزینه» (gold)
+                // - اگر payment_required = 1 و پرداخت هنوز در انتظار → «لغو درخواست پرداخت» (outline-danger)
+                // - اگر پرداخت تأیید شده → دکمه لغو مخفی، نمایش «درخواست پرداخت جدید» (gold)
+                $hasApprovedPayment = false;
+                foreach ($payments as $pay) {
+                    if ($pay['status'] === 'تأیید شده') { $hasApprovedPayment = true; break; }
+                }
+                $showCancelButton = $paymentRequired && !$hasApprovedPayment;
+                $showRequestButton = !$paymentRequired || $hasApprovedPayment;
+                $requestLabel = $hasApprovedPayment ? 'درخواست پرداخت جدید (هزینهٔ اضافی)' : 'درخواست پرداخت هزینه';
+                $requestConfirmAmount = number_format((int)$feeAmount);
+                ?>
+
+                <?php if ($showCancelButton): ?>
+                    <!-- دکمه لغو درخواست پرداخت -->
+                    <form method="post" action="<?= $base ?>admin/request-payment">
+                        <?= Session::csrfField() ?>
+                        <input type="hidden" name="applicant_id" value="<?= (int)$applicant['id'] ?>">
+                        <input type="hidden" name="enable" value="0">
+                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                onclick="return confirm('درخواست پرداخت غیرفعال شود؟');">
+                            <?= icon('x', '', 14) ?> لغو درخواست پرداخت
+                        </button>
+                    </form>
+                <?php endif; ?>
+
+                <?php if ($showRequestButton): ?>
+                    <!-- دکمه درخواست پرداخت -->
+                    <form method="post" action="<?= $base ?>admin/request-payment">
+                        <?= Session::csrfField() ?>
+                        <input type="hidden" name="applicant_id" value="<?= (int)$applicant['id'] ?>">
+                        <input type="hidden" name="enable" value="1">
+                        <button type="submit" class="btn btn-sm <?= $hasApprovedPayment ? 'btn-outline-primary' : 'btn-gold' ?>"
+                                onclick="return confirm('پرداخت هزینهٔ ثبت‌نام (<?= $requestConfirmAmount ?> تومان) برای متقاضی فعال شود؟');">
+                            <?= icon('money', '', 14) ?> <?= $requestLabel ?>
+                        </button>
+                    </form>
+                <?php endif; ?>
             </div>
+
+            <!-- اطلاعات محاسبهٔ هزینه -->
+            <?php if (!empty($feeInfo) && !empty($feeInfo['group'])): ?>
+            <div class="card-body bg-light py-2 border-bottom">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 small">
+                    <span>
+                        <span class="badge bg-info fs-6"><?= htmlspecialchars($feeInfo['group']['icon'] ?? '') ?> <?= htmlspecialchars($feeInfo['group']['name']) ?></span>
+                        <?php if (!empty($feeInfo['is_rural'])): ?>
+                            <span class="badge bg-success">معافیت روستایی</span>
+                        <?php endif; ?>
+                        <?php if (!empty($feeInfo['fallback_used'])): ?>
+                            <span class="badge bg-warning text-dark">fallback (دهک خالی)</span>
+                        <?php endif; ?>
+                    </span>
+                    <span class="text-muted"><?= htmlspecialchars($feeInfo['reason']) ?></span>
+                    <span class="fw-bold fs-5"><?= number_format((int)$feeAmount) ?> تومان</span>
+                </div>
+                <?php if (!empty($feeInfo['suspicion_flags'])): ?>
+                    <div class="alert alert-warning mt-2 mb-0 py-1 small">
+                        <strong>⚠️ موارد مشکوک:</strong>
+                        <?php foreach ($feeInfo['suspicion_flags'] as $flag): ?>
+                            <span class="badge bg-warning text-dark me-1"><?= htmlspecialchars($flag) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <?php if (!empty($payments)): ?>
             <ul class="list-group list-group-flush">
                 <?php foreach ($payments as $pay): ?>
@@ -372,6 +431,9 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                         <div class="d-flex justify-content-between flex-wrap gap-1">
                             <span>
                                 <strong><?= number_format((int)$pay['amount']) ?> تومان</strong>
+                                <?php if (!empty($pay['final_amount']) && (int)$pay['final_amount'] !== (int)$pay['amount']): ?>
+                                    <span class="text-success">(نهایی پس از تخفیف: <?= number_format((int)$pay['final_amount']) ?>)</span>
+                                <?php endif; ?>
                                 — <?= htmlspecialchars($pay['purpose']) ?>
                                 <?php if (!empty($pay['channel_title'])): ?><span class="text-muted">(<?= htmlspecialchars($pay['channel_title']) ?>)</span><?php endif; ?>
                             </span>
@@ -381,6 +443,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             ثبت: <?= persianDate((string)$pay['created_at']) ?>
                             <?php if (!empty($pay['reference_code'])): ?> • پیگیری: <code><?= htmlspecialchars($pay['reference_code']) ?></code><?php endif; ?>
                             <?php if (!empty($pay['reject_reason'])): ?> • دلیل رد: <?= htmlspecialchars($pay['reject_reason']) ?><?php endif; ?>
+                            <?php if (!empty($pay['discount_reason'])): ?> • دلیل تخفیف: <?= htmlspecialchars($pay['discount_reason']) ?><?php endif; ?>
                             <?php if (!empty($pay['receipt_document_id'])): ?>
                                 • <button type="button" class="btn btn-link btn-sm p-0 align-baseline view-doc-btn" data-id="<?= (int)$pay['receipt_document_id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>">مشاهدهٔ رسید</button>
                             <?php endif; ?>
@@ -390,6 +453,139 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
             </ul>
             <?php else: ?>
             <div class="card-body"><p class="text-muted small mb-0">پرداختی ثبت نشده است.</p></div>
+            <?php endif; ?>
+
+            <!-- کارت تیک خدمات (تنها در صورت وجود پرداخت با fee_group_id) -->
+            <?php
+            // یافتن آخرین پرداخت با fee_group_id برای نمایش تیک خدمات
+            $tickPayment = null;
+            foreach ($payments as $pay) {
+                if (!empty($pay['fee_group_id'])) {
+                    $tickPayment = $pay;
+                    break; // آخرین (همان اول چون DESC مرتب شده)
+                }
+            }
+            ?>
+            <?php if ($tickPayment): ?>
+                <?php
+                $tickModel = new PaymentServiceTick();
+                $auditModel = new PaymentAuditLog();
+                $ticks = $tickModel->findByPaymentId((int)$tickPayment['id']);
+                $sumAll = $tickModel->sumAll((int)$tickPayment['id']);
+                $sumDone = $tickModel->sumDone((int)$tickPayment['id']);
+                $untickedCount = $tickModel->countUnticked((int)$tickPayment['id']);
+                $finalAmount = (int)($tickPayment['final_amount'] ?? $tickPayment['amount'] ?? 0);
+                $originalAmount = (int)($tickPayment['original_amount'] ?? $tickPayment['amount'] ?? 0);
+                $discountAmount = $originalAmount - $finalAmount;
+                $auditLogs = $auditModel->findByPaymentId((int)$tickPayment['id']);
+                $requiresReason = FeeCalculatorService::discountRequiresReason((int)$tickPayment['id']);
+                $isExcessive = FeeCalculatorService::isDiscountExcessive((int)$tickPayment['id']);
+                $isPendingPayment = $tickPayment['status'] === 'در انتظار بررسی';
+                ?>
+            <div class="card-body border-top">
+                <h6 class="fw-bold mb-3"><?= icon('check-square', 'me-1') ?> خدمات انجام‌شده برای این پرونده</h6>
+
+                <?php if ($isExcessive): ?>
+                    <div class="alert alert-danger py-2 small">
+                        ⚠️ <strong>تخفیف بیش از حد مجاز:</strong> مبلغ کسرشده از ۵۰٪ مبلغ اصلی بیشتر است.
+                        برای تأیید نهایی نیازمند مجوز مدیر ارشد است.
+                    </div>
+                <?php endif; ?>
+
+                <table class="table table-sm align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:50px">انجام شد</th>
+                            <th>خدمت</th>
+                            <th style="width:140px" class="text-end">مبلغ (تومان)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($ticks)): ?>
+                            <tr><td colspan="3" class="text-muted text-center">هیچ تیک خدمتی برای این پرداخت وجود ندارد.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($ticks as $t): ?>
+                                <tr data-tick-id="<?= (int)$t['id'] ?>" data-payment-id="<?= (int)$tickPayment['id'] ?>">
+                                    <td>
+                                        <div class="form-check form-switch m-0">
+                                            <input class="form-check-input tick-checkbox" type="checkbox"
+                                                   <?= (int)$t['is_done'] === 1 ? 'checked' : '' ?>
+                                                   data-tick-id="<?= (int)$t['id'] ?>"
+                                                   data-payment-id="<?= (int)$tickPayment['id'] ?>"
+                                                   data-amount="<?= (int)$t['original_amount'] ?>"
+                                                   <?= !$isPendingPayment ? 'disabled' : '' ?>>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?= htmlspecialchars($t['item_label']) ?>
+                                        <?php if (!empty($t['untick_reason'])): ?>
+                                            <br><small class="text-muted">دلیل: <?= htmlspecialchars($t['untick_reason']) ?></small>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end"><?= number_format((int)$t['original_amount']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <th colspan="2" class="text-end">مبلغ اصلی (همهٔ خدمات):</th>
+                            <th class="text-end"><?= number_format($originalAmount) ?></th>
+                        </tr>
+                        <?php if ($discountAmount > 0): ?>
+                        <tr class="table-warning">
+                            <th colspan="2" class="text-end">کسر خدمات انجام‌نشده (<?= $untickedCount ?> مورد):</th>
+                            <th class="text-end text-danger">- <?= number_format($discountAmount) ?></th>
+                        </tr>
+                        <?php endif; ?>
+                        <tr class="table-success">
+                            <th colspan="2" class="text-end">مبلغ نهایی قابل‌قبول:</th>
+                            <th class="text-end fs-5" id="finalAmountCell"><?= number_format($finalAmount) ?></th>
+                        </tr>
+                        <tr>
+                            <th colspan="2" class="text-end">مبلغ واریزی متقاضی (از رسید):</th>
+                            <th class="text-end <?= (int)$tickPayment['amount'] >= $finalAmount ? 'text-success' : 'text-danger' ?>">
+                                <?= number_format((int)$tickPayment['amount']) ?>
+                                <?php if ((int)$tickPayment['amount'] >= $finalAmount): ?>
+                                    ✓
+                                <?php else: ?>
+                                    ⚠ کمتر از مبلغ نهایی
+                                <?php endif; ?>
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <?php if ($requiresReason && $untickedCount > 0): ?>
+                    <div class="mb-3">
+                        <label class="form-label small">دلیل تخفیف (<?= $untickedCount ?> خدمت تیک‌برداشته — توضیح اجباری)</label>
+                        <textarea class="form-control form-control-sm" id="discountReason"
+                                  placeholder="مثلاً: تصویر مجوز هنوز بارگذاری نشده چون صادر نشده"><?= htmlspecialchars($tickPayment['discount_reason'] ?? '') ?></textarea>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!$isPendingPayment): ?>
+                    <div class="alert alert-info py-2 small mb-0">
+                        ℹ️ این پرداخت در وضعیت «<?= htmlspecialchars($tickPayment['status']) ?>» است و تیک‌ها قابل تغییر نیستند.
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($auditLogs)): ?>
+                    <details class="mt-3">
+                        <summary class="small text-muted cursor-pointer">تاریخچهٔ تغییرات (<?= count($auditLogs) ?> مورد)</summary>
+                        <ul class="list-unstyled small mt-2" style="max-height:200px;overflow-y:auto">
+                            <?php foreach ($auditLogs as $log): ?>
+                                <li class="mb-1">
+                                    <code><?= persianDate((string)$log['created_at']) ?> <?= date('H:i', strtotime($log['created_at'])) ?></code>
+                                    — <strong><?= htmlspecialchars($log['action']) ?></strong>
+                                    <?php if (!empty($log['note'])): ?>: <?= htmlspecialchars($log['note']) ?><?php endif; ?>
+                                    <span class="text-muted">(<?= htmlspecialchars($log['display_name'] ?? $log['username'] ?? '?') ?>)</span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </details>
+                <?php endif; ?>
+            </div>
             <?php endif; ?>
         </div>
 
@@ -544,6 +740,79 @@ document.querySelectorAll('.view-doc-btn').forEach(btn => {
             new bootstrap.Modal(document.getElementById('docModal')).show();
         } catch (e) {
             box.innerHTML = '<div class="py-5 text-danger">خطا در ارتباط با سرور</div>';
+        }
+    });
+});
+
+// =====================================================
+// تیک خدمات پرداخت (AJAX)
+// =====================================================
+document.querySelectorAll('.tick-checkbox').forEach(cb => {
+    cb.addEventListener('change', async function () {
+        const tickId = this.dataset.tickId;
+        const paymentId = this.dataset.paymentId;
+        const done = this.checked ? '1' : '0';
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        // دریافت دلیل از textarea (اگر وجود دارد)
+        let reason = '';
+        const reasonEl = document.getElementById('discountReason');
+        if (reasonEl && !this.checked) {
+            reason = reasonEl.value.trim();
+            if (!reason) {
+                if (!confirm('بدون ذکر دلیل، تیک این خدمت برداشته شود؟')) {
+                    this.checked = true;
+                    return;
+                }
+            }
+        }
+
+        const formData = new FormData();
+        formData.append('tick_id', tickId);
+        formData.append('payment_id', paymentId);
+        formData.append('done', done);
+        formData.append('reason', reason);
+        formData.append('_csrf', csrfToken);
+
+        try {
+            const response = await fetch('<?= $base ?>admin/payment/tick', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.success) {
+                // به‌روزرسانی مبلغ نهایی
+                const finalCell = document.getElementById('finalAmountCell');
+                if (finalCell) {
+                    finalCell.textContent = new Intl.NumberFormat('fa-IR').format(data.final_amount);
+                }
+                // به‌روزرسانی رنگ ردیف
+                const row = this.closest('tr');
+                if (row) {
+                    row.classList.toggle('table-warning', !data.is_done);
+                }
+                // اگر دلیل لازم است و داده نشده، هشدار
+                if (!data.is_done && !reason) {
+                    if (reasonEl) {
+                        reasonEl.focus();
+                        reasonEl.classList.add('is-invalid');
+                    }
+                }
+                // به‌روزرسانی تودار شدن سطر
+                const siblingTr = row?.querySelector('small.text-muted');
+                if (!data.is_done && reason) {
+                    if (!siblingTr) {
+                        const small = document.createElement('small');
+                        small.className = 'text-muted d-block';
+                        small.textContent = 'دلیل: ' + reason;
+                        row.querySelector('td:nth-child(2)').appendChild(small);
+                    }
+                }
+            } else {
+                alert('خطا: ' + (data.error || 'نامشخص'));
+                this.checked = !this.checked; // برگرداندن
+            }
+        } catch (e) {
+            alert('خطا در ارتباط با سرور');
+            this.checked = !this.checked;
         }
     });
 });

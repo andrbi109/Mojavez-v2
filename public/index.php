@@ -151,6 +151,14 @@ $router->post('/admin/payments/review', ['PaymentController', 'review']);
 $router->get('/admin/payments/csv', ['PaymentController', 'csv']);
 $router->post('/admin/payment-channels/save', ['PaymentController', 'saveChannel']);
 $router->post('/admin/payment-channels/delete', ['PaymentController', 'deleteChannel']);
+
+// نرخ‌نامهٔ چندگانه و تیک خدمات
+$router->get('/admin/fee-tariff', ['FeeTariffController', 'index']);
+$router->post('/admin/fee-tariff/settings', ['FeeTariffController', 'saveSettings']);
+$router->post('/admin/fee-tariff/group/save', ['FeeTariffController', 'groupSave']);
+$router->post('/admin/fee-tariff/group/{id}/delete', ['FeeTariffController', 'groupDelete']);
+$router->post('/admin/fee-tariff/items/save', ['FeeTariffController', 'itemsSave']);
+$router->post('/admin/payment/tick', ['FeeTariffController', 'toggleTick']);
 // درخواست پرداخت هزینه توسط مدیر روی پرونده
 $router->post('/admin/request-payment', ['AdminController', 'requestPayment']);
 // وضعیت مجوز و سلسله‌مراتب پرونده‌ها (فاز ۷)

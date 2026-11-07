@@ -8,6 +8,120 @@
 
 ---
 
+## [0.2.0] — ۲۰۲۶-۱۱-۰۷ — نرخ‌نامهٔ چندگانه + تیک خدمات + مودال پیام
+
+### ✨ افزوده‌ها (MINOR)
+
+#### ۱. نرخ‌نامهٔ چندگانه بر اساس دهک درآمدی
+- ۴ گروه قیمتی: الف (روستایی/دهک ۱-۲: ۱,۳۵۰,۰۰۰)، ب (۳-۴: ۲,۲۵۰,۰۰۰)، ج (۵-۶: ۳,۸۰۰,۰۰۰)، د (۷-۱۰: ۶,۵۰۰,۰۰۰)
+- ۱۲ خدمت پایه برای هر گروه (قابل تنظیم از پنل)
+- محاسبهٔ خودکار بر اساس `income_decile` و `village/rural_district`
+- معافیت خودکار روستاییان (گروه الف) — قابل لغو توسط مدیر
+- fallback هوشمند برای دهک خالی (گروه ج با flag `fallback_used`)
+- سازگاری عقب کامل: اگر `fee_tariff_active=0`، مبلغ ثابت قبلی اعمال می‌شود
+
+#### ۲. تیک خدمات در پنل مدیریت
+- ۱۲ تیک برای هر پرداخت (پیش‌فرض همه تیک‌خورده)
+- مدیر می‌تواند خدمات انجام‌نشده را تیک بردارد
+- محاسبهٔ خودکار مبلغ نهایی (`final_amount`)
+- حداقل مبلغ نهایی: ۱۰٪ مبلغ اصلی (محافظت)
+- دلیل تخفیف اجباری اگر تعداد تیک‌برداشته‌شده > ۲ باشد
+- هشدار تخفیف بیش از ۵۰٪ (نیازمند مدیر ارشد)
+- به‌روزرسانی AJAX (بدون رفرش صفحه)
+- نمایش مبلغ اصلی، کسر، نهایی، و مبلغ واریزی متقاضی
+
+#### ۳. تشخیص خودکار موارد مشکوک
+- `rural_address_mismatch`: روستا + شهر بزرگ (تهران/مشهد/...)
+- `decile_history_conflict`: دهک فعلی ۳+ کمتر از دهک قبلی شخص
+- `low_decile_urban`: دهک ۱-۲ + آدرس شهری بزرگ
+- `fallback_used`: دهک خالی یا نامعتبر
+- نمایش flags در صفحهٔ پرونده با badge های رنگی
+
+#### ۴. مودال پیام حمایتی پس از کد رهگیری
+- نمایش خودکار پس از ۱.۵ ثانیه در صفحهٔ موفقیت ثبت‌نام
+- متن پیام مخصوص هر گروه (قابل تنظیم از پنل)
+- فقط یک بار در هر نشست مرورگر نمایش داده می‌شود (`sessionStorage`)
+- قابل بستن توسط کاربر
+
+#### ۵. پنل مدیریت نرخ‌نامه (مسیر `/admin/fee-tariff`)
+- تنظیمات کلی: فعال‌سازی، تاریخ اعتبار، معافیت روستایی، fallback
+- CRUD کامل گروه‌های قیمتی (مودال)
+- ویرایش مبالغ ۱۲ آیتم هر گروه
+- راهنمای منطق محاسبه
+
+#### ۶. درخواست پرداخت پیشرفته
+- هنگام فعال‌سازی، مبلغ خودکار محاسبه می‌شود (نه ثابت ۵۰۰,۰۰۰)
+- ایجاد رکورد `payments` با `original_amount`, `final_amount`, `fee_group_id`, `suspicion_flags`
+- ایجاد خودکار ۱۲ تیک اولیه برای پرداخت جدید
+- ثبت در audit log (`payment_audit_log`)
+
+#### ۷. نمایش هوشمند دکمه‌ها در صفحهٔ پرونده
+- اگر `payment_required = 0` → «درخواست پرداخت هزینه» (gold)
+- اگر `payment_required = 1` و پرداخت در انتظار → «لغو درخواست پرداخت» (outline-danger)
+- اگر پرداخت تأیید شده → دکمه لغو **مخفی**، نمایش «درخواست پرداخت جدید (هزینهٔ اضافی)» (outline-primary)
+
+#### ۸. تاریخچهٔ ممیزی کامل (Audit Log)
+- هر تغییر مدیر روی تیک‌ها، تخفیف، تأیید/رد ثبت می‌شود
+- نمایش تاریخچه در صفحهٔ پرونده (قابل باز/بسته شدن)
+
+### 🗄️ پایگاه داده
+
+#### جداول جدید (۳)
+- `fee_groups` — ۴ گروه قیمتی
+- `fee_group_items` — ۱۲ خدمت برای هر گروه (۴۸ ردیف بذر)
+- `payment_service_ticks` — تیک خدمات انجام‌شده برای هر پرداخت
+- `payment_audit_log` — تاریخچهٔ تغییرات مدیر
+
+#### ستون‌های جدید در `payments` (۸ ستون)
+- `original_amount`, `final_amount`, `discount_reason`
+- `fee_group_id`, `is_rural_exempt`, `fallback_used`, `suspicion_flags`
+
+#### تنظیمات جدید (۹ کلید)
+- `fee_tariff_active`, `fee_tariff_valid_until`, `fee_default_amount`
+- `fee_rural_auto_eligible`, `fee_modal_enabled`, `fee_modal_dismissable`
+- `fee_fallback_group_code`, `fee_min_amount_percent`
+- `fee_max_discount_without_reason`, `fee_max_discount_with_reason`
+
+### 📁 فایل‌های جدید (۷)
+- `app/Models/FeeGroup.php`
+- `app/Models/FeeGroupItem.php`
+- `app/Models/PaymentServiceTick.php`
+- `app/Models/PaymentAuditLog.php`
+- `app/Services/FeeCalculatorService.php`
+- `app/Controllers/FeeTariffController.php`
+- `app/Views/admin/fee_tariff.php`
+
+### 📝 فایل‌های اصلاح‌شده (۸)
+- `database/schema.sql` — افزودن ۳ جدول + ۸ ستون + ۹ تنظیم + بذر اولیه
+- `app/Controllers/AdminController.php` — اصلاح `requestPayment` و `viewApplication`
+- `app/Controllers/TrackingController.php` — استفاده از FeeCalculatorService
+- `app/Controllers/RegistrationController.php` — ارسال feeGroup به success.php
+- `app/Views/admin/view_application.php` — دکمه‌های هوشمند + کارت تیک خدمات
+- `app/Views/registration/success.php` — مودال پیام حمایتی
+- `app/Views/admin_layout.php` — آیتم منو + آیکون‌های جدید
+- `config/helper.php` — توابع `safe_file_extension`, `sanitize_upload_filename` + آیکون‌های `wallet`, `check-square`
+- `public/index.php` — مسیرهای جدید (۶ مسیر)
+
+### 🛡️ محافظت‌های امنیتی
+
+| محافظت | مقدار |
+|---|---|
+| حداقل مبلغ نهایی | ۱۰٪ مبلغ اصلی |
+| حداکثر تخفیف بدون دلیل | ۲ خدمت |
+| حداکثر تخفیف با دلیل | ۵۰٪ (با تأیید مدیر ارشد بیشتر) |
+| پیش‌فرض تیک‌ها | همه تیک‌خورده |
+| Audit log | تمام تغییرات مدیر |
+| سازگاری عقب | اگر `fee_tariff_active=0`، سیستم به حالت قبلی برمی‌گردد |
+
+### 🎯 تجربهٔ متقاضی (بدون تغییر ساختاری)
+- متقاضی فقط مبلغ جدید را می‌بیند (به‌جای ۵۰۰,۰۰۰ مثلاً ۱,۳۵۰,۰۰۰)
+- کانال‌های پرداخت همان‌اند
+- رسید آپلود می‌کند همان‌طور
+- گردش تأیید مدیر همان است
+- تنها افزوده: مودال پیام حمایتی پس از کد رهگیری
+
+---
+
 ## [0.1.2] — ۲۰۲۶-۱۱-۰۷ — اصلاح خطای JavaScript و تغییر نوع خدمت
 
 ### 🔧 اصلاحات (Bug Fixes)

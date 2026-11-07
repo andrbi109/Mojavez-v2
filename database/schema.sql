@@ -717,3 +717,179 @@ ALTER TABLE applicants
 
 -- company_name, company_national_id, reg_number, reg_date, company_type, economic_code
 
+-- =================================================================
+-- نرخ‌نامهٔ چندگانه (درخواست کاربر)
+-- -----------------------------------------------------------------
+-- ۴ گروه قیمتی بر اساس دهک درآمدی + معافیت روستایی
+-- =================================================================
+
+CREATE TABLE IF NOT EXISTS fee_groups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    icon VARCHAR(30),
+    decile_min TINYINT NOT NULL,
+    decile_max TINYINT NOT NULL,
+    is_rural_eligible TINYINT(1) NOT NULL DEFAULT 0,
+    total_amount BIGINT UNSIGNED NOT NULL,
+    message_title VARCHAR(100),
+    message_body TEXT,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_active_sort (is_active, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS fee_group_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fee_group_id INT NOT NULL,
+    item_key VARCHAR(40) NOT NULL,
+    item_label VARCHAR(150) NOT NULL,
+    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    notes VARCHAR(255),
+    sort_order INT NOT NULL DEFAULT 0,
+    FOREIGN KEY (fee_group_id) REFERENCES fee_groups(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_group_item (fee_group_id, item_key),
+    INDEX idx_group_sort (fee_group_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- تیک خدمات انجام‌شده برای هر پرداخت (واسط مدیر)
+CREATE TABLE IF NOT EXISTS payment_service_ticks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT NOT NULL,
+    item_key VARCHAR(40) NOT NULL,
+    item_label VARCHAR(150) NOT NULL,
+    original_amount BIGINT UNSIGNED NOT NULL,
+    is_done TINYINT(1) NOT NULL DEFAULT 1,
+    ticked_by INT NULL,
+    ticked_at DATETIME NULL,
+    untick_reason VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (ticked_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY uniq_payment_item (payment_id, item_key),
+    INDEX idx_payment (payment_id),
+    INDEX idx_done (is_done)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- تاریخچهٔ تغییرات مدیر روی پرداخت‌ها (audit log)
+CREATE TABLE IF NOT EXISTS payment_audit_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    field_changed VARCHAR(50) NULL,
+    old_value TEXT NULL,
+    new_value TEXT NULL,
+    note VARCHAR(500) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_audit_payment (payment_id),
+    INDEX idx_audit_user (user_id),
+    INDEX idx_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ستون‌های جدید در payments برای نرخ‌نامه و تخفیف
+ALTER TABLE payments
+    ADD COLUMN original_amount BIGINT UNSIGNED NULL AFTER amount,
+    ADD COLUMN final_amount BIGINT UNSIGNED NULL AFTER original_amount,
+    ADD COLUMN discount_reason VARCHAR(500) NULL AFTER final_amount,
+    ADD COLUMN fee_group_id INT NULL AFTER discount_reason,
+    ADD COLUMN is_rural_exempt TINYINT(1) NOT NULL DEFAULT 0 AFTER fee_group_id,
+    ADD COLUMN fallback_used TINYINT(1) NOT NULL DEFAULT 0 AFTER is_rural_exempt,
+    ADD COLUMN suspicion_flags VARCHAR(255) NULL AFTER fallback_used,
+    ADD INDEX idx_pay_group (fee_group_id),
+    ADD INDEX idx_pay_suspicion (suspicion_flags(50));
+
+-- بذر ۴ گروه قیمتی + ۱۲ خدمت برای هر گروه
+INSERT INTO fee_groups (code, name, icon, decile_min, decile_max, is_rural_eligible, total_amount, message_title, message_body, sort_order) VALUES
+('A', 'گروه الف: حمایتی', '🌱', 1, 2, 1, 1350000,
+ 'پیام ما به شما',
+ 'هنرمند عزیز روستایی، ما می‌دانیم که برای آمدن به شهر و انجام این کارها، هم هزینه رفت‌وآمد می‌دهید و هم وقت ارزشمندتان را صرف می‌کنید. به همین دلیل، تمام تلاشمان را می‌کنیم که در یک مراجعه، تمام کارهایتان انجام شود. اگر هم پرونده‌تان نقص داشت، خودمان با شما تماس می‌گیریم و بدون هزینه اضافی، رفع نقص می‌کنیم. هنر شما سرمایه این سرزمین است و ما مفتخریم که در خدمت شما هستیم.',
+ 10),
+('B', 'گروه ب: متوسط آسیب‌پذیر', '🌿', 3, 4, 0, 2250000,
+ 'پیام ما به شما',
+ 'هنرمند گرامی، ما می‌دانیم که شما با دستان هنرمندتان، آبروی خانواده‌تان را تأمین می‌کنید. هر ریالی که از شما می‌گیریم، در قبال خدماتی است که واقعاً انجام می‌دهیم. اگر در هر مرحله از کار، سوالی داشتید یا نگرانی برایتان پیش آمد، با روی خوش پاسخگو هستیم.',
+ 20),
+('C', 'گروه ج: متوسط', '🌳', 5, 6, 0, 3800000,
+ 'پیام ما به شما',
+ 'همشهری گرامی، شفافیت، اصل اول کار ماست. شما با پرداخت این مبلغ، صاحب یک پرونده کامل و بدون نقص خواهید شد که در سریع‌ترین زمان ممکن به نتیجه می‌رسد. ما به وقت شما احترام می‌گذاریم.',
+ 30),
+('D', 'گروه د: حرفه‌ای/VIP', '🌲', 7, 10, 0, 6500000,
+ 'پیام ما به شما',
+ 'همراه گرامی، این پکیج ویژه برای کسانی طراحی شده که به دنبال خدمات حرفه‌ای، سریع و بدون دغدغه هستند. در این پکیج، ما تمام مراحل را از ابتدا تا انتها به صورت اختصاصی برای شما مدیریت می‌کنیم.',
+ 40)
+ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- بذر ۱۲ خدمت پایه برای هر گروه (مبالغ اولیه)
+-- کلیدهای آیتم‌ها
+INSERT INTO fee_group_items (fee_group_id, item_key, item_label, amount, sort_order) VALUES
+-- گروه الف
+((SELECT id FROM fee_groups WHERE code='A'), 'service_registration', 'ثبت‌نام و احراز هویت در درگاه ملی مجوزها', 80000, 10),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_postal_code', 'ثبت/اصلاح کد پستی در سامانه املاک و اسکان', 40000, 20),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_document_upload', 'ثبت و بارگذاری مدارک در سامانه میراث فرهنگی', 300000, 30),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_address_verify', 'احراز نشانی پستی (GNAF)', 120000, 40),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_scan', 'اسکن مدارک (تا ۱۰ صفحه)', 40000, 50),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_license_print', 'چاپ مجوز نهایی', 40000, 60),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_delivery', 'ارسال فایل نهایی به موبایل', 40000, 70),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_followup', 'پیگیری و رفع نقص احتمالی', 400000, 80),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_license_image', 'بارگذاری تصویر مجوز + توکن ۷۲ ساعته', 50000, 90),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_revision_cycle', 'چرخهٔ بازبینی پرونده', 50000, 100),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_sms_status', 'ثبت پیامک‌های وضعیت با ارتقای خودکار', 40000, 110),
+((SELECT id FROM fee_groups WHERE code='A'), 'service_multi_license', 'پشتیبانی چندمجوزی + احراز شش‌عاملی', 150000, 120),
+-- گروه ب
+((SELECT id FROM fee_groups WHERE code='B'), 'service_registration', 'ثبت‌نام و احراز هویت در درگاه ملی مجوزها', 240000, 10),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_postal_code', 'ثبت/اصلاح کد پستی در سامانه املاک و اسکان', 80000, 20),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_document_upload', 'ثبت و بارگذاری مدارک در سامانه میراث فرهنگی', 650000, 30),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_address_verify', 'احراز نشانی پستی (GNAF)', 160000, 40),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_scan', 'اسکن مدارک (تا ۱۰ صفحه)', 80000, 50),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_license_print', 'چاپ مجوز نهایی', 80000, 60),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_delivery', 'ارسال فایل نهایی به موبایل', 40000, 70),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_followup', 'پیگیری و رفع نقص احتمالی', 480000, 80),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_license_image', 'بارگذاری تصویر مجوز + توکن ۷۲ ساعته', 80000, 90),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_revision_cycle', 'چرخهٔ بازبینی پرونده', 80000, 100),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_sms_status', 'ثبت پیامک‌های وضعیت با ارتقای خودکار', 60000, 110),
+((SELECT id FROM fee_groups WHERE code='B'), 'service_multi_license', 'پشتیبانی چندمجوزی + احراز شش‌عاملی', 220000, 120),
+-- گروه ج
+((SELECT id FROM fee_groups WHERE code='C'), 'service_registration', 'ثبت‌نام و احراز هویت در درگاه ملی مجوزها', 400000, 10),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_postal_code', 'ثبت/اصلاح کد پستی در سامانه املاک و اسکان', 120000, 20),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_document_upload', 'ثبت و بارگذاری مدارک در سامانه میراث فرهنگی', 1100000, 30),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_address_verify', 'احراز نشانی پستی (GNAF)', 240000, 40),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_scan', 'اسکن مدارک (تا ۱۰ صفحه)', 120000, 50),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_license_print', 'چاپ مجوز نهایی', 120000, 60),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_delivery', 'ارسال فایل نهایی به موبایل', 40000, 70),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_followup', 'پیگیری و رفع نقص احتمالی', 800000, 80),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_license_image', 'بارگذاری تصویر مجوز + توکن ۷۲ ساعته', 120000, 90),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_revision_cycle', 'چرخهٔ بازبینی پرونده', 120000, 100),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_sms_status', 'ثبت پیامک‌های وضعیت با ارتقای خودکار', 100000, 110),
+((SELECT id FROM fee_groups WHERE code='C'), 'service_multi_license', 'پشتیبانی چندمجوزی + احراز شش‌عاملی', 120000, 120),
+-- گروه د
+((SELECT id FROM fee_groups WHERE code='D'), 'service_registration', 'ثبت‌نام و احراز هویت در درگاه ملی مجوزها', 650000, 10),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_postal_code', 'ثبت/اصلاح کد پستی در سامانه املاک و اسکان', 240000, 20),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_document_upload', 'ثبت و بارگذاری مدارک در سامانه میراث فرهنگی', 1900000, 30),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_address_verify', 'احراز نشانی پستی (GNAF)', 360000, 40),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_scan', 'اسکن مدارک (تا ۱۰ صفحه)', 200000, 50),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_license_print', 'چاپ مجوز نهایی', 200000, 60),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_delivery', 'ارسال فایل نهایی به موبایل', 80000, 70),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_followup', 'پیگیری و رفع نقص احتمالی', 1500000, 80),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_license_image', 'بارگذاری تصویر مجوز + توکن ۷۲ ساعته', 200000, 90),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_revision_cycle', 'چرخهٔ بازبینی پرونده', 200000, 100),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_sms_status', 'ثبت پیامک‌های وضعیت با ارتقای خودکار', 160000, 110),
+((SELECT id FROM fee_groups WHERE code='D'), 'service_multi_license', 'پشتیبانی چندمجوزی + احراز شش‌عاملی', 810000, 120)
+ON DUPLICATE KEY UPDATE item_label = VALUES(item_label), amount = VALUES(amount);
+
+-- تنظیمات نرخ‌نامه
+INSERT INTO settings (setting_key, setting_value) VALUES
+('fee_tariff_active', '1'),
+('fee_tariff_valid_until', '1405/12/29'),
+('fee_default_amount', '500000'),
+('fee_rural_auto_eligible', '1'),
+('fee_modal_enabled', '1'),
+('fee_modal_dismissable', '1'),
+('fee_fallback_group_code', 'C'),
+('fee_min_amount_percent', '10'),
+('fee_max_discount_without_reason', '2'),
+('fee_max_discount_with_reason', '50')
+ON DUPLICATE KEY UPDATE setting_key = setting_key;
+

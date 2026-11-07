@@ -820,11 +820,26 @@ class RegistrationController extends Controller
             $this->redirect('/');
         }
         $fullName = trim($applicant['first_name'] . ' ' . $applicant['last_name']);
+
+        // محاسبهٔ گروه قیمتی برای نمایش مودال پیام حمایتی
+        $feeInfo = null;
+        $feeGroup = null;
+        try {
+            if ((int)setting('fee_modal_enabled', '1') === 1) {
+                $feeInfo = FeeCalculatorService::calculateForApplicant((int)$applicant['id']);
+                $feeGroup = $feeInfo['group'] ?? null;
+            }
+        } catch (\Throwable $e) {
+            // در صورت خطا، مودال نمایش داده نمی‌شود
+        }
+
         $this->render('registration/success', [
             'title' => 'ثبت‌نام با موفقیت انجام شد',
             'trackingCode' => $trackingCode,
             'applicantName' => $fullName,
             'notifyMessage' => build_notify_message($fullName, $trackingCode),
+            'feeGroup' => $feeGroup,
+            'feeInfo' => $feeInfo,
         ]);
     }
 }
