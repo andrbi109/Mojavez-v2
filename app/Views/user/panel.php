@@ -346,7 +346,7 @@ $stateBadge = ['جاری' => 'primary', 'صادر شده' => 'success', 'باط�
                     <?= $e(mb_substr($u['first_name'] ?? '؟', 0, 1)) ?>
                 </div>
                 <h5 class="fw-bold mb-0"><?= $e($u['first_name'] . ' ' . $u['last_name']) ?></h5>
-                <small class="opacity-75"><?= $e($roleLabels[$role] ?? $u['mobile'] ?? '') ?></small>
+                <small class="opacity-75" dir="ltr"><?= $e($u['mobile'] ?? '') ?></small>
             </div>
             <div class="profile-body">
                 <div class="profile-item">
