@@ -118,18 +118,36 @@
                 $payBadge = $pay ? match ($pay['status']) {
                     'تأیید شده' => 'success', 'رد شده' => 'danger', default => 'warning text-dark',
                 } : null;
+                // تعیین نمایش فرم آپلود رسید:
+                // - اگر پرداخت تأیید شده → فقط پیام تأیید (بدون فرم)
+                // - اگر پرداخت در انتظار بررسی (رسید آپلود شده، منتظر مدیر) → فقط پیام (بدون فرم)
+                // - اگر پرداخت در انتظار رسید (مدیر درخواست داده، رسید آپلود نشده) → فرم آپلود
+                // - اگر پرداخت رد شده → فرم آپلود (برای آپلود مجدد)
+                // - اگر اصلاً پرداخت وجود ندارد → فرم آپلود
+                $showReceiptForm = !$pay
+                    || $pay['status'] === 'در انتظار رسید'
+                    || $pay['status'] === 'رد شده';
                 ?>
-                <?php if ($pay && in_array($pay['status'], ['در انتظار بررسی', 'تأیید شده'], true)): ?>
-                    <div class="alert alert-<?= $pay['status'] === 'تأیید شده' ? 'success' : 'info' ?> py-2 small mb-0">
-                        <strong>رسید پرداخت شما <?= htmlspecialchars($pay['status']) ?> است.</strong>
-                        مبلغ <?= number_format((int)$pay['amount']) ?> تومان
-                        <?php if ($pay['status'] === 'در انتظار بررسی'): ?>— پس از بررسی مدیر، نتیجه در تایم‌لاین پرونده اعلام می‌شود.<?php else: ?>— پرداخت شما تأیید شد. ✔<?php endif; ?>
+                <?php if ($pay && $pay['status'] === 'تأیید شده'): ?>
+                    <div class="alert alert-success py-2 small mb-0">
+                        <strong>رسید پرداخت شما تأیید شد. ✔</strong>
+                        مبلغ <?= number_format((int)$pay['amount']) ?> تومان — پرداخت شما تأیید شد.
+                    </div>
+                <?php elseif ($pay && $pay['status'] === 'در انتظار بررسی'): ?>
+                    <div class="alert alert-info py-2 small mb-0">
+                        <strong>رسید پرداخت شما در انتظار بررسی مدیر است.</strong>
+                        مبلغ <?= number_format((int)$pay['amount']) ?> تومان — پس از بررسی مدیر، نتیجه در تایم‌لاین پرونده اعلام می‌شود.
                     </div>
                 <?php else: ?>
                     <?php if ($pay && $pay['status'] === 'رد شده'): ?>
                         <div class="alert alert-danger py-2 small">
                             رسید قبلی شما <strong>رد شد</strong><?= !empty($pay['reject_reason']) ? ' — دلیل: ' . htmlspecialchars($pay['reject_reason']) : '' ?>.
                             می‌توانید رسید اصلاح‌شده را مجدداً ثبت کنید.
+                        </div>
+                    <?php elseif ($pay && $pay['status'] === 'در انتظار رسید'): ?>
+                        <div class="alert alert-warning py-2 small">
+                            <strong>مدیر درخواست پرداخت هزینهٔ ثبت‌نام را صادر کرده است.</strong><br>
+                            لطفاً مبلغ <strong><?= number_format((int)$feeAmount) ?> تومان</strong> را از یکی از کانال‌های زیر واریز کنید و سپس تصویر رسید را بارگذاری نمایید.
                         </div>
                     <?php endif; ?>
 

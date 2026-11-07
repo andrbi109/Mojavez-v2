@@ -853,13 +853,13 @@ class AdminController extends Controller
         );
         $stmt->execute(['flag' => $enable ? 1 : 0, 'flag2' => $enable ? 1 : 0, 'id' => $applicantId]);
 
-        // اگر فعال‌سازی شده، یک رکورد payments با مبلغ محاسبه‌شده بساز (وضعیت: در انتظار بررسی)
+        // اگر فعال‌سازی شده، یک رکورد payments با مبلغ محاسبه‌شده بساز (وضعیت: در انتظار رسید)
         if ($enable) {
-            // جلوگیری از ایجاد رکورد تکراری
+            // جلوگیری از ایجاد رکورد تکراری (هم در انتظار رسید و هم در انتظار بررسی)
             $stmt = $db->prepare(
                 "SELECT id FROM payments
                  WHERE applicant_id = :aid AND purpose = 'هزینهٔ ثبت‌نام'
-                   AND status = 'در انتظار بررسی'
+                   AND status IN ('در انتظار رسید', 'در انتظار بررسی')
                  ORDER BY id DESC LIMIT 1"
             );
             $stmt->execute(['aid' => $applicantId]);
@@ -867,6 +867,7 @@ class AdminController extends Controller
 
             if ($existingPaymentId === 0) {
                 // ایجاد رکورد پرداخت با مبلغ محاسبه‌شده
+                // وضعیت 'در انتظار رسید' یعنی مدیر درخواست داده، ولی متقاضی هنوز رسید آپلود نکرده
                 $stmt = $db->prepare(
                     "INSERT INTO payments
                         (applicant_id, payment_channel_id, purpose, amount, original_amount,
@@ -875,7 +876,7 @@ class AdminController extends Controller
                      VALUES
                         (:aid, NULL, 'هزینهٔ ثبت‌نام', :amount, :orig,
                          :final, :gid, :rural, :fallback,
-                         :flags, 'در انتظار بررسی', NOW())"
+                         :flags, 'در انتظار رسید', NOW())"
                 );
                 $stmt->execute([
                     'aid' => $applicantId,

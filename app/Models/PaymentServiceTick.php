@@ -16,13 +16,26 @@ class PaymentServiceTick
 
     public function findByPaymentId(int $paymentId): array
     {
+        // کوئری با ORDER BY id به‌عنوان fallback امن — sort_order ممکن است در دیتابیس‌های قدیمی موجود نباشد
+        // اما در CREATE TABLE فعلی موجود است، پس مشکلی نیست
         $stmt = $this->db->prepare(
             "SELECT * FROM payment_service_ticks
              WHERE payment_id = :pid
              ORDER BY sort_order, id"
         );
-        $stmt->execute(['pid' => $paymentId]);
-        return $stmt->fetchAll();
+        try {
+            $stmt->execute(['pid' => $paymentId]);
+            return $stmt->fetchAll();
+        } catch (\PDOException $e) {
+            // fallback: اگر ستون sort_order موجود نبود (دیتابیس قدیمی)
+            $stmt = $this->db->prepare(
+                "SELECT * FROM payment_service_ticks
+                 WHERE payment_id = :pid
+                 ORDER BY id"
+            );
+            $stmt->execute(['pid' => $paymentId]);
+            return $stmt->fetchAll();
+        }
     }
 
     /**
@@ -40,9 +53,9 @@ class PaymentServiceTick
         $adminId = (int)($_SESSION['admin_id'] ?? 0);
         $stmt = $this->db->prepare(
             "INSERT INTO payment_service_ticks
-                (payment_id, item_key, item_label, original_amount, is_done, ticked_by, ticked_at, untick_reason)
+                (payment_id, item_key, item_label, original_amount, is_done, ticked_by, ticked_at, untick_reason, sort_order)
              VALUES
-                (:pid, :k, :label, :amt, 1, :uid, NOW(), NULL)"
+                (:pid, :k, :label, :amt, 1, :uid, NOW(), NULL, :sort)"
         );
         $count = 0;
         foreach ($items as $item) {
@@ -52,6 +65,7 @@ class PaymentServiceTick
                 'label' => $item['item_label'],
                 'amt' => (int)$item['amount'],
                 'uid' => $adminId,
+                'sort' => (int)($item['sort_order'] ?? 0),
             ]);
             $count++;
         }

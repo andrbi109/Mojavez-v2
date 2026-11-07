@@ -8,6 +8,78 @@
 
 ---
 
+## [0.2.2] — ۲۰۲۶-۱۱-۰۷ — اصلاح sort_order و وضعیت «در انتظار رسید»
+
+### 🔧 اصلاحات (Bug Fixes)
+
+#### ۱) خطای `Column not found: 1054 Unknown column 'sort_order' in 'ORDER BY'`
+- **علت:** جدول `payment_service_ticks` در CREATE TABLE اولیه فاقد ستون `sort_order` بود
+  ولی کوئری `findByPaymentId` از `ORDER BY sort_order, id` استفاده می‌کرد. این باعث
+  خطای ۵۰۰ و از بین رفتن استایل صفحهٔ پرونده می‌شد.
+- **راه‌حل:**
+  ۱. افزودن ستون `sort_order INT NOT NULL DEFAULT 0` به `CREATE TABLE` در `schema.sql`
+  ۲. افزودن مهاجرت idempotent برای دیتابیس‌های موجود:
+     ```sql
+     SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+                        WHERE TABLE_NAME = 'payment_service_ticks' AND COLUMN_NAME = 'sort_order');
+     SET @ddl = IF(@col_exists = 0,
+         'ALTER TABLE payment_service_ticks ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER untick_reason',
+         'SELECT 1');
+     PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+     ```
+  ۳. به‌روزرسانی `createForPayment` برای ذخیرهٔ `sort_order`
+  ۴. افزودن fallback امن در `findByPaymentId` (try/catch) برای دیتابیس‌های قدیمی
+
+#### ۲) متقاضی پس از درخواست پرداخت توسط مدیر، فرم آپلود رسید را نمی‌بیند
+- **علت:** وقتی مدیر «درخواست پرداخت» را فعال می‌کرد، یک رکورد `payments` با
+  `status='در انتظار بررسی'` ایجاد می‌شد. سپس view با دیدن این وضعیت، پیام
+  «رسید پرداخت شما در انتظار بررسی است» را نمایش می‌داد و فرم آپلود را مخفی می‌کرد.
+  این یعنی متقاضی هرگز نمی‌توانست رسید آپلود کند!
+- **راه‌حل:**
+  ۱. افزودن وضعیت جدید `در انتظار رسید` به ENUM `payments.status`
+     (این یعنی مدیر درخواست داده، ولی متقاضی هنوز رسید آپلود نکرده)
+  ۲. مدیر هنگام فعال‌سازی، رکورد را با وضعیت `در انتظار رسید` ایجاد می‌کند
+  ۳. متقاضی در صفحهٔ پیگیری، فرم آپلود رسید را می‌بیند
+  ۴. وقتی متقاضی رسید را آپلود کرد، وضعیت به `در انتظار بررسی` تغییر می‌کند
+  ۵. سپس مدیر می‌تواند تأیید/رد کند
+
+#### ۳) به‌روزرسانی منطق نمایش فرم آپلود در `tracking/status.php`
+- ۴ حالت نمایش:
+  - `تأیید شده` → فقط پیام موفقیت
+  - `در انتظار بررسی` → فقط پیام «در انتظار بررسی مدیر»
+  - `در انتظار رسید` → فرم آپلود + پیام «مدیر درخواست صادر کرده»
+  - `رد شده` → فرم آپلود + دلیل رد
+- پیام‌های دقیق‌تر و فارسی‌تر
+
+#### ۴) رفع باگ `original_name` در رسید پرداخت
+- قبلاً از `basename((string)$file['name'])` استفاده می‌شد که برای نام‌های عجیب ممکن بود
+  مشکل داشته باشد. اکنون از `sanitize_upload_filename()` استفاده می‌شود.
+
+### 🗄️ پایگاه داده
+- افزودن ستون `sort_order` به `payment_service_ticks`
+- افزودن وضعیت `در انتظار رسید` به ENUM `payments.status`
+- مهاجرت idempotent برای دیتابیس‌های موجود
+
+### 📁 فایل‌های اصلاح‌شده (۵)
+- `database/schema.sql` — CREATE TABLE + ALTER idempotent + MODIFY COLUMN
+- `app/Models/PaymentServiceTick.php` — ایجاد sort_order + fallback امن
+- `app/Controllers/AdminController.php` — استفاده از `در انتظار رسید` به‌جای `در انتظار بررسی`
+- `app/Controllers/TrackingController.php` — به‌روزرسانی رکورد موجود به‌جای ایجاد رکورد جدید
+- `app/Views/tracking/status.php` — منطق نمایش صحیح بر اساس ۴ وضعیت پرداخت
+
+### 🎯 گردش کار صحیح
+```
+۱. مدیر در پنل → «درخواست پرداخت هزینه» را فعال می‌کند
+   → رکورد payments با status='در انتظار رسید' و مبلغ محاسبه‌شده ایجاد می‌شود
+۲. متقاضی در /tracking/status/{code} → فرم آپلود رسید را می‌بیند
+   + پیام «مدیر درخواست پرداخت صادر کرده — مبلغ X تومان»
+۳. متقاضی مبلغ را واریز می‌کند، رسید را آپلود می‌کند
+   → رکورد payments به‌روزرسانی می‌شود: status='در انتظار بررسی'
+۴. مدیر در پنل → تأیید یا رد می‌کند
+   → status='تأیید شده' یا 'رد شده'
+```
+
+---
 ## [0.2.1] — ۲۰۲۶-۱۱-۰۷ — اعتبارسنجی چندلایه‌ای فایل آپلودی
 
 ### 🔧 اصلاحات (Bug Fixes)

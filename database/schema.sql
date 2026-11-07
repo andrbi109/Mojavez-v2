@@ -410,7 +410,7 @@ CREATE TABLE IF NOT EXISTS payments (
     paid_at DATE NULL,                               -- تاریخ واریز اعلامی (میلادی، از شمسی تبدیل می‌شود)
     receipt_document_id INT NULL,                    -- تصویر رسید → documents
     linked_request_id INT NULL,                      -- درخواست مرتبط (بازصدور تصویر مجوز — فاز ۶)
-    status ENUM('در انتظار بررسی','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار بررسی',
+    status ENUM('در انتظار رسید','در انتظار بررسی','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار رسید',
     reviewed_by INT NULL,
     reviewed_at DATETIME NULL,
     reject_reason VARCHAR(255) NULL,
@@ -764,6 +764,7 @@ CREATE TABLE IF NOT EXISTS payment_service_ticks (
     ticked_by INT NULL,
     ticked_at DATETIME NULL,
     untick_reason VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
     FOREIGN KEY (ticked_by) REFERENCES users(id) ON DELETE SET NULL,
@@ -801,6 +802,25 @@ ALTER TABLE payments
     ADD COLUMN suspicion_flags VARCHAR(255) NULL AFTER fallback_used,
     ADD INDEX idx_pay_group (fee_group_id),
     ADD INDEX idx_pay_suspicion (suspicion_flags(50));
+
+-- مهاجرت: افزودن وضعیت 'در انتظار رسید' به ENUM پرداخت‌ها
+-- این وضعیت برای زمانی است که مدیر درخواست پرداخت صادر کرده ولی هنوز رسیدی آپلود نشده.
+ALTER TABLE payments
+    MODIFY COLUMN status ENUM('در انتظار رسید','در انتظار بررسی','تأیید شده','رد شده')
+    NOT NULL DEFAULT 'در انتظار رسید';
+
+-- مهاجرت: افزودن ستون sort_order به payment_service_ticks (در صورت نبود)
+-- این مهاجرت idempotent است — اگر ستون از قبل موجود باشد، نادیده گرفته می‌شود.
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE()
+                     AND TABLE_NAME = 'payment_service_ticks'
+                     AND COLUMN_NAME = 'sort_order');
+SET @ddl = IF(@col_exists = 0,
+    'ALTER TABLE payment_service_ticks ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER untick_reason',
+    'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- بذر ۴ گروه قیمتی + ۱۲ خدمت برای هر گروه
 INSERT INTO fee_groups (code, name, icon, decile_min, decile_max, is_rural_eligible, total_amount, message_title, message_body, sort_order) VALUES

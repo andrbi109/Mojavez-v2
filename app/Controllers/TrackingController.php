@@ -338,19 +338,46 @@ class TrackingController extends Controller
             'applicant_id' => (int)$applicant['id'],
             'doc_type' => 'payment_receipt',
             'file_name' => $uniqueName,
-            'original_name' => basename((string)$file['name']),
+            'original_name' => sanitize_upload_filename((string)$file['name']),
             'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
         ]);
 
-        $this->paymentModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'payment_channel_id' => $channelId,
-            'purpose' => 'هزینهٔ ثبت‌نام',
-            'amount' => $amount,
-            'reference_code' => trim((string)($data['reference_code'] ?? '')) ?: null,
-            'paid_at' => $paidAt,
-            'receipt_document_id' => $docId,
-        ]);
+        // به‌روزرسانی رکورد پرداخت موجود (که مدیر با وضعیت 'در انتظار رسید' ایجاد کرده)
+        // یا ایجاد رکورد جدید اگر وجود ندارد
+        $existingPayment = $this->paymentModel->findLatestByApplicant((int)$applicant['id'], 'هزینهٔ ثبت‌نام');
+        if ($existingPayment && in_array($existingPayment['status'], ['در انتظار رسید', 'در انتظار بررسی'], true)) {
+            // به‌روزرسانی رکورد موجود با اطلاعات رسید
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                "UPDATE payments
+                 SET payment_channel_id = :chid,
+                     amount = :amt,
+                     reference_code = :ref,
+                     paid_at = :paid,
+                     receipt_document_id = :docid,
+                     status = 'در انتظار بررسی'
+                 WHERE id = :pid"
+            );
+            $stmt->execute([
+                'chid' => $channelId,
+                'amt' => $amount,
+                'ref' => trim((string)($data['reference_code'] ?? '')) ?: null,
+                'paid' => $paidAt,
+                'docid' => $docId,
+                'pid' => (int)$existingPayment['id'],
+            ]);
+        } else {
+            // ایجاد رکورد جدید (در حالت نادر که رکوردی موجود نیست)
+            $this->paymentModel->create([
+                'applicant_id' => (int)$applicant['id'],
+                'payment_channel_id' => $channelId,
+                'purpose' => 'هزینهٔ ثبت‌نام',
+                'amount' => $amount,
+                'reference_code' => trim((string)($data['reference_code'] ?? '')) ?: null,
+                'paid_at' => $paidAt,
+                'receipt_document_id' => $docId,
+            ]);
+        }
 
         $this->statusLogModel->create([
             'applicant_id' => (int)$applicant['id'],
