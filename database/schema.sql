@@ -913,3 +913,55 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('fee_max_discount_with_reason', '50')
 ON DUPLICATE KEY UPDATE setting_key = setting_key;
 
+
+-- =================================================================
+-- حساب‌های کاربری متقاضیان (مدل فروشگاهی)
+-- -----------------------------------------------------------------
+-- کاربران آزادانه ثبت‌نام می‌کنند، درخواست‌ها را «خریداری» می‌کنند
+-- سابقهٔ خرید و پرداخت متمرکز روی حساب کاربر
+-- =================================================================
+
+CREATE TABLE IF NOT EXISTS user_accounts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT NOT NULL UNIQUE,
+    username VARCHAR(50) UNIQUE NULL,
+    mobile CHAR(11) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(150) NULL,
+    avatar_document_id INT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_login_at DATETIME NULL,
+    failed_login_count INT NOT NULL DEFAULT 0,
+    locked_until DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE,
+    FOREIGN KEY (avatar_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+    INDEX idx_username (username),
+    INDEX idx_mobile (mobile),
+    INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- مهاجرت idempotent: افزودن ستون user_account_id به applicants
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = DATABASE()
+                     AND TABLE_NAME = 'applicants'
+                     AND COLUMN_NAME = 'user_account_id');
+SET @ddl = IF(@col_exists = 0,
+    'ALTER TABLE applicants ADD COLUMN user_account_id INT NULL AFTER person_id, ADD INDEX idx_applicant_user (user_account_id)',
+    'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- مهاجرت idempotent: افزودن ستون user_account_id به payments
+SET @col_pay = (SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'payments'
+                  AND COLUMN_NAME = 'user_account_id');
+SET @ddl_pay = IF(@col_pay = 0,
+    'ALTER TABLE payments ADD COLUMN user_account_id INT NULL AFTER applicant_id, ADD INDEX idx_pay_user (user_account_id)',
+    'SELECT 1');
+PREPARE stmt_pay FROM @ddl_pay;
+EXECUTE stmt_pay;
+DEALLOCATE PREPARE stmt_pay;

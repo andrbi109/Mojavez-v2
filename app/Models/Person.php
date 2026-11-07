@@ -84,6 +84,34 @@ class Person
     }
 
     /**
+     * ایجاد شخص جدید (نسخهٔ ساده برای ثبت‌نام کاربر).
+     */
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare(
+            "INSERT INTO persons (national_code, first_name, last_name, mobile, postal_code, person_type)
+             VALUES (:nc, :fn, :ln, :mo, :pc, 'حقیقی')"
+        );
+        $stmt->execute([
+            'nc' => $data['national_code'],
+            'fn' => $data['first_name'] ?? '',
+            'ln' => $data['last_name'] ?? '',
+            'mo' => $data['mobile'] ?? '',
+            'pc' => $data['postal_code'] ?? null,
+        ]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    /**
+     * به‌روزرسانی موبایل شخص.
+     */
+    public function updateMobile(int $personId, string $mobile): void
+    {
+        $stmt = $this->db->prepare("UPDATE persons SET mobile = :mo WHERE id = :id");
+        $stmt->execute(['mo' => $mobile, 'id' => $personId]);
+    }
+
+    /**
      * اتصال پرونده به شخص
      */
     public function linkApplication(int $applicantId, int $personId): void
