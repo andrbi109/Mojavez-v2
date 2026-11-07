@@ -60,6 +60,16 @@ $router->get('/about', ['HomeController', 'about']);
     $controller->render('home', ['title' => 'سامانه مجوز صنایع دستی']);
 });*/
 
+// صفحات عمومی
+$router->get('/', ['HomeController', 'index']);
+
+// احراز هویت کاربران (مدل فروشگاهی)
+$router->get('/signup', ['AuthController', 'signupForm']);
+$router->post('/signup', ['AuthController', 'signup']);
+$router->get('/login', ['AuthController', 'loginForm']);
+$router->post('/login', ['AuthController', 'login']);
+$router->get('/logout', ['AuthController', 'logout']);
+
 // Registration — موتور ویزارد پویا (موقعیت‌محور) + نام‌های مستعار قدیمی
 $router->get('/register', ['RegistrationController', 'index']);
 $router->get('/register/service/{id}', ['RegistrationController', 'selectService']);
