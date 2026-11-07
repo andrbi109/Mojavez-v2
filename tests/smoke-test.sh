@@ -54,7 +54,7 @@ php -r '$im = imagecreatetruecolor(80, 40); $c = imagecolorallocate($im, 0, 180,
 
 # شناسایی فیلدهای پویای اجباری فعال (فرم‌ساز) تا آزمون با هر پیکربندی فرم سازگار بماند
 DYN1=""; DYN2=""; DYN3=""; DYN4=""; DYNF=""
-while IFS=$'	' read -r fid fstep ftype fopt; do
+while IFS=$'    ' read -r fid fstep ftype fopt; do
     case "$ftype" in
         select|radio) val="$fopt" ;;
         number) val="5" ;;
@@ -346,7 +346,7 @@ assert "صفحهٔ موفقیت → قالب پیام با نام متقاضی" 
 assert "صفحهٔ موفقیت → کد رهگیری در قالب" "grep -q "$TC" sucd.html && grep -q 'کپی متن پیام' sucd.html"
 assert "صفحهٔ موفقیت → لینک شبکه‌های اجتماعی" "grep -q 'eitaa.com' sucd.html && grep -q 'rubika.ir' sucd.html && grep -q 'ble.ir' sucd.html"
 
-echo "═══════════ ۱۵) نسخهٔ v0.3.0: رشته‌ها، وضعیت‌ها، تم، ناوبری ═══════════"
+echo "═══════════ ۱۵) رشته‌ها، وضعیت‌ها، تم، ناوبری ═══════════"
 curl -s -b aj.txt -o lt.html "$B/admin/license-titles"
 assert "مدیریت رشته‌ها → فهرست گسترده از پایگاه داده" "grep -q 'پته دوزی' lt.html && grep -q 'قالی تمام ابریشم' lt.html && grep -q 'فیروزه کوبی' lt.html"
 CSRF=$(get_csrf lt.html)

@@ -1,9 +1,47 @@
-RewriteEngine On
+# =================================================================
+# Mojavez — قواعد مسیریابی و امنیت در DocumentRoot (public/)
+# =================================================================
 
-# اگر فایل یا پوشه واقعی نیست، به index.php هدایت کن
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+# --- فعال‌سازی موتور بازنویسی ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
 
-# جلوگیری از لیست شدن پوشه‌ها
-Options -Indexes
+    # اگر فایل یا پوشهٔ واقعی نیست، به index.php هدایت کن
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>
+
+# --- امنیت: جلوگیری از لیست شدن پوشه‌ها ---
+Options -Indexes -ExecCGI +FollowSymLinks
+
+# --- کاراکترست پیش‌فرض ---
+AddDefaultCharset UTF-8
+
+# --- هدرهای امنیتی ---
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    # HSTS فقط روی HTTPS فعال شود
+    <IfModule mod_ssl.c>
+        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    </IfModule>
+</IfModule>
+
+# --- فشرده‌سازی ---
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json application/xml
+</IfModule>
+
+# --- کش مرورگر ---
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>

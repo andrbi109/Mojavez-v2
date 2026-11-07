@@ -1,0 +1,44 @@
+# =================================================================
+# Mojavez — هدایت خودکار به پوشهٔ public/ (Apache)
+# -----------------------------------------------------------------
+# این فایل در ریشهٔ پروژه قرار دارد. وقتی DocumentRoot روی ریشه
+# تنظیم شده باشد (مثلاً در XAMPP/Laragon که کل پوشه را سرو می‌کند)،
+# تمام درخواست‌ها به‌صورت شفاف به public/index.php هدایت می‌شوند
+# تا فایل‌های حساس app/, core/, config/, database/ هرگز قابل دسترسی
+# مستقیم از وب نباشند.
+# =================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # مسیر نسبی به پوشهٔ public — اگر پروژه در زیرپوشه نصب شد،
+    # باید این مسیر را به‌صورت نسبی تنظیم کنید (مثلاً mojavez/public)
+    RewriteRule ^$ public/index.php [L]
+    RewriteRule (.*) public/$1 [L]
+</IfModule>
+
+# جلوگیری از لیست شدن پوشه‌ها و دسترسی مستقیم به فایل‌های حساس
+Options -Indexes -ExecCGI
+
+<FilesMatch "\.(sql|md|py|sh|json|lock|log|bak)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# مسدودسازی دسترسی به پوشه‌های حساس (لایهٔ دوم، در صورت پیکربندی اشتباه)
+<IfModule mod_alias.c>
+    RedirectMatch 403 (?i)/(app|core|config|database|tests|tools|docs|uploads)(/|$)
+</IfModule>
+
+# هدرهای امنیتی پایه
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>

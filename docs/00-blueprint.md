@@ -1,6 +1,6 @@
 # بلوپرینت فنی پروژهٔ Mojavez 🗺️
 
-> **نسخهٔ سند:** ۱.۰ — متناظر با کد پایه `v0.0.5` (`APP_VERSION`) —
+> **نسخهٔ سند:** ۱.۰ — متناظر با کد پایه `0.1.0` (`APP_VERSION`) —
 > **مسیر پروژه:** `/home/z/my-project/work/Mojavez/`
 > **طراح و توسعه‌دهنده:** امین دروگر بزدی (`Derogaramin@`)
 >
@@ -93,7 +93,7 @@ flowchart TD
 | **app/Models/** | `app/Models/` | لایهٔ داده؛ هر مدل یک جدول + کوئری‌های Prepared (۲۰ مدل). الگوی Repository-مانند: مدل‌ها فقط کوئری می‌دانند، نه منطق تجاری |
 | **app/Services/** | `app/Services/` | منطق بین‌لایه‌ای: `AutoCancelService` (لغو خودکار + اولویت‌بندی زمان‌محور) |
 | **app/Views/** | `app/Views/` | قالب‌ها: `layout.php` (عمومی)، `admin_layout.php` (پنل با سایدبار)، `layout_print.php` (چاپ A4) + نماهای صفحات در زیرپوشه‌های `admin/`، `registration/`، `tracking/` |
-| **database/** | `database/schema.sql` | اسکیمای یکپارچهٔ پایگاه داده (ادغام ۱۴ فایل `update-v0.0.X.sql` در یک فایل واحد با حفظ ترتیب وابستگی‌ها) |
+| **database/** | `database/schema.sql` | اسکیمای یکپارچهٔ پایگاه داده در یک فایل واحد با حفظ ترتیب وابستگی‌ها |
 | **uploads/** | `uploads/` | فایل‌های کاربران — **خارج از document root** با `.htaccess` محافظ (لایهٔ دوم امنیتی) |
 | **public/** | `public/` | **document root یگانه** — شامل `index.php`، `router.php` (توسعه)، `assets/` (Bootstrap محلی، فونت‌ها، JS تم) |
 
@@ -281,34 +281,34 @@ AutoCancelService::updatePriorities(); // پرچم ⭐ برای ثبت‌نام�
 
 پایگاه داده: `handicraft_license` — کدگذاری `utf8mb4_unicode_ci`، موتور
 `InnoDB` (تراکنش + FK). تنها یک فایل اسکیمای یکپارچه در `database/schema.sql`
-(۸۵۹ خط) وجود دارد که ادغام ۱۴ مهاجرت `update-v0.0.2 تا v0.0.14` است.
+(۸۵۹ خط) وجود دارد.
 
 ### ۴.۱ جداول
 
-| # | جدول | شرح مختصر | ایجاد شده در |
+| # | جدول | شرح مختصر | محل تعریف |
 |---|---|---|---|
-| 1 | `users` | مدیران پنل (admin/expert/document_uploader) | schema.sql اصلی |
-| 2 | `applicants` | هستهٔ پرونده‌ها + وضعیت + اولویت + پرداخت + نوع متقاضی | اصلی + v0.0.2/v0.0.6/v0.0.7/v0.0.11/v0.0.13/v0.0.14 |
-| 3 | `job_details` | اطلاعات شغلی (۱:۱) | اصلی |
-| 4 | `property_details` | اطلاعات ملک (۱:۱) + آدرس | اصلی + v0.0.2 |
-| 5 | `documents` | مدارک (۱:N) | اصلی |
-| 6 | `status_log` | تایم‌لاین رویدادها | اصلی |
-| 7 | `postal_code_changes` | درخواست‌های تغییر کد پستی + گردش تأیید | اصلی + v0.0.4 |
-| 8 | `settings` | تنظیمات کلید/مقدار | v0.0.5 |
-| 9 | `form_fields` | تعریف فیلدهای فرم ثبت‌نام | v0.0.5 + v0.0.12/v0.0.13 |
-| 10 | `applicant_field_values` | مقادیر فیلدهای پویا هر متقاضی | v0.0.5 |
-| 11 | `license_titles` | رشته‌های مجوز (~۹۰ رشته در ۱۲ دسته) | v0.0.6 |
-| 12 | `payment_channels` | کانال‌های پرداخت | v0.0.7 |
-| 13 | `payments` | پرداخت‌های متقاضیان | v0.0.7 |
-| 14 | `license_files` | تصویر مجوز صادرشده (۱:۱) | v0.0.8 |
-| 15 | `license_access_requests` | درخواست‌های دسترسی به تصویر مجوز | v0.0.8 |
-| 16 | `sms_templates` | الگوهای پیامک | v0.0.9 |
-| 17 | `user_sms_entries` | پیامک‌های ثبت‌شده توسط متقاضی | v0.0.9 |
-| 18 | `applicant_revisions` | بازبینی‌های پرونده (payload JSON) | v0.0.10 |
-| 19 | `persons` | اشخاص (لنگر هویت = کد ملی) | v0.0.11 |
-| 20 | `identity_checks` | لاگ احراز هویت (ضد Brute-force) | v0.0.11 |
-| 21 | `wizard_steps` | مراحل ویزارد (سیستمی + سفارشی) | v0.0.12 |
-| 22 | `service_types` | انواع خدمات (صنایع دستی، مشاغل خانگی، گردشگری، هنری) | v0.0.13 |
+| 1 | `users` | مدیران پنل (admin/expert/document_uploader) | schema.sql |
+| 2 | `applicants` | هستهٔ پرونده‌ها + وضعیت + اولویت + پرداخت + نوع متقاضی | schema.sql |
+| 3 | `job_details` | اطلاعات شغلی (۱:۱) | schema.sql |
+| 4 | `property_details` | اطلاعات ملک (۱:۱) + آدرس | schema.sql |
+| 5 | `documents` | مدارک (۱:N) | schema.sql |
+| 6 | `status_log` | تایم‌لاین رویدادها | schema.sql |
+| 7 | `postal_code_changes` | درخواست‌های تغییر کد پستی + گردش تأیید | schema.sql |
+| 8 | `settings` | تنظیمات کلید/مقدار | schema.sql |
+| 9 | `form_fields` | تعریف فیلدهای فرم ثبت‌نام | schema.sql |
+| 10 | `applicant_field_values` | مقادیر فیلدهای پویا هر متقاضی | schema.sql |
+| 11 | `license_titles` | رشته‌های مجوز (~۹۰ رشته در ۱۲ دسته) | schema.sql |
+| 12 | `payment_channels` | کانال‌های پرداخت | schema.sql |
+| 13 | `payments` | پرداخت‌های متقاضیان | schema.sql |
+| 14 | `license_files` | تصویر مجوز صادرشده (۱:۱) | schema.sql |
+| 15 | `license_access_requests` | درخواست‌های دسترسی به تصویر مجوز | schema.sql |
+| 16 | `sms_templates` | الگوهای پیامک | schema.sql |
+| 17 | `user_sms_entries` | پیامک‌های ثبت‌شده توسط متقاضی | schema.sql |
+| 18 | `applicant_revisions` | بازبینی‌های پرونده (payload JSON) | schema.sql |
+| 19 | `persons` | اشخاص (لنگر هویت = کد ملی) | schema.sql |
+| 20 | `identity_checks` | لاگ احراز هویت (ضد Brute-force) | schema.sql |
+| 21 | `wizard_steps` | مراحل ویزارد (سیستمی + سفارشی) | schema.sql |
+| 22 | `service_types` | انواع خدمات (صنایع دستی، مشاغل خانگی، گردشگری، هنری) | schema.sql |
 
 ### ۴.۲ روابط کلیدی خارجی (FK)
 
@@ -321,14 +321,14 @@ property_details.applicant_id       → applicants.id          (ON DELETE CASCAD
 documents.applicant_id              → applicants.id          (ON DELETE CASCADE)
 status_log.applicant_id             → applicants.id          (ON DELETE CASCADE)
 postal_code_changes.applicant_id    → applicants.id          (ON DELETE CASCADE)
-postal_code_changes.reviewed_by     → users.id               (ON DELETE SET NULL)  [v0.0.4]
+postal_code_changes.reviewed_by     → users.id               (ON DELETE SET NULL)
 applicant_field_values.applicant_id → applicants.id          (ON DELETE CASCADE)
 applicant_field_values.field_id     → form_fields.id         (ON DELETE CASCADE)
 payments.applicant_id               → applicants.id          (ON DELETE CASCADE)
 payments.payment_channel_id         → payment_channels.id    (ON DELETE SET NULL)
 payments.receipt_document_id        → documents.id           (ON DELETE SET NULL)
 payments.reviewed_by                → users.id               (ON DELETE SET NULL)
-payments.linked_request_id          → license_access_requests.id  (ON DELETE SET NULL)  [v0.0.8]
+payments.linked_request_id          → license_access_requests.id  (ON DELETE SET NULL)
 license_files.applicant_id          → applicants.id          (ON DELETE CASCADE)
 license_files.document_id           → documents.id           (ON DELETE CASCADE)
 license_access_requests.applicant_id→ applicants.id          (ON DELETE CASCADE)
@@ -339,12 +339,12 @@ user_sms_entries.sms_template_id    → sms_templates.id       (ON DELETE CASCAD
 user_sms_entries.reviewed_by        → users.id               (ON DELETE SET NULL)
 applicant_revisions.applicant_id    → applicants.id          (ON DELETE CASCADE)
 applicant_revisions.reviewed_by     → users.id               (ON DELETE SET NULL)
-applicants.person_id                → persons.id             (ON DELETE SET NULL)  [v0.0.11]
-applicants.parent_application_id    → applicants.id          (ON DELETE SET NULL)  [v0.0.11]
-form_fields.wizard_step_id          → wizard_steps.id        (ON DELETE SET NULL)  [v0.0.12]
-form_fields.service_type_id         → service_types.id       (ON DELETE CASCADE)   [v0.0.13]
-wizard_steps.service_type_id        → service_types.id       (ON DELETE CASCADE)   [v0.0.13]
-applicants.service_type_id          → service_types.id       (ON DELETE SET NULL)   [v0.0.13]
+applicants.person_id                → persons.id             (ON DELETE SET NULL)
+applicants.parent_application_id    → applicants.id          (ON DELETE SET NULL)
+form_fields.wizard_step_id          → wizard_steps.id        (ON DELETE SET NULL)
+form_fields.service_type_id         → service_types.id       (ON DELETE CASCADE)
+wizard_steps.service_type_id        → service_types.id       (ON DELETE CASCADE)
+applicants.service_type_id          → service_types.id       (ON DELETE SET NULL)
 ```
 
 ### ۴.۳ انواع روابط
@@ -364,7 +364,7 @@ applicants.service_type_id          → service_types.id       (ON DELETE SET NU
 | `idx_national_code` | applicants | احراز هویت سوابق، گزارش‌گیری |
 | `idx_status` | applicants | فیلتر فهرست بر اساس وضعیت، آمار داشبورد |
 | `idx_priority` | applicants | مرتب‌سازی فهرست با اولویت ⭐ |
-| `idx_mobile` | applicants | جستجو با موبایل، یکتایی در سطح persons (v0.0.11) |
+| `idx_mobile` | applicants | جستجو با موبایل، یکتایی در سطح persons |
 | `idx_completed_priority` | applicants | **ترکیبی** — مرتب‌سازی فهرست‌ها به‌صورت `(priority DESC, registration_completed_at DESC)` در یک کوئری |
 | `idx_postal_status` | postal_code_changes | فیلتر سریع «در انتظار» در صفحهٔ بررسی مدیر |
 | `idx_status_log_created` | status_log | محاسبهٔ لغو خودکار (`created_at < NOW() - INTERVAL 14 DAY`) |

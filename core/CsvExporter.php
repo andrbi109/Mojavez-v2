@@ -2,7 +2,7 @@
 /**
  * کلاس خروجی CSV با پشتیبانی از کاراکترهای فارسی
  *
- * نسخهٔ v0.0.5: افزودن sanitizeCsvCell برای مقابله با CSV/Formula Injection
+ * شامل sanitizeCell برای مقابله با CSV/Formula Injection
  * (سلول‌هایی که با =, +, -, @, \t, \r, \n شروع می‌شوند پیشوند ' می‌گیرند).
  */
 class CsvExporter

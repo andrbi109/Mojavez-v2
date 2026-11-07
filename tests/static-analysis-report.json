@@ -111,7 +111,7 @@
     {
       "name": "ثابت APP_VERSION",
       "status": "PASS",
-      "detail": "APP_VERSION = '0.0.5' در config.php",
+      "detail": "APP_VERSION = '0.1.0' در config.php",
       "icon": "✓"
     }
   ]

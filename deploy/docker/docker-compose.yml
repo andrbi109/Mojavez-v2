@@ -1,0 +1,129 @@
+# ============================================================
+# docker-compose.yml — سامانهٔ Mojavez
+# ------------------------------------------------------------
+# سه سرویس:
+#   - db  : MariaDB 10.11 (پایگاه دادهٔ دائمی با volume)
+#   - app : کانتینر PHP+Apache ساخته‌شده از Dockerfile (داخلی)
+#   - web : Nginx reverse proxy در جلوی Apache (نقطهٔ ورود عمومی)
+#
+# اجرا:    docker compose up -d
+# توقف:   docker compose down
+# بازسازی: docker compose up -d --build
+#
+# نکته: اگر nginx نمی‌خواهید، کل بلوک `web` را کامنت کنید و در
+# سرویس `app` بخش `ports` را از حالت کامنت خارج نمایید.
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # ۱) پایگاه داده — MariaDB 10.11 (سازگار با MySQL و PHP PDO)
+  # ----------------------------------------------------------
+  db:
+    image: mariadb:10.11
+    container_name: mojavez-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-rootsecret}
+      MYSQL_DATABASE: ${DB_NAME:-handicraft_license}
+      MYSQL_USER: ${DB_USER:-mojavez}
+      MYSQL_PASSWORD: ${DB_PASS:-secret}
+      # تنظیمات کاراکترست برای پشتیبانی کامل از فارسی
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATION: utf8mb4_unicode_ci
+      TZ: ${TZ:-Asia/Tehran}
+    volumes:
+      - mojavez-db-data:/var/lib/mysql
+      # اسکریپت init فقط در اولین اجرا (هنگام خالی بودن volume) اجرا می‌شود
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - mojavez-net
+    healthcheck:
+      test:
+        - "CMD"
+        - "healthcheck.sh"
+        - "--connect"
+        - "--innodb_initialized"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ----------------------------------------------------------
+  # ۲) اپلیکیشن — PHP 8.2 + Apache (ساخته‌شده از Dockerfile)
+  #    این کانتینر پورت ۸۰ را فقط به‌صورت داخلی expose می‌کند.
+  #    دسترسی عمومی از طریق سرویس `web` (nginx) انجام می‌شود.
+  # ----------------------------------------------------------
+  app:
+    build:
+      # build context = ریشهٔ پروژه (دو سطح بالاتر از این فایل)
+      # تا COPY . در Dockerfile کل پروژه را در بر بگیرد و .dockerignore
+      # ریشهٔ پروژه اعمال شود.
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: mojavez-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP_DEBUG: ${APP_DEBUG:-false}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-handicraft_license}
+      DB_USER: ${DB_USER:-mojavez}
+      DB_PASS: ${DB_PASS:-secret}
+      # INIT_DB=1 باعث می‌شود entrypoint اسکیمای دیتابیس را بسازد
+      INIT_DB: ${INIT_DB:-1}
+      TZ: ${TZ:-Asia/Tehran}
+    volumes:
+      # فایل‌های بارگذاری‌شدهٔ کاربران در volume دائمی نگه‌داری می‌شوند
+      # تا با rebuild کانتینر از بین نروند
+      - mojavez-uploads:/var/www/html/uploads
+    networks:
+      - mojavez-net
+    expose:
+      - "80"
+    # ← اگر nginx نمی‌خواهید، بلوک `web` پایین را کامنت کنید و این
+    #   بخش ports را فعال نمایید:
+    # ports:
+    #   - "${MOJAVEZ_PORT:-8080}:80"
+
+  # ----------------------------------------------------------
+  # ۳) وب — Nginx reverse proxy در جلوی Apache
+  #    نقطهٔ ورود عمومی: پورت ۸۰ کانتینر روی ${MOJAVEZ_PORT} (پیش‌فرض 8080)
+  #    درخواست‌ها را به سرویس app:80 پروکسی می‌کند.
+  #    این سرویس اختیاری است؛ برای حذف، کل بلوک را کامنت و ports
+  #    سرویس app را فعال کنید.
+  # ----------------------------------------------------------
+  web:
+    image: nginx:1.27-alpine
+    container_name: mojavez-web
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${MOJAVEZ_PORT:-8080}:80"
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - mojavez-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+# ============================================================
+# شبکه‌ها و Volumeهای دائمی
+# ============================================================
+networks:
+  mojavez-net:
+    driver: bridge
+    name: mojavez-net
+
+volumes:
+  mojavez-db-data:
+    name: mojavez-db-data
+  mojavez-uploads:
+    name: mojavez-uploads

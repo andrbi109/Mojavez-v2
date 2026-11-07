@@ -9,7 +9,7 @@
  *   cancelable_before → آیا جزو وضعیت‌های «پیش از صدور» برای لغو خودکار است
  *
  * ⚠️ این فهرست باید با ENUM ستون applicants.current_status
- *    در database/update-v0.0.6.sql هم‌خوان باشد.
+ *    در database/schema.sql هم‌خوان باشد.
  */
 return [
     'statuses' => [
