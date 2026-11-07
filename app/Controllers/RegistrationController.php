@@ -632,6 +632,7 @@ class RegistrationController extends Controller
                 'tracking_code' => $trackingCode,
                 'service_type_id' => $this->selectedServiceId(),
                 'applicant_type' => $step1['applicant_type'] ?? 'حقیقی',
+                'user_account_id' => Session::get('user_id') ?: null,
             ]);
 
             // شخص (چندمجوزی — فاز ۷)

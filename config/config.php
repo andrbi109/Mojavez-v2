@@ -8,8 +8,8 @@
 // نسخهٔ فعلی پروژه — در README.md، فوتر پنل و پاسخ‌های JSON بازگردانده می‌شود.
 // الگوی SemVer: MAJOR.MINOR.PATCH
 // این اولین نسخهٔ رسمی است. هر اصلاح یک واحد به PATCH اضافه می‌شود.
-define('APP_VERSION', '0.3.8');
-define('APP_VERSION_NAME', 'اصلاح کوئری st.icon در UserAccount');
+define('APP_VERSION', '0.3.9');
+define('APP_VERSION_NAME', 'بازنویسی پنل کاربری + اتصال user_account_id');
 
 // ==================== حالت اشکال‌زدایی ====================
 // در محیط توسعه true و روی سرور واقعی حتماً false باشد.

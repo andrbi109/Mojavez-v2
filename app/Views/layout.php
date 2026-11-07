@@ -50,7 +50,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
                             <span class="icon-sun"><?= icon('sun', '', 16) ?></span><span class="icon-moon"><?= icon('moon', '', 16) ?></span>
                         </button>
                         <?php if (Session::get('user_logged_in')): ?>
-                            <a href="<?= $base ?>dashboard" class="btn btn-primary btn-sm px-3"><?= icon('user', '', 15) ?> داشبورد من</a>
+                            <a href="<?= $base ?>dashboard" class="btn btn-primary btn-sm px-3"><?= icon('user', '', 15) ?> پنل کاربری</a>
                         <?php else: ?>
                             <a href="<?= $base ?>login" class="btn btn-outline-primary btn-sm px-3">ورود</a>
                             <a href="<?= $base ?>signup" class="btn btn-gold btn-sm px-3">ثبت‌نام</a>
@@ -89,7 +89,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
                     </div>
                     <p class="text-center text-md-end small mt-2 mb-0" style="color:#8B98A5;">
                         © <?= jdate('Y') ?> — کلیهٔ حقوق محفوظ است
-                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.8' ?></span>
+                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.9' ?></span>
                     </p>
                 </div>
             </div>

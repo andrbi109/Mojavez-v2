@@ -30,7 +30,7 @@ try {
         <div class="d-flex justify-content-center flex-wrap gap-2">
             <?php if ($userLoggedIn): ?>
                 <a href="<?= $base ?>services" class="btn btn-gold btn-lg px-4"><?= icon('shopping-cart', '', 17) ?> مشاهدهٔ خدمات</a>
-                <a href="<?= $base ?>dashboard" class="btn btn-outline-light btn-lg px-4"><?= icon('dashboard', '', 17) ?> داشبورد من</a>
+                <a href="<?= $base ?>dashboard" class="btn btn-outline-light btn-lg px-4"><?= icon('user', '', 17) ?> پنل کاربری</a>
             <?php else: ?>
                 <a href="<?= $base ?>signup" class="btn btn-gold btn-lg px-4"><?= icon('user', '', 17) ?> ثبت‌نام کنید</a>
                 <a href="<?= $base ?>services" class="btn btn-outline-light btn-lg px-4"><?= icon('grid', '', 17) ?> مشاهدهٔ خدمات</a>

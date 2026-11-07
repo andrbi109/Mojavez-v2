@@ -22,13 +22,15 @@ class Applicant
                 birth_date, father_name, marital_status, children_count, 
                 physical_condition, disability_details, income_decile, 
                 has_court_case, has_active_loan, has_overdue_installments, 
-                tracking_code, service_type_id, applicant_type, current_status, registration_started_at)
+                tracking_code, service_type_id, applicant_type, user_account_id,
+                current_status, registration_started_at)
             VALUES 
                 (:first_name, :last_name, :national_code, :postal_code, :mobile,
                 :birth_date, :father_name, :marital_status, :children_count,
                 :physical_condition, :disability_details, :income_decile,
                 :has_court_case, :has_active_loan, :has_overdue_installments,
-                :tracking_code, :service_type_id, :applicant_type, 'پیش‌نویس', NOW())"
+                :tracking_code, :service_type_id, :applicant_type, :user_account_id,
+                'پیش‌نویس', NOW())"
         );
 
         $stmt->execute([
@@ -50,6 +52,7 @@ class Applicant
             'tracking_code' => $data['tracking_code'],
             'service_type_id' => $data['service_type_id'] ?? null,
             'applicant_type' => $data['applicant_type'] ?? 'حقیقی',
+            'user_account_id' => $data['user_account_id'] ?? null,
         ]);
 
         return (int)$this->db->lastInsertId();
