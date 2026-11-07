@@ -73,6 +73,10 @@ $router->get('/logout', ['AuthController', 'logout']);
 // داشبورد کاربر (مدل فروشگاهی)
 $router->get('/dashboard', ['UserDashboardController', 'index']);
 
+// خدمات (مدل فروشگاهی — کارت‌های محصول)
+$router->get('/services', ['ServiceController', 'index']);
+$router->post('/services/{id}/purchase', ['ServiceController', 'purchase']);
+
 // Registration — موتور ویزارد پویا (موقعیت‌محور) + نام‌های مستعار قدیمی
 $router->get('/register', ['RegistrationController', 'index']);
 $router->get('/register/service/{id}', ['RegistrationController', 'selectService']);
