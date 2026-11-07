@@ -154,7 +154,7 @@ class UserAccount
     public function getApplications(int $accountId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT a.*, st.title AS service_title, st.icon AS service_icon
+            "SELECT a.*, st.title AS service_title
              FROM applicants a
              LEFT JOIN service_types st ON st.id = a.service_type_id
              WHERE a.user_account_id = :uid

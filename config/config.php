@@ -8,8 +8,8 @@
 // نسخهٔ فعلی پروژه — در README.md، فوتر پنل و پاسخ‌های JSON بازگردانده می‌شود.
 // الگوی SemVer: MAJOR.MINOR.PATCH
 // این اولین نسخهٔ رسمی است. هر اصلاح یک واحد به PATCH اضافه می‌شود.
-define('APP_VERSION', '0.3.7');
-define('APP_VERSION_NAME', 'بازنویسی سایدبار با الگوی Bootstrap 5.3');
+define('APP_VERSION', '0.3.8');
+define('APP_VERSION_NAME', 'اصلاح کوئری st.icon در UserAccount');
 
 // ==================== حالت اشکال‌زدایی ====================
 // در محیط توسعه true و روی سرور واقعی حتماً false باشد.
