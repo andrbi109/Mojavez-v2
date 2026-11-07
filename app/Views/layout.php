@@ -89,7 +89,7 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
                     </div>
                     <p class="text-center text-md-end small mt-2 mb-0" style="color:#8B98A5;">
                         © <?= jdate('Y') ?> — کلیهٔ حقوق محفوظ است
-                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.5' ?></span>
+                        <span style="opacity:.6; margin-inline-start:.4rem;">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.6' ?></span>
                     </p>
                 </div>
             </div>

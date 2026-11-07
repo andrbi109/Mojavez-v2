@@ -461,7 +461,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 }
 
 /* =====================================================================
-   نوار کناری (Sidebar) — بازطراحی کامل با ریسپانسیو
+   نوار کناری (Sidebar) — بازطراحی با الگوی Bootstrap 5.3 + RTL صحیح
    ===================================================================== */
 .admin-sidebar {
   background: linear-gradient(180deg, var(--navy) 0%, #101E2E 100%);
@@ -470,15 +470,14 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   min-height: 100vh;
   color: #B9C4CF;
   position: fixed;
-  inset-inline-end: 0; top: 0; bottom: 0;
+  right: 0; top: 0; bottom: 0;
   z-index: 1000;
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 0;
-  border-inline-start: 1px solid rgba(217,164,65,.18);
+  border-left: 1px solid rgba(217,164,65,.18);
   display: flex;
   flex-direction: column;
-  /* اسکرول‌بار ظریف */
   scrollbar-width: thin;
   scrollbar-color: rgba(217,164,65,.3) transparent;
 }
@@ -522,22 +521,23 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 }
 .admin-sidebar .sidebar-user small { color: var(--saffron); }
 
-/* ناوبری سایدبار */
+/* ناوبری سایدبار — الگوی Bootstrap: nav nav-pills flex-column */
 .admin-sidebar .nav {
   flex-grow: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 1rem;
+  padding: .5rem .75rem 1rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(217,164,65,.2) transparent;
 }
 .admin-sidebar .nav::-webkit-scrollbar { width: 4px; }
 .admin-sidebar .nav::-webkit-scrollbar-thumb { background: rgba(217,164,65,.2); border-radius: 2px; }
 
+/* لینک‌های منو — الگوی Bootstrap nav-link */
 .admin-sidebar .nav-link {
   color: #B9C4CF;
   border-radius: 10px;
-  margin: 2px .8rem;
+  margin: 2px 0;
   padding: .55rem .9rem;
   display: flex; align-items: center; gap: .55rem;
   transition: all .15s ease;
@@ -559,7 +559,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 .admin-sidebar .nav-link.active::before {
   content: '';
   position: absolute;
-  inset-inline-end: -.8rem;
+  right: 0;
   top: 15%; bottom: 15%;
   width: 4px;
   border-radius: 4px;
@@ -570,7 +570,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   font-size: .7rem;
 }
 
-/* گروه‌های قابل جمع‌شدن */
+/* گروه‌های قابل جمع‌شدن — الگوی Bootstrap btn-toggle */
 .admin-sidebar .sidebar-group {
   color: var(--saffron);
   font-size: .82rem;
@@ -588,16 +588,16 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   transition: transform .2s ease;
 }
 
-/* زیرمنوها */
+/* زیرمنوها — الگوی Bootstrap btn-toggle-nav */
 .admin-sidebar .collapse .nav-link {
   font-size: .84rem;
-  padding-inline-start: 2.2rem;
+  padding-right: 2.2rem;
   position: relative;
 }
 .admin-sidebar .collapse .nav-link::after {
   content: '•';
   position: absolute;
-  inset-inline-start: 1.4rem;
+  right: 1.4rem;
   color: var(--muted);
   opacity: .5;
 }
@@ -610,11 +610,11 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   background: rgba(0,0,0,.15);
 }
 
-/* محتوای اصلی */
+/* محتوای اصلی — margin-right برای RTL صحیح */
 .admin-main {
-  margin-inline-end: 280px;
+  margin-right: 280px;
   padding: 1.5rem;
-  min-width: 0; /* جلوگیری از overflow افقی */
+  min-width: 0;
 }
 
 /* =====================================================================
@@ -623,13 +623,13 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
 /* دسکتاپ بزرگ */
 @media (min-width: 1400px) {
   .admin-sidebar { width: 300px; }
-  .admin-main { margin-inline-end: 300px; padding: 2rem; }
+  .admin-main { margin-right: 300px; padding: 2rem; }
 }
 
 /* لپ‌تاپ */
 @media (min-width: 992px) and (max-width: 1399.98px) {
   .admin-sidebar { width: 260px; }
-  .admin-main { margin-inline-end: 260px; padding: 1.25rem; }
+  .admin-main { margin-right: 260px; padding: 1.25rem; }
 }
 
 /* تبلت و موبایل — سایدبار به offcanvas تبدیل می‌شود */
@@ -639,7 +639,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
     max-width: 320px;
   }
   .admin-main {
-    margin-inline-end: 0 !important;
+    margin-right: 0 !important;
     padding: 1rem;
     width: 100%;
   }
