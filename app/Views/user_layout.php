@@ -178,12 +178,6 @@ $navItem = fn(string $key) => $active === $key ? 'active' : '';
 <main class="user-main">
     <div class="d-none d-lg-flex justify-content-between align-items-center mb-3">
         <h4 class="fw-bold mb-0" style="color:var(--navy)"><?= htmlspecialchars($title ?? 'پنل کاربری') ?></h4>
-        <div class="d-flex align-items-center gap-2">
-            <button type="button" class="theme-toggle layout-light" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تم">
-                <span class="icon-sun"><?= icon('sun', '', 16) ?></span><span class="icon-moon"><?= icon('moon', '', 16) ?></span>
-            </button>
-            <a href="<?= $base ?>services" class="btn btn-primary btn-sm"><?= icon('plus', '', 14) ?> درخواست جدید</a>
-        </div>
     </div>
     <?= $content ?>
 </main>

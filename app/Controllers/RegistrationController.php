@@ -759,6 +759,12 @@ class RegistrationController extends Controller
 
             $db->commit();
             Session::clearRegistration();
+
+            // اگر کاربر وارد شده → به پنل کاربری
+            if (Session::get('user_logged_in')) {
+                Session::set('signup_success', 'درخواست شما با موفقیت ثبت شد. کد رهگیری: ' . $trackingCode);
+                $this->redirect('/panel');
+            }
             $this->redirect('/register/success/' . $trackingCode);
         } catch (\Exception $e) {
             $db->rollBack();

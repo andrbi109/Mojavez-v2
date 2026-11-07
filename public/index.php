@@ -70,6 +70,9 @@ $router->get('/login', ['AuthController', 'loginForm']);
 $router->post('/login', ['AuthController', 'login']);
 $router->get('/logout', ['AuthController', 'logout']);
 
+// هدایت /dashboard قدیمی به /panel
+$router->get('/dashboard', ['UserPanelController', 'index']);
+
 // پنل کاربری (مدل فروشگاهی — سایدبار + محتوا)
 $router->get('/panel', ['UserPanelController', 'index']);
 $router->get('/panel/profile', ['UserPanelController', 'profile']);

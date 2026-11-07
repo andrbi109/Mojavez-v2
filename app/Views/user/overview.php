@@ -26,7 +26,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 </style>
 <div class="ov-hero">
     <div class="row align-items-center g-3">
-        <div class="col-md-8">
+        <div class="col-12">
             <h4 class="fw-bold mb-1">خوش آمدید، <?= $e($user['first_name'] ?? '') ?> 👋</h4>
             <p class="mb-0 ov-stat-lbl">نمای کلی درخواست‌ها و فعالیت‌های شما</p>
             <div class="row g-3 mt-2">
@@ -35,10 +35,6 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                 <div class="col-6 col-md-3"><p class="ov-stat"><?= (int)$s['issued_apps'] ?></p><p class="ov-stat-lbl mb-0">مجوز صادرشده</p></div>
                 <div class="col-6 col-md-3"><p class="ov-stat"><?= number_format(array_sum(array_map(fn($p)=>$p['status']==='تأیید شده'?(int)$p['amount']:0,$pays))) ?><small> ت</small></p><p class="ov-stat-lbl mb-0">پرداخت‌شده</p></div>
             </div>
-        </div>
-        <div class="col-md-4 text-md-end">
-            <a href="<?= $base ?>services" class="btn btn-light fw-bold mb-1"><?= icon('plus', '', 16) ?> درخواست جدید</a><br>
-            <a href="<?= $base ?>panel/notifications" class="btn btn-outline-light">اعلان‌ها<?php if($unreadCount??0>0):?> <span class="badge bg-danger"><?= $unreadCount ?></span><?php endif;?></a>
         </div>
     </div>
 </div>

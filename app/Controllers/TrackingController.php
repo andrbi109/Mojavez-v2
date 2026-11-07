@@ -386,7 +386,12 @@ class TrackingController extends Controller
                 . ' — در انتظار بررسی مدیر',
         ]);
 
-        Session::set('payment_success', 'رسید پرداخت ثبت شد و پس از بررسی مدیر، نتیجه در همین صفحه و تایم‌لاین پرونده نمایش داده می‌شود.');
+        Session::set('payment_success', 'رسید پرداخت ثبت شد و پس از بررسی مدیر، نتیجه در پنل کاربری نمایش داده می‌شود.');
+
+        // اگر کاربر وارد شده → به پنل کاربری
+        if (Session::get('user_logged_in')) {
+            $this->redirect('/panel/payments');
+        }
         $this->redirect($back);
     }
 
