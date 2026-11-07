@@ -161,22 +161,14 @@ class RevisionController extends Controller
                 $validator->addError('rev_doc_' . $i, 'خطا در بارگذاری فایل شمارهٔ ' . $i);
                 continue;
             }
-            $ext = safe_file_extension((string)$file['name']);
-            $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-            if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {
-                $validator->addError('rev_doc_' . $i, 'پسوند فایل شمارهٔ ' . $i . ' مجاز نیست.');
-                continue;
-            }
-            if ($file['size'] > MAX_UPLOAD_SIZE) {
-                $validator->addError('rev_doc_' . $i, 'حجم فایل شمارهٔ ' . $i . ' بیش از ۲ مگابایت است.');
-                continue;
-            }
-            if (!in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
-                $validator->addError('rev_doc_' . $i, 'محتوای فایل شمارهٔ ' . $i . ' معتبر نیست.');
+            // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
+            $validation = validate_uploaded_file($file);
+            if (!$validation['valid']) {
+                $validator->addError('rev_doc_' . $i, $validation['error'] ?? ('فایل شمارهٔ ' . $i . ' نامعتبر است.'));
                 continue;
             }
             $type = (string)($data['rev_doc_type_' . $i] ?? 'optional');
-            $newDocs[$i] = ['file' => $file, 'type' => in_array($type, $allowedDocTypes, true) ? $type : 'optional'];
+            $newDocs[$i] = ['file' => $file, 'type' => in_array($type, $allowedDocTypes, true) ? $type : 'optional', 'ext' => $validation['ext']];
         }
 
         if ($validator->hasErrors()) {
@@ -192,7 +184,7 @@ class RevisionController extends Controller
         $payloadDocs = [];
         foreach ($newDocs as $d) {
             $file = $d['file'];
-            $ext = safe_file_extension((string)$file['name']);
+            $ext = $d['ext']; // پسوند تأیید شده از اعتبارسنجی بالا
             $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
             if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
                 Session::set('revision_error', 'خطا در ذخیرهٔ یکی از فایل‌ها.');

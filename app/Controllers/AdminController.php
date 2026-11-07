@@ -569,17 +569,23 @@ class AdminController extends Controller
             }
             $saveFile = function ($file, $docType) use ($applicantId, $uploadDir) {
                 if (!$file || $file['error'] !== UPLOAD_ERR_OK) return;
-                $ext = safe_file_extension((string)$file['name']);
+                // اعتبارسنجی چندلایه‌ای هر فایل قبل از ذخیره
+                $validation = validate_uploaded_file($file);
+                if (!$validation['valid']) {
+                    throw new \RuntimeException('فایل نامعتبر: ' . ($validation['error'] ?? 'خطا'));
+                }
+                $ext = $validation['ext'];
                 $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
                 $destPath = $uploadDir . '/' . $uniqueName;
                 if (!move_uploaded_file($file['tmp_name'], $destPath)) {
                     throw new \RuntimeException('خطا در ذخیره فایل ' . sanitize_upload_filename((string)$file['name']));
                 }
+                @chmod($destPath, 0640);
                 $this->documentModel->create([
                     'applicant_id' => $applicantId,
                     'doc_type' => $docType,
                     'file_name' => $uniqueName,
-                    'original_name' => $file['name'],
+                    'original_name' => sanitize_upload_filename((string)$file['name']),
                     'file_path' => str_replace(UPLOAD_DIR, '', $destPath)
                 ]);
             };
@@ -768,23 +774,13 @@ class AdminController extends Controller
             $this->redirect('/admin/view/' . $applicantId);
         }
 
-        $ext = safe_file_extension((string)$file['name']);
-        if (!in_array($ext, ALLOWED_EXTENSIONS)) {
-            Session::set('errors', ['document' => 'پسوند فایل مجاز نیست. فقط: ' . implode(', ', ALLOWED_EXTENSIONS)]);
+        // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
+        $validation = validate_uploaded_file($file);
+        if (!$validation['valid']) {
+            Session::set('errors', ['document' => $validation['error'] ?? 'فایل نامعتبر است.']);
             $this->redirect('/admin/view/' . $applicantId);
         }
-        if ($file['size'] > MAX_UPLOAD_SIZE) {
-            Session::set('errors', ['document' => 'حجم فایل بیش از حد مجاز (۲ مگابایت) است.']);
-            $this->redirect('/admin/view/' . $applicantId);
-        }
-
-        // اعتبارسنجی نوع واقعی محتوا (MIME) — جلوگیری از جاگذاری اسکریپت با پسوند جعلی
-        $realMime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-        $allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-        if (!in_array($realMime, $allowedMimes, true)) {
-            Session::set('errors', ['document' => 'محتوای فایل با پسوندهای مجاز (تصویر یا PDF) همخوانی ندارد.']);
-            $this->redirect('/admin/view/' . $applicantId);
-        }
+        $ext = $validation['ext'];
 
         $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
         if (!is_dir($uploadDir)) {
@@ -798,18 +794,19 @@ class AdminController extends Controller
         }
         @chmod($destPath, 0640); // حداقل دسترسی ممکن روی فایل ذخیره‌شده
 
+        $safeOriginalName = sanitize_upload_filename((string)$file['name']);
         $this->documentModel->create([
             'applicant_id' => $applicantId,
             'doc_type' => $docType,
             'file_name' => $uniqueName,
-            'original_name' => basename($file['name']),
+            'original_name' => $safeOriginalName,
             'file_path' => str_replace(UPLOAD_DIR, '', $destPath)
         ]);
 
         $this->statusLogModel->create([
             'applicant_id' => $applicantId,
             'status_name' => 'افزودن مدرک توسط مدیر',
-            'description' => 'مدرک ' . htmlspecialchars(basename($file['name']), ENT_QUOTES, 'UTF-8')
+            'description' => 'مدرک ' . htmlspecialchars($safeOriginalName, ENT_QUOTES, 'UTF-8')
                 . ' اضافه شد. (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
         ]);
 

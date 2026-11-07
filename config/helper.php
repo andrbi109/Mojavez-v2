@@ -138,37 +138,89 @@ if (!function_exists('safe_file_extension')) {
      *   - نام فایل با چند نقطه (مثل «archive.tar.gz» — آخرین پسوند)
      *   - نام فایل با نقطه در ابتدا (مثل «.htaccess» — پسوند ندارد)
      *   - نام فایل با فاصله یا کاراکترهای کنترلی در انتها
+     *   - نام فایل با کاراکترهای ویندوزی (مانند IMG_20240406_165048_478.jpg)
+     *   - نام فایل با خط تیره در ابتدا (مانند -2147483648_-210002.jpg)
+     *   - نام فایل با کاراکترهای غیر ASCII در بخش میانی
+     *
+     * الگوریتم:
+     *   ۱. نرمال‌سازی encoding (تبدیل ویندوز-۱۲۵۶ → UTF-8 در صورت نیاز)
+     *   ۲. حذف کاراکترهای کنترلی (nul, CR, LF, tab) و BOM
+     *   ۳. حذف مسیر (basename)
+     *   ۴. یافتن آخرین نقطه با strrpos
+     *   ۵. استخراج پسوند و حذف کاراکترهای غیر ASCII
+     *   ۶. تبدیل به حروف کوچک
      *
      * @param string $filename نام فایل (می‌تواند $_FILES['name'] باشد)
      * @return string پسوند به حروف کوچک، بدون نقطه (مثلاً 'jpg' یا '')
      */
     function safe_file_extension(string $filename): string
     {
-        // نرمال‌سازی: حذف BOM، تبدیل ویندوز-۱۲۵۶ به UTF-8، trim
+        // نرمال‌سازی: حذف BOM، trim فاصله‌ها از ابتدا و انتها
         $filename = trim($filename);
         if ($filename === '') {
             return '';
         }
-        // اگر نام فایل از encoding ویندوزی باشد (مثلاً cp1256 برای فارسی)
+
+        // اگر نام فایل از encoding ویندوزی باشد (مثلاً cp1256 برای فارسی یا ascii mangled)
         if (!mb_check_encoding($filename, 'UTF-8')) {
             $converted = @iconv('Windows-1256', 'UTF-8//IGNORE', $filename);
             if ($converted !== false && $converted !== '') {
                 $filename = $converted;
             }
         }
-        // حذف کاراکترهای کنترلی و nul byte
-        $filename = str_replace(["\0", "\r", "\n", "\t"], '', $filename);
-        // گرفتن basename (حذف مسیر در صورت وجود)
-        $filename = basename($filename);
+
+        // حذف BOM (UTF-8 BOM در ابتدای رشته)
+        if (substr($filename, 0, 3) === "\xEF\xBB\xBF") {
+            $filename = substr($filename, 3);
+        }
+
+        // حذف کاراکترهای کنترلی (NUL byte که می‌تواند برای Path Traversal استفاده شود)
+        $filename = str_replace(["\0", "\r", "\n", "\t", "\x0B", "\x1A"], '', $filename);
+
+        // trim مجدد پس از حذف کاراکترهای کنترلی
+        $filename = trim($filename);
+
+        if ($filename === '') {
+            return '';
+        }
+
+        // گرفتن basename — حذف مسیر در صورت وجود (مانند "C:\Users\..." یا "/tmp/...")
+        // basename در PHP ممکن است برای مسیرهای ویندوز با کاراکترهای خاص مشکل داشته باشد
+        // بنابراین ابتدا/بک‌اسلش را نرمال‌سازی می‌کنیم
+        $filename = str_replace('\\', '/', $filename);
+        // حذف مسیر: فقط آخر بخش پس از آخرین /
+        $lastSlash = strrpos($filename, '/');
+        if ($lastSlash !== false) {
+            $filename = substr($filename, $lastSlash + 1);
+        }
+
+        if ($filename === '' || $filename === '.') {
+            return '';
+        }
+
         // پیدا کردن آخرین نقطه
         $lastDot = strrpos($filename, '.');
         if ($lastDot === false || $lastDot === 0) {
-            // نقطه نیست یا فایل با نقطه شروع شده (مثل .htaccess)
+            // نقطه نیست یا فایل با نقطه شروع شده (مثل .htaccess — پسوند ندارد)
             return '';
         }
+
+        // استخراج پسوند
         $ext = substr($filename, $lastDot + 1);
+
+        // محدودیت طول پسوند (بیش از ۲۰ کاراکتر غیرمعقول است)
+        if (strlen($ext) > 20) {
+            $ext = substr($ext, 0, 20);
+        }
+
         // حذف کاراکترهای غیر ASCII (پسوند فقط باید ASCII باشد)
+        // این کار همچنین کاراکترهای کنترلی احتمالی در پسوند را پاک می‌کند
         $ext = preg_replace('/[^a-zA-Z0-9]/', '', $ext);
+
+        if ($ext === '' || $ext === null) {
+            return '';
+        }
+
         return mb_strtolower($ext, 'UTF-8');
     }
 }
@@ -180,6 +232,7 @@ if (!function_exists('sanitize_upload_filename')) {
      * - حذف BOM و کاراکترهای کنترلی
      * - تبدیل encoding ویندوزی به UTF-8
      * - trim فاصله‌ها
+     * - حذف مسیر (basename)
      *
      * @param string $filename نام فایل خام از $_FILES
      * @return string نام فایل پاک‌سازی‌شده
@@ -196,8 +249,234 @@ if (!function_exists('sanitize_upload_filename')) {
                 $filename = $converted;
             }
         }
-        $filename = str_replace(["\0", "\r", "\n", "\t"], '', $filename);
-        return basename($filename);
+        // حذف BOM
+        if (substr($filename, 0, 3) === "\xEF\xBB\xBF") {
+            $filename = substr($filename, 3);
+        }
+        // حذف کاراکترهای کنترلی
+        $filename = str_replace(["\0", "\r", "\n", "\t", "\x0B", "\x1A"], '', $filename);
+        $filename = trim($filename);
+
+        // نرمال‌سازی جداکننده‌های مسیر و گرفتن basename
+        $filename = str_replace('\\', '/', $filename);
+        $lastSlash = strrpos($filename, '/');
+        if ($lastSlash !== false) {
+            $filename = substr($filename, $lastSlash + 1);
+        }
+
+        return $filename === '.' ? '' : $filename;
+    }
+}
+
+if (!function_exists('detect_extension_from_mime')) {
+    /**
+     * استخراج پسوند مورد انتظار از روی MIME type واقعی فایل.
+     *
+     * این تابع به‌عنوان fallback استفاده می‌شود وقتی نام فایل خالی است یا
+     * پسوند قابل استخراج نیست. در این حالت، MIME واقعی محتوای فایل را بررسی می‌کنیم
+     * و پسوند متناظر را برمی‌گردانیم.
+     *
+     * @param string $tmpPath مسیر فایل موقت آپلودشده
+     * @return string|null پسوند پیشنهادی (مانند 'jpg') یا null اگر قابل تشخیص نباشد
+     */
+    function detect_extension_from_mime(string $tmpPath): ?string
+    {
+        if (!is_file($tmpPath) || !is_readable($tmpPath)) {
+            return null;
+        }
+
+        // استفاده از finfo برای تشخیص MIME واقعی
+        try {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = (string)$finfo->file($tmpPath);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($mime === '' || $mime === 'application/octet-stream') {
+            // تلاش با FILEINFO_MIME برای اطلاعات بیشتر
+            try {
+                $finfo2 = new finfo(FILEINFO_MIME);
+                $mimeRaw = (string)(new finfo(FILEINFO_MIME))->file($tmpPath);
+                // الگوی "image/jpeg; charset=binary" → فقط بخش اول
+                $mime = trim(explode(';', $mimeRaw)[0]);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        // نگاشت MIME به پسوندهای مجاز
+        $mimeToExt = [
+            'image/jpeg' => 'jpg',      // JPEG استاندارد
+            'image/jpg' => 'jpg',       // برخی مرورگرها
+            'image/pjpeg' => 'jpg',     // Progressive JPEG
+            'image/png' => 'png',
+            'image/x-png' => 'png',     // برخی مرورگرهای قدیمی
+            'application/pdf' => 'pdf',
+            'image/webp' => null,       // پشتیبانی نمی‌شود
+            'image/gif' => null,        // پشتیبانی نمی‌شود
+            'image/bmp' => null,        // پشتیبانی نمی‌شود
+        ];
+
+        return $mimeToExt[$mime] ?? null;
+    }
+}
+
+if (!function_exists('validate_uploaded_file')) {
+    /**
+     * اعتبارسنجی کامل یک فایل آپلودشده با رویکرد چندلایه‌ای.
+     *
+     * این تابع مرکزی، تمام بررسی‌های امنیتی لازم را روی یک فایل آپلودشده انجام می‌دهد:
+     *
+     *   ۱. بررسی خطای آپلود (UPLOAD_ERR_OK)
+     *   ۲. استخراج پسوند از نام فایل (با safe_file_extension)
+     *   ۳. اگر نام خالی بود یا پسوند قابل استخراج نبود → استفاده از detect_extension_from_mime
+     *      به‌عنوان fallback (تشخیص از روی محتوای واقعی فایل)
+     *   ۴. بررسی حجم فایل
+     *   ۵. بررسی MIME واقعی با finfo (نه فقط پسوند)
+     *   ۶. تطبیق پسوند با MIME (مثلاً jpg با image/jpeg)
+     *
+     * این رویکرد تضمین می‌کند:
+     *   - فایل‌هایی با نام‌های عجیب (مانند -2147483648_-210002.jpg) پذیرفته شوند
+     *   - فایل‌هایی با نام‌های فارسی پذیرفته شوند
+     *   - فایل‌هایی که نامشان در PHP خالی می‌شود (به دلیل encoding) باز هم پذیرفته شوند
+     *   - اما فایل‌های مخرب (مثل PHP با پسوند jpg) رد شوند
+     *
+     * @param array $file ورودی از $_FILES (با کلیدهای name, tmp_name, size, error)
+     * @param int $maxSizeBytes حداکثر حجم مجاز (پیش‌فرض از MAX_UPLOAD_SIZE)
+     * @return array {
+     *   valid: bool,           آیا فایل قابل پذیرش است؟
+     *   ext: string,           پسوند نهایی (تأیید شده)
+     *   mime: string,          MIME واقعی
+     *   safe_name: string,     نام امن برای نمایش
+     *   error: ?string,        پیام خطا (در صورت رد)
+     *   reason: string,        دلیل رد (برای لاگ)
+     * }
+     */
+    function validate_uploaded_file(array $file, ?int $maxSizeBytes = null): array
+    {
+        $maxSize = $maxSizeBytes ?? (defined('MAX_UPLOAD_SIZE') ? MAX_UPLOAD_SIZE : 2 * 1024 * 1024);
+        $allowedExts = defined('ALLOWED_EXTENSIONS') ? ALLOWED_EXTENSIONS : ['jpg', 'jpeg', 'png', 'pdf'];
+        $allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
+
+        $result = [
+            'valid' => false,
+            'ext' => '',
+            'mime' => '',
+            'safe_name' => '',
+            'error' => null,
+            'reason' => '',
+        ];
+
+        // ۱. بررسی خطای آپلود
+        $uploadError = (int)($file['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $errorMessages = [
+                UPLOAD_ERR_INI_SIZE => 'حجم فایل بیش از حد مجاز سرور (upload_max_filesize) است.',
+                UPLOAD_ERR_FORM_SIZE => 'حجم فایل بیش از حد مجاز فرم است.',
+                UPLOAD_ERR_PARTIAL => 'فایل به‌طور ناقص آپلود شد.',
+                UPLOAD_ERR_NO_FILE => 'هیچ فایلی ارسال نشده است.',
+                UPLOAD_ERR_NO_TMP_DIR => 'پوشهٔ موقت سرور موجود نیست.',
+                UPLOAD_ERR_CANT_WRITE => 'سرور نمی‌تواند فایل را روی دیسک بنویسد.',
+                UPLOAD_ERR_EXTENSION => 'افزونهٔ PHP این آپلود را مسدود کرد.',
+            ];
+            $result['error'] = $errorMessages[$uploadError] ?? 'خطای ناشناخته در آپلود فایل.';
+            $result['reason'] = 'upload_error_' . $uploadError;
+            return $result;
+        }
+
+        // ۲. نرمال‌سازی نام فایل
+        $rawName = (string)($file['name'] ?? '');
+        $safeName = sanitize_upload_filename($rawName);
+        $result['safe_name'] = $safeName ?: '(نام نامعتبر)';
+
+        // ۳. استخراج پسوند از نام فایل
+        $ext = safe_file_extension($rawName);
+
+        // ۴. اگر پسوند قابل استخراج نبود، از MIME واقعی استفاده کن (fallback)
+        $tmpPath = (string)($file['tmp_name'] ?? '');
+        $realMime = '';
+        if (is_file($tmpPath) && is_readable($tmpPath)) {
+            try {
+                $realMime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($tmpPath);
+            } catch (\Throwable $e) {
+                $realMime = '';
+            }
+        }
+        $result['mime'] = $realMime;
+
+        if ($ext === '' || !in_array($ext, $allowedExts, true)) {
+            // پسوند از نام قابل استخراج نیست یا مجاز نیست
+            // تلاش برای تشخیص از روی MIME واقعی
+            $detectedExt = detect_extension_from_mime($tmpPath);
+            if ($detectedExt !== null && in_array($detectedExt, $allowedExts, true)) {
+                // MIME واقعی تأیید می‌کند که فایل تصویر/PDF است
+                $ext = $detectedExt;
+            } else {
+                // نه نام و نه MIME مجاز نیست
+                $result['error'] = 'پسوند فایل «' . $result['safe_name'] . '» مجاز نیست. فقط '
+                    . implode(', ', $allowedExts) . ' مجاز است.';
+                $result['reason'] = 'invalid_extension_and_mime';
+                return $result;
+            }
+        }
+
+        $result['ext'] = $ext;
+
+        // ۵. بررسی حجم
+        $size = (int)($file['size'] ?? 0);
+        if ($size <= 0) {
+            $result['error'] = 'حجم فایل «' . $result['safe_name'] . '» قابل تشخیص نیست یا صفر است.';
+            $result['reason'] = 'zero_size';
+            return $result;
+        }
+        if ($size > $maxSize) {
+            $result['error'] = 'حجم فایل «' . $result['safe_name'] . '» بیش از حد مجاز ('
+                . number_format($maxSize / 1024 / 1024, 1) . ' مگابایت) است.';
+            $result['reason'] = 'size_exceeded';
+            return $result;
+        }
+
+        // ۶. بررسی MIME واقعی (نه فقط پسوند)
+        if (!in_array($realMime, $allowedMimes, true)) {
+            // تلاش مجدد با FILEINFO_MIME (اطلاعات دقیق‌تر)
+            try {
+                $mimeRaw = (string)(new finfo(FILEINFO_MIME))->file($tmpPath);
+                $realMime = trim(explode(';', $mimeRaw)[0]);
+            } catch (\Throwable $e) {}
+
+            if (!in_array($realMime, $allowedMimes, true)) {
+                $result['error'] = 'محتوای فایل «' . $result['safe_name'] . '» با پسوندهای مجاز '
+                    . '(تصویر JPG/PNG یا PDF) همخوانی ندارد. MIME تشخیص‌داده‌شده: ' . $realMime;
+                $result['reason'] = 'mime_mismatch';
+                return $result;
+            }
+        }
+
+        // ۷. تطبیق پسوند با MIME (برای امنیت مضاعف)
+        $extToMime = [
+            'jpg' => ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+            'jpeg' => ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+            'png' => ['image/png', 'image/x-png'],
+            'pdf' => ['application/pdf'],
+        ];
+        // اگر پسوند استخراج‌شده از نام بود، بررسی تطبیق
+        if (isset($extToMime[$ext]) && !in_array($realMime, $extToMime[$ext], true)) {
+            // عدم تطبیق مجاز نیست چون ممکن است کاربر پسوند را دستی تغییر داده باشد
+            // اما اگر پسوند از MIME تشخیص داده شده باشد، تطبیق خودکار است
+            $nameExt = safe_file_extension($rawName);
+            if ($nameExt !== '' && $nameExt === $ext) {
+                $result['error'] = 'پسوند فایل «' . $result['safe_name'] . '» با محتوای واقعی همخوانی ندارد. '
+                    . 'احتمالاً پسوند فایل تغییر داده شده است.';
+                $result['reason'] = 'ext_mime_mismatch';
+                return $result;
+            }
+            // در غیر این صورت، ext از MIME آمده و تطبیق خودکار است
+        }
+
+        $result['valid'] = true;
+        $result['reason'] = 'ok';
+        return $result;
     }
 }
 

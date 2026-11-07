@@ -163,14 +163,14 @@ class LicenseController extends Controller
         }
 
         $file = $_FILES['receipt_file'] ?? null;
+        $receiptValidation = null;
         if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
             $validator->addError('receipt_file', 'بارگذاری تصویر رسید الزامی است.');
         } else {
-            $ext = safe_file_extension((string)$file['name']);
-            $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-            if (!in_array($ext, ALLOWED_EXTENSIONS, true) || $file['size'] > MAX_UPLOAD_SIZE
-                || !in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
-                $validator->addError('receipt_file', 'فایل رسید باید jpg/png/pdf و حداکثر ۲ مگابایت باشد.');
+            // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
+            $receiptValidation = validate_uploaded_file($file);
+            if (!$receiptValidation['valid']) {
+                $validator->addError('receipt_file', $receiptValidation['error'] ?? 'فایل رسید نامعتبر است.');
             }
         }
 
@@ -179,10 +179,10 @@ class LicenseController extends Controller
             $this->redirect($back);
         }
 
-        // ذخیرهٔ رسید
+        // ذخیرهٔ رسید (با پسوند تأیید شده از اعتبارسنجی)
         $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-        $ext = safe_file_extension((string)$file['name']);
+        $ext = $receiptValidation ? $receiptValidation['ext'] : safe_file_extension((string)$file['name']);
         $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
         if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
             Session::set('license_message', 'خطا در ذخیرهٔ فایل رسید.');
@@ -294,13 +294,13 @@ class LicenseController extends Controller
             Session::set('errors', ['license' => ['فایل تصویر مجوز را انتخاب کنید.']]);
             $this->redirect('/admin/view/' . $applicantId);
         }
-        $ext = safe_file_extension((string)$file['name']);
-        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
-        if (!in_array($ext, ALLOWED_EXTENSIONS, true) || $file['size'] > MAX_UPLOAD_SIZE
-            || !in_array($mime, ['image/jpeg', 'image/png', 'application/pdf'], true)) {
-            Session::set('errors', ['license' => ['فایل مجوز باید jpg/png/pdf و حداکثر ۲ مگابایت باشد.']]);
+        // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
+        $licenseValidation = validate_uploaded_file($file);
+        if (!$licenseValidation['valid']) {
+            Session::set('errors', ['license' => [$licenseValidation['error'] ?? 'فایل مجوز نامعتبر است.']]);
             $this->redirect('/admin/view/' . $applicantId);
         }
+        $ext = $licenseValidation['ext'];
 
         $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
