@@ -2,28 +2,37 @@
 /**
  * فایل پیکربندی اصلی سامانه
  * سامانه مدیریت ثبت‌نام و پیگیری صدور مجوز صنایع دستی
+ * ----------------------------------------------------------------
+ * مقادیر حساس (DB credentials، APP_DEBUG، CRON_SECRET) از فایل .env خوانده می‌شوند.
+ * برای راه‌اندازی: فایل .env.example را به .env کپی کرده و مقادیر واقعی را جایگزین کنید.
  */
+
+// بارگذاری لودر .env (قبل از هر define)
+require_once __DIR__ . '/env.php';
+load_env();
 
 // ==================== نسخهٔ سامانه ====================
 // نسخهٔ فعلی پروژه — در README.md، فوتر پنل و پاسخ‌های JSON بازگردانده می‌شود.
 // الگوی SemVer: MAJOR.MINOR.PATCH
-// این اولین نسخهٔ رسمی است. هر اصلاح یک واحد به PATCH اضافه می‌شود.
-define('APP_VERSION', '0.5.5');
-define('APP_VERSION_NAME', 'رفع خطای اعتبارسنجی فایل CSV در ایمپورت');
+define('APP_VERSION', '2.0.0-dev');
+define('APP_VERSION_NAME', 'بازنویسی کامل بر اساس تحلیل جامع (فاز ۱: امنیت)');
 
 // ==================== حالت اشکال‌زدایی ====================
 // در محیط توسعه true و روی سرور واقعی حتماً false باشد.
 // وقتی false است: خطاها در لاگ سرور ثبت می‌شوند و کاربر صفحهٔ عمومی ۵۰۰ می‌بیند.
-define('APP_DEBUG', true);
+// از فایل .env یا متغیر محیطی APP_DEBUG خوانده می‌شود؛ پیش‌فرض false (امن).
+define('APP_DEBUG', (bool)env('APP_DEBUG', false));
 
-// تنظیمات پایگاه داده
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'handicraft_license');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+// ==================== تنظیمات پایگاه داده ====================
+// از فایل .env یا متغیرهای محیطی سرور خوانده می‌شوند.
+// پیش‌فرض‌ها فقط برای توسعهٔ محلی هستند — در تولید حتماً از .env استفاده کنید.
+define('DB_HOST', (string)env('DB_HOST', 'localhost'));
+define('DB_NAME', (string)env('DB_NAME', 'handicraft_license'));
+define('DB_USER', (string)env('DB_USER', 'root'));
+define('DB_PASS', (string)env('DB_PASS', ''));
 
 // مسیر پایه - در لوکال معمولاً خالی یا '/' است
-define('BASE_URL', '/');
+define('BASE_URL', (string)env('BASE_URL', '/'));
 
 // مسیرهای اصلی
 define('ROOT_PATH', dirname(__DIR__));
@@ -39,11 +48,26 @@ define('ALLOWED_EXTENSIONS', ['jpg', 'jpeg', 'png', 'pdf']);
 define('UPLOAD_DIR', ROOT_PATH . '/uploads');
 
 // استفاده از CDN برای Bootstrap
-define('USE_CDN', false);
+define('USE_CDN', (bool)env('USE_CDN', false));
 
 // تنظیمات نشست
-define('SESSION_LIFETIME', 86400); // ۲۴ ساعت
+define('SESSION_LIFETIME', (int)env('SESSION_LIFETIME', 86400)); // ۲۴ ساعت
 
 // تنظیمات محدودیت زمانی
 define('AUTO_CANCEL_DAYS', 14); // لغو خودکار پس از ۱۴ روز
 define('PRIORITY_DAYS', 12); // اولویت‌بندی برای ثبت‌نام بیش از ۱۲ روز
+
+// ==================== امنیت endpoint های عمومی ====================
+// رمز مشترک برای endpoint هایی که فقط باید از cron فراخوانی شوند (مثل /check-cancel).
+// اگر CRON_SECRET در .env تنظیم شده باشد، درخواست باید آن را در کوئری یا هدر بفرستد.
+// اگر خالی باشد، endpoint غیرفعال می‌شود.
+define('CRON_SECRET', (string)env('CRON_SECRET', ''));
+
+// ==================== احراز هویت اختیاری برای tracking عمومی ====================
+// اگر true باشد، کد رهگیری به‌تنهایی کافی نیست؛ کاربر باید موبایل را هم وارد کند.
+// فعلاً برای backward-compat پیش‌فرض false (در فاز بعدی به true تغییر کند).
+define('TRACKING_REQUIRE_MOBILE', (bool)env('TRACKING_REQUIRE_MOBILE', false));
+
+// ==================== Rate Limit عمومی برای endpoint های عمومی ====================
+// حداکثر تعداد درخواست در دقیقه برای endpoint هایی که بدون login هستند.
+define('PUBLIC_RATE_LIMIT_PER_MIN', (int)env('PUBLIC_RATE_LIMIT_PER_MIN', 30));

@@ -709,3 +709,80 @@ if (!function_exists('is_valid_national_code')) {
         return $nc !== '' && preg_match('/^\d{10}$/', $nc);
     }
 }
+
+if (!function_exists('client_ip')) {
+    /**
+     * دریافت IP واقعی کاربر — با پشتیبانی از پروکسی‌های رایج.
+     * در محیط تولید، Apache/Nginx معمولاً X-Forwarded-For را تنظیم می‌کنند.
+     *
+     * @return string
+     */
+    function client_ip(): string
+    {
+        $candidates = [
+            'HTTP_CF_CONNECTING_IP', // Cloudflare
+            'HTTP_X_REAL_IP',         // Nginx
+            'HTTP_X_FORWARDED_FOR',  // پروکسی استاندارد
+            'HTTP_X_FORWARDED',
+            'HTTP_FORWARDED_FOR',
+            'HTTP_FORWARDED',
+            'REMOTE_ADDR',            // نقطهٔ پایانی مستقیم
+        ];
+        foreach ($candidates as $key) {
+            if (!empty($_SERVER[$key])) {
+                $ip = trim(explode(',', $_SERVER[$key])[0]);
+                if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+            }
+        }
+        return '0.0.0.0';
+    }
+}
+
+if (!function_exists('rate_limit_ip')) {
+    /**
+     * Rate limiting مبتنی بر IP (مستقل از session) برای endpoint های عمومی.
+     * پیاده‌سازی: فایل‌های شمارنده در /tmp/mojavez_rate_limit/.
+     *
+     * @param string $key     کلید منبع (مثلاً 'tracking_print')
+     * @param int    $max     حداکثر تعداد در بازه
+     * @param int    $window  طول بازه به ثانیه
+     * @return bool           true = محدود شده، false = مجاز (و شمارنده +۱ شد)
+     */
+    function rate_limit_ip(string $key, int $max, int $window): bool
+    {
+        $ip = client_ip();
+        $dir = sys_get_temp_dir() . '/mojavez_rate_limit';
+        if (!is_dir($dir)) @mkdir($dir, 0700, true);
+
+        $file = $dir . '/' . md5($key . '|' . $ip) . '.json';
+        $now = time();
+        $data = ['hits' => [], 'first' => $now];
+
+        if (is_file($file)) {
+            $content = @file_get_contents($file);
+            if ($content !== false) {
+                $decoded = json_decode($content, true);
+                if (is_array($decoded) && isset($decoded['hits'])) {
+                    $data = $decoded;
+                }
+            }
+        }
+
+        // پاک‌سازی hits قدیمی
+        $data['hits'] = array_values(array_filter(
+            $data['hits'],
+            fn($t) => $t > ($now - $window)
+        ));
+
+        // بررسی محدودیت
+        if (count($data['hits']) >= $max) {
+            return true; // محدود شده
+        }
+
+        // ثبت hit جدید
+        $data['hits'][] = $now;
+        $data['first'] = $data['first'] ?? $now;
+        @file_put_contents($file, json_encode($data), LOCK_EX);
+        return false;
+    }
+}

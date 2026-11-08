@@ -247,10 +247,21 @@ $router->post('/document/view', ['DocumentController', 'view']);
 $router->get('/document/thumb/{id}', ['DocumentController', 'thumb']);
 //$router->get('/document/{id}', ['DocumentController', 'serve']);
 
-// Check cancel
+// Check cancel — نیاز به رمز مشترک (CRON_SECRET) دارد
+// برای فراخوانی: GET /check-cancel?key=SECRET یا با هدر X-Cron-Secret
+// اگر CRON_SECRET در .env خالی باشد، endpoint با خطای 403 برمی‌گردد.
 $router->get('/check-cancel', function () {
+    // بررسی رمز مشترک
+    $provided = $_GET['key'] ?? ($_SERVER['HTTP_X_CRON_SECRET'] ?? '');
+    if (CRON_SECRET === '' || !hash_equals(CRON_SECRET, (string)$provided)) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'forbidden', 'message' => 'CRON_SECRET required']);
+        return;
+    }
     $count = AutoCancelService::cancelExpired();
     AutoCancelService::updatePriorities();
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['cancelled' => $count, 'message' => 'OK']);
 });
 

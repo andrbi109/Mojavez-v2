@@ -86,6 +86,17 @@ class TrackingController extends Controller
      */
     public function status(string $trackingCode): void
     {
+        // Rate limiting مبتنی بر IP (محافظت در برابر brute-force کد رهگیری)
+        if (rate_limit_ip('tracking_status', PUBLIC_RATE_LIMIT_PER_MIN, 60)) {
+            http_response_code(429);
+            header('Retry-After: 60');
+            echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+                . '<title>درخواست بیش از حد</title></head><body style="font-family:Tahoma;text-align:center;padding:3rem">'
+                . '<h2>⏱ تعداد درخواست‌های شما بیش از حد مجاز است.</h2>'
+                . '<p>لطفاً یک دقیقه دیگر تلاش کنید.</p></body></html>';
+            return;
+        }
+
         $applicant = $this->applicantModel->findByTrackingCode(strtoupper(trim($trackingCode)));
         if (!$applicant) {
             Session::set('tracking_error', 'کد رهگیری نامعتبر است.');
@@ -486,19 +497,48 @@ class TrackingController extends Controller
     /**
      * نمایش نسخه چاپی پرونده
      * طبق نیازمندی، هر بار مشاهده یک رویداد «مشاهده و چاپ پرونده» ثبت می‌شود.
+     *
+     * نکتهٔ امنیتی: این endpoint حساس است — شامل کد ملی، موبایل، آدرس و مدارک متقاضی است.
+     * Rate limit مبتنی بر IP برای جلوگیری از brute-force کد رهگیری اعمال شده است.
      */
     public function printView(string $trackingCode): void
     {
+        // Rate limiting شدیدتر برای endpoint حساس — ۱۰ درخواست در دقیقه
+        if (rate_limit_ip('tracking_print', 10, 60)) {
+            http_response_code(429);
+            header('Retry-After: 60');
+            echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+                . '<title>درخواست بیش از حد</title></head><body style="font-family:Tahoma;text-align:center;padding:3rem">'
+                . '<h2>⏱ تعداد درخواست‌های شما بیش از حد مجاز است.</h2>'
+                . '<p>لطفاً یک دقیقه دیگر تلاش کنید.</p></body></html>';
+            return;
+        }
+
         $applicant = $this->applicantModel->findByTrackingCode(strtoupper(trim($trackingCode)));
         if (!$applicant) {
             $this->redirect('/tracking');
         }
 
-        // ثبت رویداد مشاهده و چاپ
+        // اگر TRACKING_REQUIRE_MOBILE فعال باشد، کاربر باید موبایل را هم وارد کند.
+        // این یک لایهٔ دوم احراز هویت برای دسترسی به مدارک است.
+        if (TRACKING_REQUIRE_MOBILE) {
+            $providedMobile = normalize_mobile((string)($_GET['m'] ?? ''));
+            if ($providedMobile !== $applicant['mobile']) {
+                http_response_code(403);
+                echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+                    . '<title>دسترسی غیرمجاز</title></head><body style="font-family:Tahoma;text-align:center;padding:3rem">'
+                    . '<h2>⛔ دسترسی غیرمجاز</h2>'
+                    . '<p>برای مشاهدهٔ پرونده، کد رهگیری به‌تنهایی کافی نیست.</p>'
+                    . '<p><a href="/tracking">بازگشت به جستجو</a></p></body></html>';
+                return;
+            }
+        }
+
+        // ثبت رویداد مشاهده و چاپ — همراه با IP برای ممیزی
         $this->statusLogModel->create([
             'applicant_id' => $applicant['id'],
             'status_name' => 'مشاهده و چاپ پرونده',
-            'description' => 'کاربر نسخه چاپی پرونده را مشاهده کرد.'
+            'description' => 'کاربر نسخه چاپی پرونده را مشاهده کرد. (IP: ' . client_ip() . ')'
         ]);
 
         $this->render('print', [
