@@ -70,6 +70,52 @@ class Applicant
     }
 
     /**
+     * به‌روزرسانی کامل رکورد متقاضی (برای ویرایش توسط مدیر).
+     * national_code و tracking_code عمداً به‌روزرسانی نمی‌شوند (لنگر هویت).
+     */
+    public function update(int $id, array $data): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE applicants SET
+                first_name = :first_name,
+                last_name = :last_name,
+                postal_code = :postal_code,
+                mobile = :mobile,
+                birth_date = :birth_date,
+                father_name = :father_name,
+                marital_status = :marital_status,
+                children_count = :children_count,
+                physical_condition = :physical_condition,
+                disability_details = :disability_details,
+                income_decile = :income_decile,
+                has_court_case = :has_court_case,
+                has_active_loan = :has_active_loan,
+                has_overdue_installments = :has_overdue_installments,
+                service_type_id = :service_type_id,
+                updated_at = NOW()
+             WHERE id = :id"
+        );
+        $stmt->execute([
+            'first_name' => $data['first_name'] ?? '',
+            'last_name' => $data['last_name'] ?? '',
+            'postal_code' => $data['postal_code'] ?? '',
+            'mobile' => $data['mobile'] ?? '',
+            'birth_date' => $data['birth_date'] ?: null,
+            'father_name' => $data['father_name'] ?? null,
+            'marital_status' => $data['marital_status'] ?? 'مجرد',
+            'children_count' => (int)($data['children_count'] ?? 0),
+            'physical_condition' => $data['physical_condition'] ?? 'سالم',
+            'disability_details' => $data['disability_details'] ?? null,
+            'income_decile' => !empty($data['income_decile']) ? (int)$data['income_decile'] : null,
+            'has_court_case' => $data['has_court_case'] ?? 'خیر',
+            'has_active_loan' => $data['has_active_loan'] ?? 'خیر',
+            'has_overdue_installments' => $data['has_overdue_installments'] ?? 'خیر',
+            'service_type_id' => !empty($data['service_type_id']) ? (int)$data['service_type_id'] : null,
+            'id' => $id,
+        ]);
+    }
+
+    /**
      * یافتن با کد رهگیری
      */
     public function findByTrackingCode(string $code): ?array

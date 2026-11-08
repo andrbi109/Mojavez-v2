@@ -39,4 +39,28 @@ class Document
         $stmt->execute(['id' => $id]);
         return $stmt->fetch() ?: null;
     }
+
+    /**
+     * حذف یک مدرک (با حذف فیزیکی فایل از دیسک).
+     * @return bool آیا حذف شد؟
+     */
+    public function delete(int $id): bool
+    {
+        $doc = $this->findById($id);
+        if (!$doc) return false;
+
+        // حذف رکورد دیتابیس
+        $stmt = $this->db->prepare("DELETE FROM documents WHERE id = :id");
+        $stmt->execute(['id' => $id]);
+        $deleted = $stmt->rowCount() > 0;
+
+        // حذف فایل فیزیکی از دیسک
+        if ($deleted && !empty($doc['file_path'])) {
+            $fullPath = UPLOAD_DIR . '/' . ltrim($doc['file_path'], '/');
+            if (is_file($fullPath)) {
+                @unlink($fullPath);
+            }
+        }
+        return $deleted;
+    }
 }

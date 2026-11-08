@@ -43,4 +43,52 @@ class PropertyDetail
         $stmt->execute(['id' => $applicantId]);
         return $stmt->fetch() ?: null;
     }
+
+    /**
+     * به‌روزرسانی اطلاعات ملک یک متقاضی.
+     * اگر رکوردی موجود نبود، آن را می‌سازد (upsert).
+     */
+    public function updateByApplicantId(int $applicantId, array $data): void
+    {
+        $existing = $this->findByApplicantId($applicantId);
+        $params = [
+            'aid' => $applicantId,
+            'os' => $data['ownership_status'] ?? 'شخص',
+            'pr' => $data['province'] ?? '',
+            'co' => $data['county'] ?? ($data['city'] ?? ''),
+            'ci' => $data['city'] ?? '',
+            'di' => $data['district'] ?? null,
+            'rd' => $data['rural_district'] ?? null,
+            'vi' => $data['village'] ?? null,
+            'eb' => $data['electricity_bill_id'] ?? '0000000000',
+            'as' => $data['address_street'] ?? null,
+            'al' => $data['address_alley'] ?? null,
+            'ap' => $data['address_plaque'] ?? null,
+        ];
+        if ($existing) {
+            $stmt = $this->db->prepare(
+                "UPDATE property_details
+                 SET ownership_status = :os, province = :pr, county = :co, city = :ci,
+                     district = :di, rural_district = :rd, village = :vi,
+                     electricity_bill_id = :eb, address_street = :as, address_alley = :al, address_plaque = :ap
+                 WHERE applicant_id = :aid"
+            );
+            $stmt->execute($params);
+        } else {
+            $this->create([
+                'applicant_id' => $applicantId,
+                'ownership_status' => $params['os'],
+                'province' => $params['pr'],
+                'county' => $params['co'],
+                'city' => $params['ci'],
+                'district' => $params['di'],
+                'rural_district' => $params['rd'],
+                'village' => $params['vi'],
+                'electricity_bill_id' => $params['eb'],
+                'address_street' => $params['as'],
+                'address_alley' => $params['al'],
+                'address_plaque' => $params['ap'],
+            ]);
+        }
+    }
 }

@@ -651,6 +651,8 @@ class AdminController extends Controller
 
     /**
      * نمایش فرم ویرایش متقاضی — فقط مدیر کل
+     * بارگذاری همهٔ داده‌های مرتبط (هویتی، شغلی، ملک، مدارک، فیلدهای پویا)
+     * برای نمایش در فرم ویرایش همسان با ثبت‌نام دستی.
      */
     public function editApplication(int|string $id): void
     {
@@ -664,14 +666,50 @@ class AdminController extends Controller
         $propertyDetail = $this->propertyDetailModel->findByApplicantId($id);
         $documents = $this->documentModel->findByApplicantId($id);
 
+        // فیلدهای پویا (custom fields) — برای هر ۴ مرحله
+        $formFieldModel = new FormField();
+        $appFieldValueModel = new ApplicantFieldValue();
+        $wizardSteps = (new WizardStep())->orderedActive((int)$applicant['service_type_id']);
+        $dynFieldsByStep = []; // step_position => [field rows]
+        foreach ($wizardSteps as $pos => $wstep) {
+            $stepId = (int)$wstep['id'];
+            $dynFieldsByStep[$pos + 1] = $formFieldModel->activeByStepId($stepId, (int)$applicant['service_type_id']);
+        }
+
+        // مقادیر ذخیره‌شدهٔ فیلدهای پویا — نگاشت field_id → value
+        $dynSavedValues = $appFieldValueModel->findKeyedByFieldId($id);
+        // تبدیل به dyn_{field_id} → value برای هماهنگی با partial _dynamic_fields.php
+        $dynValues = [];
+        foreach ($dynSavedValues as $fid => $val) {
+            $dynValues['dyn_' . $fid] = $val;
+        }
+
+        // اگر formData موجود است (بازگشت از اعتبارسنجی)، آن را با داده‌های متقاضی merge کن
+        $formData = Session::get('formData', []);
+        // برای فیلدهای پویا: اگر خطا بود و formData داشتیم، از formData استفاده کن
+        $dynErrors = [];
+        $errors = Session::get('errors', []);
+        foreach ($errors as $k => $v) {
+            if (str_starts_with($k, 'dyn_')) {
+                $dynErrors[$k] = $v;
+            }
+        }
+
         $this->render('admin/edit_application', [
             'title' => 'ویرایش متقاضی',
             'applicant' => $applicant,
             'jobDetail' => $jobDetail,
             'propertyDetail' => $propertyDetail,
             'documents' => $documents,
-            'errors' => Session::get('errors', []),
-            'formData' => Session::get('formData', []),
+            'licenseGroups' => (new LicenseTitle())->groupedActive(),
+            'services' => (new ServiceType())->getActive(),
+            'wizardSteps' => $wizardSteps,
+            'dynFieldsByStep' => $dynFieldsByStep,
+            'dynValues' => $dynValues,
+            'dynErrors' => $dynErrors,
+            'errors' => $errors,
+            'formData' => $formData,
+            'currentPage' => 'applications',
         ], 'admin_layout');
         Session::remove('errors');
         Session::remove('formData');
@@ -679,6 +717,8 @@ class AdminController extends Controller
 
     /**
      * پردازش ویرایش متقاضی — فقط مدیر کل
+     * ذخیره‌سازی همهٔ فیلدها: هویتی، شغلی، ملک، فیلدهای پویا.
+     * national_code و tracking_code قابل ویرایش نیستند (لنگر هویت).
      */
     public function updateApplication(): void
     {
@@ -689,19 +729,147 @@ class AdminController extends Controller
         $this->verifyCsrf();
 
         $applicantId = (int)$this->input('applicant_id', 0);
+        $applicant = $this->applicantModel->findById($applicantId);
+        if (!$applicant) {
+            $this->redirect('/admin/dashboard');
+        }
+
         $data = $this->allInputs();
+
+        // تاریخ تولد: تبدیل و اعتبارسنجی
+        if (!empty($data['birth_year']) && !empty($data['birth_month']) && !empty($data['birth_day'])) {
+            $jy = (int)$data['birth_year'];
+            $jm = (int)$data['birth_month'];
+            $jd = (int)$data['birth_day'];
+            if (is_valid_persian_date($jy, $jm, $jd)) {
+                $data['birth_date'] = persian_to_gregorian($jy, $jm, $jd);
+            } else {
+                $data['birth_date'] = '';
+            }
+        } else {
+            $data['birth_date'] = $applicant['birth_date'] ?? '';
+        }
+
+        // اگر «سایر» انتخاب شده
+        if (str_starts_with((string)$data['license_title'], 'سایر') && !empty($data['custom_license_title'])) {
+            $data['license_title'] = mb_substr(trim($data['custom_license_title']), 0, 100);
+        }
+
         $validator = new Validator($data);
 
+        // ---- اعتبارسنجی هویتی ----
         $validator->required('first_name', 'نام')
                 ->persianAlpha('first_name', 'نام')
                 ->maxLength('first_name', 50, 'نام')
                 ->required('last_name', 'نام خانوادگی')
                 ->persianAlpha('last_name', 'نام خانوادگی')
                 ->maxLength('last_name', 50, 'نام خانوادگی')
+                ->required('postal_code', 'کد پستی')
+                ->postalCode('postal_code', 'کد پستی')
                 ->required('mobile', 'شماره تلفن همراه')
                 ->mobile('mobile', 'شماره تلفن همراه')
-                ->required('postal_code', 'کد پستی')
-                ->postalCode('postal_code', 'کد پستی');
+                ->required('father_name', 'نام پدر')
+                ->persianAlpha('father_name', 'نام پدر')
+                ->maxLength('father_name', 50, 'نام پدر')
+                ->required('marital_status', 'وضعیت تأهل')
+                ->enum('marital_status', ['مجرد','متأهل'], 'وضعیت تأهل')
+                ->required('physical_condition', 'وضعیت جسمانی')
+                ->enum('physical_condition', ['سالم','معلولیت'], 'وضعیت جسمانی')
+                ->required('has_court_case', 'پرونده قضایی')
+                ->enum('has_court_case', ['بله','خیر'], 'پرونده قضایی')
+                ->required('has_active_loan', 'وام فعال')
+                ->enum('has_active_loan', ['بله','خیر'], 'وام فعال')
+                ->required('has_overdue_installments', 'اقساط معوقه')
+                ->enum('has_overdue_installments', ['بله','خیر'], 'اقساط معوقه');
+
+        // یکتایی موبایل در سطح شخص (چندمجوزی) — اگر موبایل تغییر کرده باشد
+        $newMobile = (string)($data['mobile'] ?? '');
+        $oldMobile = (string)$applicant['mobile'];
+        if ($newMobile !== $oldMobile) {
+            $personModel = new Person();
+            if ($personModel->mobileBelongsToOtherPerson($newMobile, (string)$applicant['national_code'])) {
+                $validator->addError('mobile', 'این شمارهٔ موبایل به کد ملی دیگری تعلق دارد.');
+            }
+        }
+
+        // وضعیت معلولیت
+        if (($data['physical_condition'] ?? '') === 'معلولیت') {
+            $validator->required('disability_details', 'توضیحات معلولیت');
+        }
+
+        // تأهل → children_count
+        if (($data['marital_status'] ?? '') === 'متأهل') {
+            $validator->required('children_count', 'تعداد فرزندان')
+                    ->unsignedInt('children_count', 'تعداد فرزندان');
+        } else {
+            $data['children_count'] = 0;
+        }
+
+        if (!empty($data['income_decile'])) {
+            $validator->unsignedInt('income_decile', 'دهک درآمدی');
+        }
+
+        // ---- اطلاعات شغلی ----
+        $validator->required('license_title', 'عنوان مجوز')
+                ->maxLength('license_title', 100, 'عنوان مجوز')
+                ->required('experience_months', 'سابقه فعالیت')
+                ->unsignedInt('experience_months', 'سابقه فعالیت')
+                ->required('training_method', 'نحوه آموزش')
+                ->enum('training_method', ['در خانه','استاد شاگردی','کارگاهی'], 'نحوه آموزش');
+
+        // ---- اطلاعات ملک ----
+        $validator->required('ownership_status', 'وضعیت مالکیت')
+                ->enum('ownership_status', ['شخص','مستأجر','سرپرست'], 'وضعیت مالکیت')
+                ->required('province', 'استان')
+                ->required('county', 'شهرستان')
+                ->required('city', 'شهر')
+                ->required('electricity_bill_id', 'شناسه قبض برق')
+                ->required('address_street', 'خیابان')
+                ->required('address_plaque', 'پلاک');
+
+        if (!empty($data['address_alley'])) {
+            $validator->maxLength('address_alley', 100, 'کوچه');
+        }
+
+        // ---- فیلدهای پویا: اعتبارسنجی ----
+        $formFieldModel = new FormField();
+        $appFieldValueModel = new ApplicantFieldValue();
+        $wizardSteps = (new WizardStep())->orderedActive((int)$applicant['service_type_id']);
+        foreach ($wizardSteps as $wstep) {
+            $fields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)$applicant['service_type_id']);
+            foreach ($fields as $f) {
+                $fid = (int)$f['id'];
+                $name = 'dyn_' . $fid;
+                $val = trim((string)($data[$name] ?? ''));
+                $rules = FormField::parseRules($f['validation_json']);
+                if (!empty($f['is_required']) && $val === '') {
+                    $validator->addError($name, $f['label'] . ' الزامی است.');
+                    continue;
+                }
+                if ($val === '') continue;
+                if ($f['field_type'] === 'number') {
+                    if (!is_numeric($val)) {
+                        $validator->addError($name, $f['label'] . ' باید عدد باشد.');
+                    } else {
+                        if (isset($rules['min']) && (float)$val < (float)$rules['min']) {
+                            $validator->addError($name, $f['label'] . ' نباید کمتر از ' . $rules['min'] . ' باشد.');
+                        }
+                        if (isset($rules['max']) && (float)$val > (float)$rules['max']) {
+                            $validator->addError($name, $f['label'] . ' نباید بیشتر از ' . $rules['max'] . ' باشد.');
+                        }
+                    }
+                }
+                if ($f['field_type'] === 'select' || $f['field_type'] === 'radio') {
+                    $opts = FormField::parseOptions($f['options']);
+                    if (!in_array($val, $opts, true)) {
+                        $validator->addError($name, $f['label'] . ' مقدار معتبری نیست.');
+                    }
+                }
+                if (isset($rules['maxlength']) && mb_strlen($val) > (int)$rules['maxlength']) {
+                    $validator->addError($name, $f['label'] . ' بیش از حد مجاز طولانی است.');
+                }
+            }
+        }
 
         if ($validator->hasErrors()) {
             Session::set('errors', $validator->getErrors());
@@ -709,42 +877,115 @@ class AdminController extends Controller
             $this->redirect('/admin/edit/' . $applicantId);
         }
 
-        // آپدیت فیلدهای اصلی — اصلاح باگ: دسترسی مستقیم به کانکشن دیتابیس
-        // (پیش‌تر به ویژگی خصوصی مدل‌ها دسترسی می‌شد که باعث خطای Fatal می‌گردید)
+        // ---- ذخیره‌سازی در تراکنش ----
         $db = Database::getInstance()->getConnection();
-        $stmt = $db->prepare(
-            "UPDATE applicants SET first_name=?, last_name=?, mobile=?, postal_code=?, updated_at=NOW() WHERE id=?"
-        );
-        $stmt->execute([
-            $data['first_name'],
-            $data['last_name'],
-            $data['mobile'],
-            $data['postal_code'],
-            $applicantId
-        ]);
-
-        // در صورت ارسال فیلدهای آدرس، اطلاعات ملک نیز به‌روزرسانی می‌شود
-        if (!empty($data['address_street']) || !empty($data['address_alley']) || !empty($data['address_plaque'])) {
-            $propSql = "UPDATE property_details SET address_street=?, address_alley=?, address_plaque=? WHERE applicant_id=?";
-            $db->prepare($propSql)->execute([
-                $data['address_street'] ?? '',
-                $data['address_alley'] ?? '',
-                $data['address_plaque'] ?? '',
-                $applicantId
+        $db->beginTransaction();
+        try {
+            // ۱. به‌روزرسانی applicants
+            $this->applicantModel->update($applicantId, [
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'postal_code' => $data['postal_code'],
+                'mobile' => $data['mobile'],
+                'birth_date' => $data['birth_date'],
+                'father_name' => $data['father_name'],
+                'marital_status' => $data['marital_status'],
+                'children_count' => $data['children_count'] ?? 0,
+                'physical_condition' => $data['physical_condition'],
+                'disability_details' => $data['disability_details'] ?? null,
+                'income_decile' => $data['income_decile'] ?? null,
+                'has_court_case' => $data['has_court_case'],
+                'has_active_loan' => $data['has_active_loan'],
+                'has_overdue_installments' => $data['has_overdue_installments'],
+                'service_type_id' => $data['service_type_id'] ?? $applicant['service_type_id'],
             ]);
+
+            // ۲. به‌روزرسانی job_details (upsert)
+            $this->jobDetailModel->updateByApplicantId($applicantId, [
+                'license_title' => $data['license_title'],
+                'experience_months' => $data['experience_months'],
+                'training_method' => $data['training_method'],
+            ]);
+
+            // ۳. به‌روزرسانی property_details (upsert)
+            $this->propertyDetailModel->updateByApplicantId($applicantId, [
+                'ownership_status' => $data['ownership_status'],
+                'province' => $data['province'],
+                'county' => $data['county'],
+                'city' => $data['city'],
+                'district' => $data['district'] ?? null,
+                'rural_district' => $data['rural_district'] ?? null,
+                'village' => $data['village'] ?? null,
+                'electricity_bill_id' => $data['electricity_bill_id'],
+                'address_street' => $data['address_street'],
+                'address_alley' => $data['address_alley'] ?? null,
+                'address_plaque' => $data['address_plaque'],
+            ]);
+
+            // ۴. ذخیرهٔ فیلدهای پویا
+            $dynValuesToSave = []; // field_id => value
+            foreach ($wizardSteps as $wstep) {
+                $fields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)($data['service_type_id'] ?? $applicant['service_type_id']));
+                foreach ($fields as $f) {
+                    $fid = (int)$f['id'];
+                    $name = 'dyn_' . $fid;
+                    $val = trim((string)($data[$name] ?? ''));
+                    $dynValuesToSave[$fid] = $val;
+                }
+            }
+            if (!empty($dynValuesToSave)) {
+                $appFieldValueModel->saveMany($applicantId, $dynValuesToSave);
+            }
+
+            // ۵. همگام‌سازی رکورد person
+            (new Person())->syncFromApplicant($applicantId);
+
+            // ۶. لاگ ممیزی
+            $this->statusLogModel->create([
+                'applicant_id' => $applicantId,
+                'status_name' => 'ویرایش اطلاعات توسط مدیر',
+                'description' => 'اطلاعات کامل متقاضی ویرایش شد. (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
+            ]);
+
+            $db->commit();
+            Session::remove('errors');
+            Session::remove('formData');
+            $this->redirect('/admin/view/' . $applicantId);
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            Session::set('errors', ['system' => ['خطا در ذخیره‌سازی: ' . $e->getMessage()]]);
+            Session::set('formData', $data);
+            $this->redirect('/admin/edit/' . $applicantId);
+        }
+    }
+
+    /**
+     * حذف یک مدرک از پروندهٔ متقاضی (با حذف فیزیکی فایل از دیسک).
+     */
+    public function deleteDocument(): void
+    {
+        $this->requireRole(['admin']);
+        if (!$this->isPost()) $this->redirect('/admin/dashboard');
+        $this->verifyCsrf();
+
+        $documentId = (int)$this->input('document_id', 0);
+        $applicantId = (int)$this->input('applicant_id', 0);
+
+        $doc = $this->documentModel->findById($documentId);
+        if (!$doc || (int)$doc['applicant_id'] !== $applicantId) {
+            Session::set('errors', ['document' => 'مدرک یافت نشد.']);
+            $this->redirect('/admin/edit/' . $applicantId);
         }
 
-        // همگام‌سازی رکورد شخص با داده‌های تازه (فاز ۷)
-        (new Person())->syncFromApplicant($applicantId);
-
-        // ثبت لاگ ممیزی — نام کاربرِ اقدام‌کننده نیز ذخیره می‌شود
-        $this->statusLogModel->create([
-            'applicant_id' => $applicantId,
-            'status_name' => 'ویرایش اطلاعات توسط مدیر',
-            'description' => 'اطلاعات هویتی یا آدرس ویرایش شد. (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
-        ]);
-
-        $this->redirect('/admin/view/' . $applicantId);
+        $deleted = $this->documentModel->delete($documentId);
+        if ($deleted) {
+            $this->statusLogModel->create([
+                'applicant_id' => $applicantId,
+                'status_name' => 'حذف مدرک توسط مدیر',
+                'description' => 'مدرک «' . htmlspecialchars($doc['original_name'], ENT_QUOTES, 'UTF-8') . '» حذف شد. (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
+            ]);
+        }
+        $this->redirect('/admin/edit/' . $applicantId);
     }
 
     /**

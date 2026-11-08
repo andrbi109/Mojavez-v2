@@ -52,6 +52,25 @@ class ApplicantFieldValue
     }
 
     /**
+     * مقادیر ذخیره‌شدهٔ یک متقاضی — نگاشت field_id → field_value.
+     * برای پیش‌پر کردن فرم ویرایش فیلدهای پویا.
+     *
+     * @return array<int, string> field_id → value
+     */
+    public function findKeyedByFieldId(int $applicantId): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT field_id, field_value FROM applicant_field_values WHERE applicant_id = :aid"
+        );
+        $stmt->execute(['aid' => $applicantId]);
+        $map = [];
+        while ($row = $stmt->fetch()) {
+            $map[(int)$row['field_id']] = (string)$row['field_value'];
+        }
+        return $map;
+    }
+
+    /**
      * همهٔ فیلدهای سفارشی فعال (برای ستون‌های پویای گزارش CSV)
      */
     public function activeCustomFields(): array

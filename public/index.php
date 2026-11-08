@@ -134,6 +134,7 @@ $router->post('/admin/register', ['AdminController', 'registerProcess']);
 $router->get('/admin/edit/{id}', ['AdminController', 'editApplication']);
 $router->post('/admin/update', ['AdminController', 'updateApplication']);
 $router->post('/admin/add-document', ['AdminController', 'addDocument']);
+$router->post('/admin/delete-document', ['AdminController', 'deleteDocument']);
 $router->get('/admin/my-tasks', ['AdminController', 'myTasks']);
 // گردش کار بررسی درخواست‌های تغییر کد پستی (تأیید/رد توسط مدیر)
 $router->get('/admin/postal-requests', ['AdminController', 'postalRequests']);
