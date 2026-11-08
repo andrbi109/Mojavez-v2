@@ -899,10 +899,8 @@ class AdminController extends Controller
         $applicantId = (int)$this->input('applicant_id', 0);
         $docType = (string)$this->input('doc_type', 'optional');
 
-        // اعتبارسنجی نوع مدرک در برابر فهرست مجاز
-        $allowedDocTypes = ['national_card', 'birth_cert', 'ownership_doc', 'lease_agreement',
-            'supervisor_doc', 'vocational_cert', 'education_degree', 'product_photos', 'optional'];
-        if (!in_array($docType, $allowedDocTypes, true)) {
+        // اعتبارسنجی نوع مدرک در برابر فهرست مرجع مرکزی (DocTypes)
+        if (!DocTypes::isAllowed($docType, true)) {
             $docType = 'optional';
         }
 
