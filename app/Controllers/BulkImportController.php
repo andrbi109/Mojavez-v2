@@ -60,8 +60,8 @@ class BulkImportController extends Controller
             $this->redirect('/admin/bulk-import');
         }
 
-        if ($file['size'] > 5 * 1024 * 1024) {
-            Session::set('bulk_error', 'حداکثر حجم فایل ۵ مگابایت است.');
+        if ($file['size'] > MAX_CSV_SIZE) {
+            Session::set('bulk_error', 'حداکثر حجم فایل ' . (MAX_CSV_SIZE / 1024 / 1024) . ' مگابایت است.');
             $this->redirect('/admin/bulk-import');
         }
 

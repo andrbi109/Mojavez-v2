@@ -41,11 +41,12 @@ define('APP_PATH', ROOT_PATH . '/app');
 define('CORE_PATH', ROOT_PATH . '/core');
 define('VIEW_PATH', APP_PATH . '/Views');
 define('CONFIG_PATH', ROOT_PATH . '/config');
-define('SERVICES_PATH', APP_PATH . '/Services');
 
 // تنظیمات آپلود
-define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024); // ۲ مگابایت
+define('MAX_UPLOAD_SIZE', 2 * 1024 * 1024); // ۲ مگابایت برای مدارک
+define('MAX_CSV_SIZE', 5 * 1024 * 1024);    // ۵ مگابایت برای فایل CSV ایمپورت دسته‌جمعی
 define('ALLOWED_EXTENSIONS', ['jpg', 'jpeg', 'png', 'pdf']);
+define('CSV_EXTENSION', 'csv');
 define('UPLOAD_DIR', ROOT_PATH . '/uploads');
 
 // استفاده از CDN برای Bootstrap
