@@ -75,18 +75,20 @@ class PaymentController extends Controller
             $this->redirect('/admin/payments');
         }
 
-        $newStatus = $action === 'approve' ? 'تأیید شده' : 'رد شده';
-        $this->paymentModel->review($id, $newStatus, (int)Session::get('admin_id', 0), $reason !== '' ? $reason : null);
+        // استفاده از سرویس متمرکز — شامل PaymentAuditLog (رفع D-D-3) و status_log
+        $paymentService = new PaymentReceiptService();
+        $result = $paymentService->reviewPayment(
+            $id,
+            $action,
+            (int)Session::get('admin_id', 0),
+            Session::get('admin_display_name', 'مدیر'),
+            $reason !== '' ? $reason : null
+        );
 
-        // رویداد در تایم‌لاین پروندهٔ متقاضی
-        $amountFmt = number_format((int)$payment['amount']);
-        $this->statusLogModel->create([
-            'applicant_id' => (int)$payment['applicant_id'],
-            'status_name' => $action === 'approve' ? 'تأیید پرداخت' : 'رد پرداخت',
-            'description' => ($payment['purpose'] ?? 'هزینهٔ ثبت‌نام') . ' — مبلغ ' . $amountFmt . ' تومان'
-                . ' توسط ' . Session::get('admin_display_name', 'مدیر')
-                . ($action === 'reject' && $reason !== '' ? ' — دلیل: ' . $reason : ''),
-        ]);
+        if (!$result['success']) {
+            Session::set('payment_message', $result['error']);
+            $this->redirect('/admin/payments');
+        }
 
         // اگر پرداخت «هزینهٔ دریافت مجدد تصویر مجوز» تأیید شد، توکن دسترسی صادر می‌شود (فاز ۶)
         if ($action === 'approve' && $payment['purpose'] === 'هزینهٔ دریافت مجدد تصویر مجوز'
