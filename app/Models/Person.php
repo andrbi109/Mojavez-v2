@@ -173,15 +173,32 @@ class Person
 
     /**
      * آیا این موبایل متعلق به شخصی «غیر از» کد ملی داده‌شده است؟
-     * (یکتایی موبایل اکنون در سطح شخص است، نه سراسری)
+     *
+     * یکتایی موبایل در سطح شخص بررسی می‌شود (نه applicants). این یعنی:
+     *  - persons.mobile
+     *  - persons.mobile_2
+     *  - persons.mobile_3
+     *
+     * نکتهٔ مهم: قبلاً این متد روی جدول applicants کوئری می‌زد که باگ داشت —
+     * شماره‌های ذخیره‌شده در mobile_2/mobile_3 persons را نمی‌دید.
+     *
+     * @param string $mobile        موبایل نرمال‌شده (۱۱ رقم، با ۰۹ شروع)
+     * @param string $nationalCode کد ملی ۱۰ رقمی شخص فعلی
+     * @return bool                 true = موبایل متعلق به شخص دیگری است
      */
     public function mobileBelongsToOtherPerson(string $mobile, string $nationalCode): bool
     {
         $stmt = $this->db->prepare(
-            "SELECT COUNT(*) FROM applicants
-             WHERE mobile = :mobile AND national_code != :nc"
+            "SELECT COUNT(*) FROM persons
+             WHERE (mobile = :m1 OR mobile_2 = :m2 OR mobile_3 = :m3)
+               AND national_code != :nc"
         );
-        $stmt->execute(['mobile' => $mobile, 'nc' => $nationalCode]);
+        $stmt->execute([
+            'm1' => $mobile,
+            'm2' => $mobile,
+            'm3' => $mobile,
+            'nc' => $nationalCode,
+        ]);
         return (int)$stmt->fetchColumn() > 0;
     }
 
