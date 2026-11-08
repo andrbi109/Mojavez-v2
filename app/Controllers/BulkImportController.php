@@ -507,7 +507,18 @@ class BulkImportController extends Controller
                 // ۶. linkApplication
                 $personModel->linkApplication($applicantId, $personId);
 
-                // ۷. اعلان
+                // ۷. ارتقا به «تکمیل اطلاعات» + ثبت در status_log
+                //    (تطبیق با جریان ویزارد و ثبت‌نام دستی مدیر)
+                $applicantModel->completeRegistration($applicantId);
+                $statusLogModel = new StatusLog();
+                $statusLogModel->create([
+                    'applicant_id' => $applicantId,
+                    'status_name' => 'تکمیل اطلاعات',
+                    'description' => 'ثبت‌نام توسط ایمپورت دسته‌جمعی — رشته: ' . $licenseTitle
+                        . ' (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
+                ]);
+
+                // ۸. اعلان
                 try {
                     $notifModel->create($accountId, 'registration',
                         'ثبت‌نام شما تکمیل شد',

@@ -145,19 +145,25 @@ class SmsController extends Controller
             $this->redirect('/admin/sms');
         }
 
-        // تأیید — ارتقای وضعیت با رعایت مسیر یکطرفه
+        // تأیید — ارتقای وضعیت با رعایت workflow.php و مسیر یکطرفه
         $applicant = $this->applicantModel->findById((int)$entry['applicant_id']);
-        $statusCfg = (require CONFIG_PATH . '/statuses.php')['statuses'];
         $target = $entry['target_status'];
+        $role = Session::get('admin_role', 'admin');
         $applied = false;
+        $applyReason = '';
 
-        if ($applicant && isset($statusCfg[$target])) {
-            $curOrder = $statusCfg[$applicant['current_status']]['order'] ?? 0;
-            $newOrder = $statusCfg[$target]['order'] ?? 0;
-            $terminal = (require CONFIG_PATH . '/statuses.php')['terminal'];
-            if (!in_array($applicant['current_status'], $terminal, true) && $newOrder > $curOrder) {
+        if ($applicant) {
+            // اعتبارسنجی مرکزی: workflow.php + مسیر یکطرفه + terminal
+            $validation = $this->validateStatusTransition(
+                $applicant['current_status'],
+                $target,
+                $role
+            );
+            if ($validation['allowed']) {
                 $this->applicantModel->updateStatus((int)$applicant['id'], $target);
                 $applied = true;
+            } else {
+                $applyReason = $validation['reason'];
             }
         }
 
@@ -167,13 +173,15 @@ class SmsController extends Controller
             'status_name' => $applied ? 'ارتقای وضعیت بر اساس پیامک' : 'تأیید پیامک ثبت‌شده',
             'description' => 'پیامک «' . $entry['template_title'] . '»'
                 . (!empty($entry['sms_code']) ? ' با کد ' . $entry['sms_code'] : '')
-                . ($applied ? ' → وضعیت پرونده به «' . $target . '» ارتقا یافت.' : ' تأیید شد (وضعیت پرونده به‌دلیل مسیر یکطرفه تغییر نکرد).')
+                . ($applied
+                    ? ' → وضعیت پرونده به «' . $target . '» ارتقا یافت.'
+                    : ' تأیید شد (وضعیت پرونده تغییر نکرد: ' . ($applyReason !== '' ? $applyReason : 'علت نامشخص') . ').')
                 . ' — توسط ' . Session::get('admin_display_name', 'مدیر'),
         ]);
 
         Session::set('sms_message', $applied
             ? 'پیامک تأیید و وضعیت پرونده به «' . $target . '» ارتقا یافت. ✔'
-            : 'پیامک تأیید شد (وضعیت پرونده از قبل جلوتر بود و تغییر نکرد).');
+            : 'پیامک تأیید شد (وضعیت پرونده تغییر نکرد: ' . ($applyReason !== '' ? $applyReason : 'علت نامشخص') . ').');
         $this->redirect('/admin/sms');
     }
 }
