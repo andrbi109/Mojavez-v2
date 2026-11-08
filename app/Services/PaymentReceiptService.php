@@ -231,6 +231,34 @@ class PaymentReceiptService
                 . ($reason ? ' — دلیل: ' . $reason : ''),
         ]);
 
+        // ارسال اعلان به کاربر دربارهٔ نتیجهٔ بررسی
+        $applicantModel = new Applicant();
+        $applicant = $applicantModel->findById((int)$payment['applicant_id']);
+        if ($applicant && !empty($applicant['user_account_id'])) {
+            try {
+                $notifModel = new UserNotification();
+                if ($decision === 'approve') {
+                    $notifModel->create(
+                        (int)$applicant['user_account_id'],
+                        'payment_approved',
+                        'پرداخت شما تأیید شد ✅',
+                        'مبلغ ' . number_format((int)$payment['amount']) . ' تومان — کد رهگیری: ' . ($applicant['tracking_code'] ?? ''),
+                        (int)$applicant['id']
+                    );
+                } else {
+                    $notifModel->create(
+                        (int)$applicant['user_account_id'],
+                        'payment_rejected',
+                        'پرداخت شما رد شد ❌',
+                        'مبلغ ' . number_format((int)$payment['amount']) . ' تومان'
+                            . ' — کد رهگیری: ' . ($applicant['tracking_code'] ?? '')
+                            . ($reason ? ' — دلیل: ' . $reason : ''),
+                        (int)$applicant['id']
+                    );
+                }
+            } catch (\Throwable $e) {}
+        }
+
         return ['success' => true, 'error' => null];
     }
 }

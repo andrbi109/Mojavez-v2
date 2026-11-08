@@ -264,11 +264,12 @@ class TrackingController extends Controller
         }
         $back = '/tracking/status/' . rawurlencode($trackingCode);
 
-        // محدودسازی نرخ: ۳ ثبت رسید در روز
-        if (Session::isLimited('payment_submit', 3, 86400)) {
-            Session::set('payment_error', 'تعداد دفعات ثبت رسید امروز بیش از حد مجاز است.');
-            $this->redirect($back);
-        }
+        // نکته: محدودیت نرخ session-based حذف شد.
+        // در عوض، منطق زیر جلوی سوءاستفاده را می‌گیرد:
+        // - اگر پرداخت در 'در انتظار بررسی' یا 'تأیید شده' باشد → ثبت جدید ممکن نیست
+        // - اگر پرداخت در 'در انتظار رسید' یا 'رد شده' باشد → کاربر می‌تواند مجدداً ارسال کند
+        // این به کاربر اجازه می‌دهد حداقل ۲ بار فرم را امتحان کند (مثلاً اگر بار اول
+        // نتوانست رسید آپلود کند یا مدیر رد کرد، می‌تواند دوباره ارسال کند).
 
         // شرایط پذیرش
         if ((int)$applicant['payment_required'] !== 1) {
@@ -291,8 +292,6 @@ class TrackingController extends Controller
             Session::set('payment_error', $validated['first_error']);
             $this->redirect($back);
         }
-
-        Session::hit('payment_submit');
 
         // ثبت رسید با سرویس متمرکز
         // اگر رکورد payments موجود است (با وضعیت 'در انتظار رسید')، آن را به‌روزرسانی کن
