@@ -171,13 +171,31 @@ class UserPanelController extends Controller
         @chmod($destPath, 0640);
 
         // ذخیره در documents
-        $docId = (new Document())->create([
-            'applicant_id' => 0,
-            'doc_type' => 'avatar',
-            'file_name' => $uniqueName,
-            'original_name' => sanitize_upload_filename((string)$file['name']),
-            'file_path' => '/avatars/' . $uniqueName,
-        ]);
+        // نکته: documents.applicant_id به applicants.id وصل است (FK).
+        // آواتار متعلق به user_account است، نه applicant.
+        // راه‌حل: از اولین applicant_id کاربر استفاده می‌کنیم.
+        // اگر کاربر هنوز پرونده‌ای ندارد، یک رکورد placeholder نمیسازیم
+        // و آواتار را فقط در فایل ذخیره می‌کنیم و avatar_document_id را NULL نگه می‌داریم.
+        $applications = $this->userModel->getApplications((int)$user['id']);
+        $applicantId = 0;
+        if (!empty($applications)) {
+            $applicantId = (int)$applications[0]['id'];
+        }
+
+        if ($applicantId > 0) {
+            $docId = (new Document())->create([
+                'applicant_id' => $applicantId,
+                'doc_type' => 'avatar',
+                'file_name' => $uniqueName,
+                'original_name' => sanitize_upload_filename((string)$file['name']),
+                'file_path' => '/avatars/' . $uniqueName,
+            ]);
+        } else {
+            // کاربر پرونده‌ای ندارد — فایل ذخیره شد ولی رکورد documents نمی‌سازیم
+            // (به‌دلیل FK constraint). avatar_document_id را NULL نگه می‌داریم.
+            $docId = null;
+            Session::set('profile_warning', 'تصویر ذخیره شد ولی تا ایجاد پرونده به‌طور کامل فعال نخواهد شد.');
+        }
 
         // به‌روزرسانی avatar_document_id
         $db = Database::getInstance()->getConnection();
