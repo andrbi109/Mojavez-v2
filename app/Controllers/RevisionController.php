@@ -367,45 +367,71 @@ class RevisionController extends Controller
 
         $aid = (int)$rev['applicant_id'];
         $p = $rev['payload_data'];
+        $applicant = $this->applicantModel->findById($aid);
+        if (!$applicant) {
+            Session::set('revision_admin_message', 'متقاضی یافت نشد.');
+            $this->redirect('/admin/revisions');
+        }
+
+        // ---- اعتبارسنجی یکتایی موبایل (رفع D-B-1: تطبیق با updateApplication) ----
+        // اگر موبایل تغییر کرده، بررسی کن که به شخص دیگری تعلق نداشته باشد
+        $i = $p['identity'] ?? [];
+        $newMobile = (string)($i['mobile'] ?? '');
+        if ($newMobile !== '' && $newMobile !== $applicant['mobile']) {
+            $personModel = new Person();
+            if ($personModel->mobileBelongsToOtherPerson($newMobile, (string)$applicant['national_code'])) {
+                Session::set('revision_admin_message', 'موبایل جدید به کد ملی دیگری تعلق دارد. بازبینی رد شد.');
+                // ثبت خودکار به‌عنوان رد شده
+                $this->revisionModel->review($id, 'رد شده', (int)Session::get('admin_id', 0), 'موبایل تکراری');
+                $this->redirect('/admin/revisions');
+            }
+        }
+
         $db = Database::getInstance()->getConnection();
         $db->beginTransaction();
         try {
-            // ۱) اطلاعات هویتی (کد ملی تغییر نمی‌کند — لنگر هویت است)
-            $i = $p['identity'] ?? [];
-            $stmt = $db->prepare(
-                "UPDATE applicants SET first_name=:fn, last_name=:ln, postal_code=:pc, mobile=:mob,
-                        birth_date=:bd, father_name=:fth, marital_status=:ms, children_count=:cc,
-                        physical_condition=:phc, disability_details=:dd, income_decile=:idc,
-                        has_court_case=:hcc, has_active_loan=:hal, has_overdue_installments=:hoi, updated_at=NOW()
-                 WHERE id=:aid"
-            );
-            $stmt->execute([
-                'fn' => $i['first_name'] ?? '', 'ln' => $i['last_name'] ?? '', 'pc' => $i['postal_code'] ?? '',
-                'mob' => $i['mobile'] ?? '', 'bd' => $i['birth_date'] ?? null, 'fth' => $i['father_name'] ?? '',
-                'ms' => $i['marital_status'] ?? 'مجرد', 'cc' => (int)($i['children_count'] ?? 0),
-                'phc' => $i['physical_condition'] ?? 'سالم', 'dd' => $i['disability_details'] ?? null,
-                'idc' => $i['income_decile'] ?? null, 'hcc' => $i['has_court_case'] ?? 'خیر',
-                'hal' => $i['has_active_loan'] ?? 'خیر', 'hoi' => $i['has_overdue_installments'] ?? 'خیر',
-                'aid' => $aid,
+            // ۱) به‌روزرسانی applicants با متد متمرکز مدل (رفع D-B-2)
+            $this->applicantModel->update($aid, [
+                'first_name'              => $i['first_name'] ?? '',
+                'last_name'               => $i['last_name'] ?? '',
+                'postal_code'             => $i['postal_code'] ?? '',
+                'mobile'                  => $i['mobile'] ?? '',
+                'birth_date'              => $i['birth_date'] ?? null,
+                'father_name'             => $i['father_name'] ?? null,
+                'marital_status'          => $i['marital_status'] ?? 'مجرد',
+                'children_count'          => (int)($i['children_count'] ?? 0),
+                'physical_condition'      => $i['physical_condition'] ?? 'سالم',
+                'disability_details'      => $i['disability_details'] ?? null,
+                'income_decile'           => $i['income_decile'] ?? null,
+                'has_court_case'          => $i['has_court_case'] ?? 'خیر',
+                'has_active_loan'         => $i['has_active_loan'] ?? 'خیر',
+                'has_overdue_installments' => $i['has_overdue_installments'] ?? 'خیر',
+                // service_type_id از applicant فعلی حفظ می‌شود
+                'service_type_id'         => $applicant['service_type_id'],
             ]);
 
-            // ۲) اطلاعات شغلی
+            // ۲) به‌روزرسانی job_details با متد متمرکز (upsert)
             $j = $p['job'] ?? [];
-            $db->prepare("UPDATE job_details SET license_title=:lt, experience_months=:em, training_method=:tm WHERE applicant_id=:aid")
-                ->execute(['lt' => $j['license_title'] ?? '', 'em' => (int)($j['experience_months'] ?? 0), 'tm' => $j['training_method'] ?? 'کارگاهی', 'aid' => $aid]);
+            $this->jobDetailModel->updateByApplicantId($aid, [
+                'license_title'     => $j['license_title'] ?? '',
+                'experience_months' => (int)($j['experience_months'] ?? 0),
+                'training_method'   => $j['training_method'] ?? 'کارگاهی',
+            ]);
 
-            // ۳) اطلاعات ملک
+            // ۳) به‌روزرسانی property_details با متد متمرکز (upsert)
             $pr = $p['property'] ?? [];
-            $db->prepare(
-                "UPDATE property_details SET ownership_status=:os, province=:prov, county=:cty, city=:ct,
-                        district=:dis, rural_district=:rd, village=:vil, electricity_bill_id=:eb,
-                        address_street=:st, address_alley=:al, address_plaque=:pl
-                 WHERE applicant_id=:aid"
-            )->execute([
-                'os' => $pr['ownership_status'] ?? 'شخص', 'prov' => $pr['province'] ?? '', 'cty' => $pr['county'] ?? '',
-                'ct' => $pr['city'] ?? '', 'dis' => $pr['district'] ?? null, 'rd' => $pr['rural_district'] ?? null,
-                'vil' => $pr['village'] ?? null, 'eb' => $pr['electricity_bill_id'] ?? '', 'st' => $pr['address_street'] ?? null,
-                'al' => $pr['address_alley'] ?? null, 'pl' => $pr['address_plaque'] ?? null, 'aid' => $aid,
+            $this->propertyDetailModel->updateByApplicantId($aid, [
+                'ownership_status'   => $pr['ownership_status'] ?? 'شخص',
+                'province'           => $pr['province'] ?? '',
+                'county'             => $pr['county'] ?? '',
+                'city'               => $pr['city'] ?? '',
+                'district'           => $pr['district'] ?? null,
+                'rural_district'     => $pr['rural_district'] ?? null,
+                'village'            => $pr['village'] ?? null,
+                'electricity_bill_id' => $pr['electricity_bill_id'] ?? '0000000000',
+                'address_street'     => $pr['address_street'] ?? null,
+                'address_alley'       => $pr['address_alley'] ?? null,
+                'address_plaque'      => $pr['address_plaque'] ?? null,
             ]);
 
             // ۴) مقادیر فیلدهای سفارشی
@@ -421,7 +447,7 @@ class RevisionController extends Controller
                     ->execute(['t' => $d['doc_type'] ?? 'optional', 'id' => (int)$d['doc_id'], 'aid' => $aid]);
             }
 
-            // ۶) همگام‌سازی رکورد شخص (فاز ۷) و ثبت نتیجه
+            // ۶) همگام‌سازی رکورد شخص و ثبت نتیجه
             (new Person())->syncFromApplicant($aid);
             $this->revisionModel->review($id, 'تأیید شده', (int)Session::get('admin_id', 0));
             $this->statusLogModel->create([
