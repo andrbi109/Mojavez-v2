@@ -43,7 +43,7 @@ class FeeTariffController extends Controller
                 'fee_max_discount_without_reason' => setting('fee_max_discount_without_reason', '2'),
                 'fee_max_discount_with_reason' => setting('fee_max_discount_with_reason', '50'),
             ],
-        ]);
+        ], 'admin_layout');
     }
 
     /**
