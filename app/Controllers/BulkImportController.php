@@ -124,26 +124,28 @@ class BulkImportController extends Controller
             $this->redirect('/admin/bulk-import');
         }
 
-        // تشخیص خودکار هدرها
-        $autoDetect = [
-            'نام کامل' => 'full_name', 'نام و نام خانوادگی' => 'full_name',
-            'نام' => 'first_name', 'نام کوچک' => 'first_name',
-            'نام خانوادگی' => 'last_name', 'فامیل' => 'last_name',
-            'کد ملی' => 'national_code', 'شناسنامه' => 'national_code',
-            'موبایل' => 'mobile', 'تلفن همراه' => 'mobile', 'شماره تماس' => 'mobile',
-            'کد پستی' => 'postal_code',
-            'استان' => 'province',
-            'شهر' => 'city',
-            'روستا' => 'village',
-            'نام پدر' => 'father_name',
-            'تاریخ تولد' => 'birth_date',
-            'دهک درآمدی' => 'income_decile',
-        ];
-
+        // تشخیص خودکار هدرها — با تطبیق جزیی (partial match)
         $autoMapping = [];
         foreach ($headers as $i => $header) {
             $header = trim($header);
-            $autoMapping[$i] = $autoDetect[$header] ?? '';
+            $mapped = '';
+
+            // تطبیق جزیی: اگر هدر شامل کلمات کلیدی باشد
+            if ($header === '') { $mapped = ''; }
+            elseif (mb_strpos($header, 'نام و نام خانوادگی') !== false || mb_strpos($header, 'نام کامل') !== false) { $mapped = 'full_name'; }
+            elseif (mb_strpos($header, 'نام خانوادگی') !== false || $header === 'فامیل') { $mapped = 'last_name'; }
+            elseif (mb_strpos($header, 'نام') !== false && mb_strpos($header, 'خانوادگی') === false && mb_strpos($header, 'کامل') === false) { $mapped = 'first_name'; }
+            elseif (mb_strpos($header, 'ملی') !== false || mb_strpos($header, 'شناسنامه') !== false) { $mapped = 'national_code'; }
+            elseif (mb_strpos($header, 'تماس') !== false || mb_strpos($header, 'موبایل') !== false || mb_strpos($header, 'تلفن') !== false || mb_strpos($header, 'همراه') !== false) { $mapped = 'mobile'; }
+            elseif (mb_strpos($header, 'پستی') !== false) { $mapped = 'postal_code'; }
+            elseif (mb_strpos($header, 'استان') !== false) { $mapped = 'province'; }
+            elseif (mb_strpos($header, 'روستا') !== false) { $mapped = 'village'; }
+            elseif (mb_strpos($header, 'شهر') !== false || mb_strpos($header, 'سکونت') !== false) { $mapped = 'city'; }
+            elseif (mb_strpos($header, 'پدر') !== false) { $mapped = 'father_name'; }
+            elseif (mb_strpos($header, 'تولد') !== false) { $mapped = 'birth_date'; }
+            elseif (mb_strpos($header, 'دهک') !== false) { $mapped = 'income_decile'; }
+
+            $autoMapping[$i] = $mapped;
         }
 
         // اعتبارسنجی ردیف‌ها
