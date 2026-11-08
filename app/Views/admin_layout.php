@@ -118,6 +118,7 @@ $ownerImg = setting('owner_image', '');
                         <?php if ($admin): ?>
                             <li><a href="<?= $base ?>admin/applications" class="d-inline-flex text-decoration-none rounded <?= $nav('applications') ?>"><?= icon('list', '', 14) ?> همهٔ درخواست‌ها</a></li>
                             <li><a href="<?= $base ?>admin/register" class="d-inline-flex text-decoration-none rounded <?= $nav('register') ?>"><?= icon('plus', '', 14) ?> ثبت‌نام دستی</a></li>
+                            <li><a href="<?= $base ?>admin/bulk-import" class="d-inline-flex text-decoration-none rounded <?= $nav('bulk-import') ?>"><?= icon('upload', '', 14) ?> ایمپورت دسته‌جمعی</a></li>
                         <?php endif; ?>
                         <li><a href="<?= $base ?>admin/postal-requests" class="d-inline-flex text-decoration-none rounded <?= $nav('postal-requests') ?>">
                             <?= icon('mail', '', 14) ?> تغییر کد پستی
@@ -259,7 +260,7 @@ $ownerImg = setting('owner_image', '');
     <div class="px-3 py-2 d-flex align-items-center justify-content-between flex-shrink-0">
         <small style="color:#5A6B7D; font-size:.7rem;">
             <?= htmlspecialchars(owner_name()) ?>
-            <span style="opacity:.6">v<?= defined('APP_VERSION') ? APP_VERSION : '0.3.10' ?></span>
+            <span style="opacity:.6">v<?= defined('APP_VERSION') ? APP_VERSION : '0.5.0' ?></span>
         </small>
         <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:28px;height:28px;">
             <span class="icon-sun"><?= icon('sun', '', 13) ?></span><span class="icon-moon"><?= icon('moon', '', 13) ?></span>

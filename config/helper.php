@@ -575,3 +575,60 @@ if (!function_exists('icon')) {
             . 'class="' . htmlspecialchars($cls) . '" aria-hidden="true">' . $body . '</svg>';
     }
 }
+
+/* =====================================================
+   توابع کمکی ایمپورت دسته‌جمعی
+   ===================================================== */
+
+if (!function_exists('split_full_name')) {
+    /**
+     * شکستن نام کامل به نام و نام خانوادگی براساس اولین فاصله.
+     *
+     * @param string $fullName نام کامل (مثلاً «محمد رضا کریمی»)
+     * @return array {first_name: string, last_name: string}
+     */
+    function split_full_name(string $fullName): array
+    {
+        $fullName = trim($fullName);
+        if ($fullName === '') return ['first_name' => '', 'last_name' => ''];
+        $parts = preg_split('/\s+/', $fullName, 2);
+        return [
+            'first_name' => $parts[0] ?? '',
+            'last_name'  => $parts[1] ?? '',
+        ];
+    }
+}
+
+if (!function_exists('get_upload_path')) {
+    /**
+     * ساخت مسیر آپلود براساس کد رهگیری و نوع مدرک.
+     *
+     * ساختار: uploads/{tracking_code}/{tracking_code}_{doc_type}[_{index}].{ext}
+     *
+     * @param string $trackingCode کد رهگیری (مثلاً HG-A1B2C3D4)
+     * @param string $docType نوع مدرک (مثلاً national_card_front)
+     * @param string $extension پسوند فایل (مثلاً jpg)
+     * @param int $index شماره (برای فایل‌های چندتایی، 0 = بدون شماره)
+     * @return array {dir, filename, path, relative_path}
+     */
+    function get_upload_path(string $trackingCode, string $docType, string $extension, int $index = 0): array
+    {
+        $dir = UPLOAD_DIR . '/' . $trackingCode;
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $fileName = $trackingCode . '_' . $docType;
+        if ($index > 0) {
+            $fileName .= '_' . $index;
+        }
+        $fileName .= '.' . $extension;
+
+        return [
+            'dir' => $dir,
+            'filename' => $fileName,
+            'path' => $dir . '/' . $fileName,
+            'relative_path' => '/' . $trackingCode . '/' . $fileName,
+        ];
+    }
+}

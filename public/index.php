@@ -181,6 +181,16 @@ $router->get('/admin/payments/csv', ['PaymentController', 'csv']);
 $router->post('/admin/payment-channels/save', ['PaymentController', 'saveChannel']);
 $router->post('/admin/payment-channels/delete', ['PaymentController', 'deleteChannel']);
 
+// ایمپورت دسته‌جمعی کاربران
+$router->get('/admin/bulk-import', ['BulkImportController', 'index']);
+$router->post('/admin/bulk-import/upload', ['BulkImportController', 'upload']);
+$router->get('/admin/bulk-import/preview', ['BulkImportController', 'preview']);
+$router->post('/admin/bulk-import/execute', ['BulkImportController', 'execute']);
+$router->get('/admin/bulk-import/result', ['BulkImportController', 'result']);
+$router->get('/admin/bulk-import/missing-docs', ['BulkImportController', 'missingDocs']);
+$router->get('/admin/bulk-import/documents/{code}', ['BulkImportController', 'uploadDocs']);
+$router->post('/admin/bulk-import/documents/{code}/save', ['BulkImportController', 'saveDocs']);
+
 // نرخ‌نامهٔ چندگانه و تیک خدمات
 $router->get('/admin/fee-tariff', ['FeeTariffController', 'index']);
 $router->post('/admin/fee-tariff/settings', ['FeeTariffController', 'saveSettings']);
