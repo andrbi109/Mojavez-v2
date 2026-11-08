@@ -940,7 +940,13 @@ class AdminController extends Controller
             // ۵. همگام‌سازی رکورد person
             (new Person())->syncFromApplicant($applicantId);
 
-            // ۶. لاگ ممیزی
+            // ۶. ذخیرهٔ مدارک جدید (در صورت آپلود)
+            $uploadErrors = $this->saveUploadedDocuments($applicantId);
+            if (!empty($uploadErrors)) {
+                Session::set('errors', ['document' => implode(' ', $uploadErrors)]);
+            }
+
+            // ۷. لاگ ممیزی
             $this->statusLogModel->create([
                 'applicant_id' => $applicantId,
                 'status_name' => 'ویرایش اطلاعات توسط مدیر',
@@ -948,7 +954,6 @@ class AdminController extends Controller
             ]);
 
             $db->commit();
-            Session::remove('errors');
             Session::remove('formData');
             $this->redirect('/admin/view/' . $applicantId);
         } catch (\Throwable $e) {
@@ -957,6 +962,83 @@ class AdminController extends Controller
             Session::set('formData', $data);
             $this->redirect('/admin/edit/' . $applicantId);
         }
+    }
+
+    /**
+     * ذخیرهٔ مدارک آپلودشده در فرم ویرایش متقاضی.
+     * فایل‌ها در UPLOAD_DIR/Y/m با نام تصادفی ذخیره می‌شوند.
+     *
+     * @param int $applicantId شناسهٔ متقاضی
+     * @return array<string> لیست پیام‌های خطا (خالی = بدون خطا)
+     */
+    private function saveUploadedDocuments(int $applicantId): array
+    {
+        $errors = [];
+        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        // نگاشت نام ورودی فایل → نوع مدرک
+        $fileMap = [
+            'national_card_front' => 'national_card',
+            'national_card_back'  => 'national_card',
+            'birth_cert'          => 'birth_cert',
+            'ownership_doc'       => 'ownership_doc',
+            'vocational_cert'     => 'vocational_cert',
+            'education_degree'    => 'education_degree',
+            'optional_1'          => 'optional',
+            'optional_2'          => 'optional',
+            'optional_3'          => 'optional',
+        ];
+
+        $saveSingleFile = function (array $file, string $docType) use ($applicantId, $uploadDir, &$errors) {
+            if (!$file || $file['error'] !== UPLOAD_ERR_OK) return;
+            $validation = validate_uploaded_file($file);
+            if (!$validation['valid']) {
+                $errors[] = ($file['name'] ?? 'فایل') . ': ' . ($validation['error'] ?? 'نامعتبر');
+                return;
+            }
+            $ext = $validation['ext'];
+            $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
+            $destPath = $uploadDir . '/' . $uniqueName;
+            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+                $errors[] = 'خطا در ذخیرهٔ فایل: ' . sanitize_upload_filename((string)$file['name']);
+                return;
+            }
+            @chmod($destPath, 0640);
+            $this->documentModel->create([
+                'applicant_id' => $applicantId,
+                'doc_type' => $docType,
+                'file_name' => $uniqueName,
+                'original_name' => sanitize_upload_filename((string)$file['name']),
+                'file_path' => str_replace(UPLOAD_DIR, '', $destPath),
+            ]);
+        };
+
+        // فایل‌های تکی
+        foreach ($fileMap as $inputName => $docType) {
+            if (!empty($_FILES[$inputName]) && $_FILES[$inputName]['error'] !== UPLOAD_ERR_NO_FILE) {
+                $saveSingleFile($_FILES[$inputName], $docType);
+            }
+        }
+
+        // تصاویر محصول (چندفایلی)
+        if (!empty($_FILES['product_photos']) && is_array($_FILES['product_photos']['name'])) {
+            $ppNames = $_FILES['product_photos']['name'];
+            $ppTmp   = $_FILES['product_photos']['tmp_name'];
+            $ppErr   = $_FILES['product_photos']['error'];
+            foreach ($ppTmp as $i => $tmpName) {
+                if (($ppErr[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                $saveSingleFile([
+                    'name'     => $ppNames[$i] ?? '',
+                    'tmp_name' => $tmpName,
+                    'error'    => $ppErr[$i],
+                ], 'product_photos');
+            }
+        }
+
+        return $errors;
     }
 
     /**
