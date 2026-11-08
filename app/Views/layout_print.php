@@ -50,6 +50,10 @@ $base = rtrim(BASE_URL, '/') . '/';
             font-size: 14px;
             line-height: 1.6;
         }
+        /* تیترها با فونت لاله‌زار — همسو با تم پروژه */
+        .doc-header h3, .doc-section-title, .sign-box {
+            font-family: 'Lalezar', 'Vazirmatn', 'Vazir', Tahoma, sans-serif;
+        }
 
         /* === نوار ابزار شناور === */
         .print-toolbar {

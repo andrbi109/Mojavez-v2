@@ -384,7 +384,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   padding: 1.1rem 1.2rem;
 }
 .msg-template-box pre, .msg-template-box .msg-text {
-  font-family: 'Vazirmatn', Tahoma, sans-serif;
+  font-family: 'Vazirmatn', 'Vazir', Tahoma, sans-serif;
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
@@ -406,7 +406,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   font-size: clamp(1.5rem, 5vw, 2rem);
   letter-spacing: 3px;
   font-weight: 800;
-  font-family: 'Vazirmatn', monospace;
+  font-family: 'Vazirmatn', 'Vazir', monospace;
   direction: ltr;
   display: inline-block;
   color: var(--turquoise-dark);
@@ -679,7 +679,7 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
   flex-wrap: wrap;
 }
 .field-row.inactive { opacity: .55; background: #F4F1EA; }
-.field-row .field-key { font-family: monospace; font-size: .74rem; color: var(--muted); direction: ltr; }
+.field-row .field-key { font-family: 'Vazirmatn', 'Vazir', monospace; font-size: .74rem; color: var(--muted); direction: ltr; }
 .field-type-badge {
   font-size: .72rem; border-radius: 50rem;
   background: var(--turquoise-light); color: var(--turquoise-dark);
@@ -768,8 +768,8 @@ tr.table-warning { --bs-table-bg: var(--saffron-light); }
    ===================================================================== */
 
 /* تیترها و لوگو با فونت لاله‌زار */
-h1, h2, h3, .navbar-brand, .sidebar-header, .hero h1, .stat-value, .display-1, .display-4 {
-  font-family: 'Lalezar', 'Vazirmatn', Tahoma, sans-serif;
+h1, h2, h3, h4, h5, h6, .navbar-brand, .sidebar-header, .hero h1, .stat-value, .display-1, .display-4, .card-header, .card-title, .modal-title, .section-title {
+  font-family: 'Lalezar', 'Vazirmatn', 'Vazir', Tahoma, sans-serif;
   letter-spacing: 0;
 }
 .hero h1, .hero .lead { font-weight: 400; }
@@ -817,7 +817,7 @@ h1, h2, h3, .navbar-brand, .sidebar-header, .hero h1, .stat-value, .display-1, .
 }
 .info-item .info-label .svg-icon { width: 15px; height: 15px; color: var(--turquoise); }
 .info-item .info-value { font-size: .93rem; font-weight: 600; color: var(--ink); word-break: break-word; }
-.info-item .info-value.mono { font-family: monospace; letter-spacing: .5px; direction: ltr; text-align: right; }
+.info-item .info-value.mono { font-family: 'Vazirmatn', 'Vazir', monospace; letter-spacing: .5px; direction: ltr; text-align: right; }
 
 /* نوار وضعیت عمودی (مسیر رسیدگی) */
 .status-track { list-style: none; margin: 0; padding: 0; }

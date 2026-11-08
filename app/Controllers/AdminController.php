@@ -166,6 +166,26 @@ class AdminController extends Controller
              ORDER BY sl.created_at DESC LIMIT 8"
         )->fetchAll();
 
+        // مجوزهای منقضی‌شده یا در حال انقضا (برای تماس با متقاضی)
+        // مجوزهایی که license_state = 'صادر شده' و license_valid_until در ۳۰ روز آینده یا گذشته است
+        $stmt = $db->prepare(
+            "SELECT a.id, a.tracking_code, a.first_name, a.last_name, a.national_code,
+                    a.mobile, a.license_valid_until,
+                    a.service_type_id, st.title AS service_title,
+                    j.license_title,
+                    DATEDIFF(a.license_valid_until, CURDATE()) AS days_remaining
+             FROM applicants a
+             LEFT JOIN service_types st ON st.id = a.service_type_id
+             LEFT JOIN job_details j ON j.applicant_id = a.id
+             WHERE a.license_state = 'صادر شده'
+               AND a.license_valid_until IS NOT NULL
+               AND a.license_valid_until <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+             ORDER BY a.license_valid_until ASC
+             LIMIT 20"
+        );
+        $stmt->execute();
+        $expiringLicenses = $stmt->fetchAll();
+
         $this->render('admin/dashboard', [
             'title' => 'داشبورد',
             'total' => (int)$total,
@@ -177,6 +197,7 @@ class AdminController extends Controller
             'payStats' => $payStats,
             'nearExpiry' => $nearExpiry,
             'recentLogs' => $recentLogs,
+            'expiringLicenses' => $expiringLicenses,
             'warnDays' => $warnDays,
             'currentPage' => 'dashboard'
         ], 'admin_layout');

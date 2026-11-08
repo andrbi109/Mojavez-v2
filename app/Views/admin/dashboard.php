@@ -512,6 +512,60 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
     </div>
 </div>
 
+<!-- ===== مجوزهای منقضی‌شده یا در حال انقضا ===== -->
+<?php if (!empty($expiringLicenses)): ?>
+<div class="card mt-4">
+    <div class="card-header fw-bold d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,rgba(181,73,63,.08),rgba(181,73,63,.02)); border-color:rgba(181,73,63,.2)">
+        <span><?= icon('alert-triangle','me-1',18) ?> مجوزهای منقضی‌شده یا در آستانه انقضا</span>
+        <span class="badge bg-danger"><?= count($expiringLicenses) ?> مورد</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>نام متقاضی</th>
+                        <th>کد رهگیری</th>
+                        <th>رشته مجوز</th>
+                        <th>موبایل</th>
+                        <th>تاریخ انقضا</th>
+                        <th>وضعیت</th>
+                        <th>اقدام</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($expiringLicenses as $lic):
+                        $days = (int)$lic['days_remaining'];
+                        $isExpired = $days < 0;
+                        $isUrgent = $days >= 0 && $days <= 7;
+                    ?>
+                    <tr class="<?= $isExpired ? 'table-danger' : ($isUrgent ? 'table-warning' : '') ?>">
+                        <td class="fw-bold"><?= htmlspecialchars($lic['first_name'] . ' ' . $lic['last_name']) ?></td>
+                        <td><code dir="ltr"><?= htmlspecialchars($lic['tracking_code']) ?></code></td>
+                        <td class="small"><?= htmlspecialchars($lic['license_title'] ?? '—') ?></td>
+                        <td class="small"><code dir="ltr"><?= htmlspecialchars($lic['mobile']) ?></code></td>
+                        <td class="small text-nowrap"><?= persianDate((string)$lic['license_valid_until']) ?></td>
+                        <td>
+                            <?php if ($isExpired): ?>
+                                <span class="badge bg-danger">منقضی شده (<?= abs($days) ?> روز پیش)</span>
+                            <?php elseif ($isUrgent): ?>
+                                <span class="badge bg-warning text-dark"><?= $days ?> روز مانده</span>
+                            <?php else: ?>
+                                <span class="badge bg-info text-dark"><?= $days ?> روز مانده</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <a href="<?= $base ?>admin/view/<?= (int)$lic['id'] ?>" class="btn btn-sm btn-outline-primary py-0"><?= icon('eye','',14) ?></a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- ===== آخرین رویدادها (تایم‌لاین) ===== -->
 <?php if (!empty($recentLogs)): ?>
 <div class="card mt-4">
