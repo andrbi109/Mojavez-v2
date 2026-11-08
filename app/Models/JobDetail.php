@@ -17,9 +17,9 @@ class JobDetail
 
         $stmt->execute([
             'applicant_id' => $data['applicant_id'],
-            'license_title' => $data['license_title'],
-            'experience_months' => $data['experience_months'],
-            'training_method' => $data['training_method']
+            'license_title' => $data['license_title'] ?? '',
+            'experience_months' => $data['experience_months'] ?? 0,
+            'training_method' => $data['training_method'] ?? 'کارگاهی'
         ]);
 
         return (int)$this->db->lastInsertId();

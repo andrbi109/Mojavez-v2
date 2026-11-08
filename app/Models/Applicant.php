@@ -37,7 +37,7 @@ class Applicant
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
             'national_code' => $data['national_code'],
-            'postal_code' => $data['postal_code'],
+            'postal_code' => $data['postal_code'] ?? '',
             'mobile' => $data['mobile'],
             'birth_date' => $data['birth_date'] ?? null,
             'father_name' => $data['father_name'] ?? null,
