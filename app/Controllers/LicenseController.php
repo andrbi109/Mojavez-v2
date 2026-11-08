@@ -227,6 +227,18 @@ class LicenseController extends Controller
      */
     public function viewByToken(string $token): void
     {
+        // Rate limiting مبتنی بر IP برای جلوگیری از brute-force توکن
+        if (rate_limit_ip('license_view', 20, 60)) {
+            http_response_code(429);
+            header('Retry-After: 60');
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+                . '<title>درخواست بیش از حد</title></head><body style="font-family:Tahoma;text-align:center;padding:3rem">'
+                . '<h2>⏱ تعداد درخواست‌های شما بیش از حد مجاز است.</h2>'
+                . '<p>لطفاً یک دقیقه دیگر تلاش کنید.</p></body></html>';
+            return;
+        }
+
         LicenseAccessRequest::expireStale();
         $req = $this->requestModel->findByToken($token);
 
