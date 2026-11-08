@@ -236,6 +236,7 @@ $router->post('/admin/license-titles/toggle/{id}', ['LicenseTitleController', 't
 
 // Documents
 $router->post('/document/view', ['DocumentController', 'view']);
+$router->get('/document/avatar', ['DocumentController', 'avatar']);
 // بندانگشتی مدرک
 $router->get('/document/thumb/{id}', ['DocumentController', 'thumb']);
 

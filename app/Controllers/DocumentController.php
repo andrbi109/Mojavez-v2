@@ -44,6 +44,33 @@ class DocumentController extends Controller
     }
 
     /**
+     * نمایش آواتار کاربر با درخواست GET (بدون CSRF)
+     * فقط کاربر واردشده می‌تواند آواتار خودش را ببیند.
+     * URL: /document/avatar?id=DOCUMENT_ID
+     */
+    public function avatar(): void
+    {
+        $this->requireLogin();
+
+        $documentId = (int)($_GET['id'] ?? 0);
+        if ($documentId <= 0) {
+            $this->deny(404, 'شناسهٔ فایل نامعتبر است.');
+        }
+
+        $document = $this->documentModel->findById($documentId);
+        if (!$document) {
+            $this->deny(404, 'فایل یافت نشد.');
+        }
+
+        // فقط doc_type='avatar' مجاز است
+        if ($document['doc_type'] !== 'avatar') {
+            $this->deny(403, 'دسترسی غیرمجاز.');
+        }
+
+        $this->stream($document, 'inline');
+    }
+
+    /**
      * بندانگشتی مدرک (در فهرست پرونده) — فعلاً همان فایل اصلی با هدرهای محدودکنندهٔ کش
      */
     public function thumb(int|string $id): void

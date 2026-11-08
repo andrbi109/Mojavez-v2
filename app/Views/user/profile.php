@@ -6,7 +6,7 @@ $u = $user ?? [];
 $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 $avatarUrl = '';
 if (!empty($u['avatar_document_id'])) {
-    $avatarUrl = $base . 'document/view?document_id=' . (int)$u['avatar_document_id'] . '&applicant_id=0';
+    $avatarUrl = $base . 'document/avatar?id=' . (int)$u['avatar_document_id'];
 }
 ?>
 <style>
