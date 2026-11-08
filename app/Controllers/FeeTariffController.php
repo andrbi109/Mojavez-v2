@@ -269,11 +269,13 @@ class FeeTariffController extends Controller
                 'final_amount_formatted' => number_format($newFinal),
             ]);
         } catch (\Throwable $e) {
+            // رفع H-10: پیام خام استثنا لاگ شود، نه به کلاینت
+            error_log('FeeTariffController::toggleTick error: ' . $e->getMessage());
             header('Content-Type: application/json; charset=utf-8');
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error' => 'خطای سرور: ' . $e->getMessage(),
+                'error' => 'خطای داخلی سرور. لطفاً دوباره تلاش کنید.',
                 'code' => 'server_error',
             ]);
         }

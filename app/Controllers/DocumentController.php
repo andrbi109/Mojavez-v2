@@ -50,7 +50,8 @@ class DocumentController extends Controller
      */
     public function avatar(): void
     {
-        $this->requireLogin();
+        // رفع C-1: هم مدیر و هم کاربر می‌توانند آواتار را ببینند
+        $this->requireAnyLogin();
 
         $documentId = (int)($_GET['id'] ?? 0);
         if ($documentId <= 0) {

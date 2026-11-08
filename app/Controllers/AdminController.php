@@ -557,9 +557,10 @@ class AdminController extends Controller
         }
         $this->verifyCsrf();
 
-        // لاگ قابل مشاهده — در uploads/debug.log
+        // لاگ تشخیصی — فقط در حالت دیباگ (رفع C-4)
         $debugLog = UPLOAD_DIR . '/debug.log';
         $debugWrite = function(string $msg) use ($debugLog) {
+            if (!APP_DEBUG) return;
             @file_put_contents($debugLog, date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND);
         };
         $debugWrite('=== updateApplication START ===');
