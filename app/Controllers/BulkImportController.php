@@ -150,6 +150,13 @@ class BulkImportController extends Controller
 
         // اعتبارسنجی ردیف‌ها
         $validatedRows = [];
+        // پیگیری کد ملی‌های دیده‌شده در همین فایل (برای تشخیص تکرار درون‌فایلی)
+        $seenInFile = []; // national_code => [first_idx, first_mobile, ...]
+
+        // کش کردن نتایج بررسی DB برای جلوگیری از کوئری تکراری روی کد ملی‌های تکراری
+        $dbPersonCache = [];   // nc => ?array
+        $dbUserCache  = [];   // mobile => ?array
+
         foreach ($rows as $idx => $row) {
             $rowData = [];
             foreach ($autoMapping as $colIdx => $field) {
@@ -166,43 +173,25 @@ class BulkImportController extends Controller
                 unset($rowData['full_name']);
             }
 
-            // اعتبارسنجی
-            $status = 'valid'; // valid, duplicate, invalid
+            // نرمال‌سازی کد ملی و موبایل — با توابع مشترک (همان نرمال‌سازی که در execute استفاده می‌شود)
+            $nc = normalize_national_code((string)($rowData['national_code'] ?? ''));
+            $mb = normalize_mobile((string)($rowData['mobile'] ?? ''));
+            $rowData['national_code'] = $nc;
+            $rowData['mobile'] = $mb;
+
+            $status = 'valid';
             $errors = [];
 
-            // کد ملی: فقط ۱۰ رقم کافی است (بدون بررسی رقم کنترل برای ایمپورت دسته‌جمعی)
-            $nc = trim($rowData['national_code'] ?? '');
-            // حذف صفرهای اضافی از ابتدا (اگر بیشتر از ۱۰ رقم باشد)
-            $nc = preg_replace('/[^0-9]/', '', $nc);
-            if (strlen($nc) > 10) {
-                $nc = substr($nc, -10); // ۱۰ رقم آخر
-            } elseif (strlen($nc) < 10 && strlen($nc) > 0) {
-                $nc = str_pad($nc, 10, '0', STR_PAD_LEFT); // صفرپَد از ابتدا
-            }
-            $rowData['national_code'] = $nc;
-
-            if (!preg_match('/^\d{10}$/', $nc)) {
+            // اعتبارسنجی کد ملی
+            if (!is_valid_national_code($nc)) {
                 $status = 'invalid';
                 $errors[] = 'کد ملی نامعتبر (باید ۱۰ رقم باشد)';
             }
 
-            // موبایل: خودکار اصلاح شود
-            $mb = trim($rowData['mobile'] ?? '');
-            $mb = preg_replace('/[^0-9]/', '', $mb); // فقط اعداد
-            // اگر با 9 شروع شده و ۱۰ رقم است → 0 اضافه کن
-            if (strlen($mb) === 10 && str_starts_with($mb, '9')) {
-                $mb = '0' . $mb;
-            }
-            // اگر ۱۱ رقم و با 09 شروع شده → OK
-            // اگر ۱۲ رقم و با 09 شروع شده → ۰ اضافی حذف
-            if (strlen($mb) === 12 && str_starts_with($mb, '09')) {
-                $mb = substr($mb, 0, 11);
-            }
-            $rowData['mobile'] = $mb;
-
-            if (!preg_match('/^09\d{9}$/', $mb)) {
+            // اعتبارسنجی موبایل — این ردیف‌ها طبق درخواست skip می‌شوند
+            if (!is_valid_mobile($mb)) {
                 $status = 'invalid';
-                $errors[] = 'موبایل نامعتبر (' . $mb . ')';
+                $errors[] = 'موبایل نامعتبر';
             }
 
             if (empty($rowData['first_name'] ?? '')) {
@@ -210,22 +199,42 @@ class BulkImportController extends Controller
                 $errors[] = 'نام خالی';
             }
 
-            // بررسی تکراری (فقط اگر معتبر باشد)
+            // بررسی تکراری در پایگاه داده (فقط اگر کد ملی/موبایل معتبر باشد)
+            $duplicateInDb = false;
             if ($status === 'valid') {
                 try {
                     $personModel = new Person();
-                    $existingPerson = $personModel->findByNationalCode($nc);
-                    if ($existingPerson) {
-                        $status = 'duplicate';
+                    if (!array_key_exists($nc, $dbPersonCache)) {
+                        $dbPersonCache[$nc] = $personModel->findByNationalCode($nc);
+                    }
+                    if ($dbPersonCache[$nc]) {
+                        $duplicateInDb = true;
                         $errors[] = 'کد ملی موجود';
                     }
                     $userModel = new UserAccount();
-                    $existingUser = $userModel->findByMobile($mb);
-                    if ($existingUser) {
-                        $status = 'duplicate';
+                    if (!array_key_exists($mb, $dbUserCache)) {
+                        $dbUserCache[$mb] = $userModel->findByMobile($mb);
+                    }
+                    if ($dbUserCache[$mb]) {
+                        $duplicateInDb = true;
                         $errors[] = 'موبایل موجود';
                     }
                 } catch (\Throwable $e) {}
+            }
+
+            if ($duplicateInDb) {
+                $status = 'duplicate';
+            }
+
+            // تشخیص تکرار درون‌فایلی: همان کد ملی قبلاً در همین CSV دیده شده و در DB موجود نیست
+            // این ردیف‌ها در وضعیت «merge» قرار می‌گیرند — یعنی موبایلشان به شخص قبلی اضافه می‌شود.
+            $mergeTargetIdx = null;
+            if ($status === 'valid' && isset($seenInFile[$nc])) {
+                $status = 'merge';
+                $mergeTargetIdx = $seenInFile[$nc]['idx'];
+                $errors[] = 'ادغام با ردیف ' . ($mergeTargetIdx + 1);
+            } elseif ($status === 'valid') {
+                $seenInFile[$nc] = ['idx' => $idx, 'mobile' => $mb];
             }
 
             $validatedRows[] = [
@@ -233,6 +242,7 @@ class BulkImportController extends Controller
                 'data' => $rowData,
                 'status' => $status,
                 'errors' => $errors,
+                'merge_target_idx' => $mergeTargetIdx,
                 'original' => $row,
             ];
         }
@@ -276,6 +286,15 @@ class BulkImportController extends Controller
             $this->redirect('/admin/bulk-import/preview');
         }
 
+        // افزایش محدودیت زمان و حافظه برای ایمپورت حجیم (۳۰۰+ ردیف)
+        // bcrypt روی هر رمز عبور ~۱۰۰ms طول می‌کشد؛ ۳۰۰ ردیف ≈ ۳۰ ثانیه فقط برای هش
+        @set_time_limit(0);            // بدون محدودیت زمان اجرا
+        @ini_set('memory_limit', '512M');
+        // از قطع نشست در حین اجرای طولانی جلوگیری کن
+        @ini_set('session.gc_maxlifetime', (string)(60 * 60));
+        // بافر خروجی را فلش کن تا کاربر در صورت تایم‌اوت مرورگر، داده‌ها از دست نرود
+        @ob_end_clean();
+
         $personModel = new Person();
         $userModel = new UserAccount();
         $applicantModel = new Applicant();
@@ -285,49 +304,152 @@ class BulkImportController extends Controller
         $db = Database::getInstance()->getConnection();
         $results = [];
 
-        try {
-            $db->beginTransaction();
+        // پیگیری کد ملی‌های پردازش‌شده در همین اجرا (برای ادغام موبایل دوم/سوم)
+        // nc => ['person_id' => int, 'mobile' => string, 'mobile_2' => ?, 'mobile_3' => ?, 'first_idx' => int]
+        $processedInBatch = [];
 
-            foreach ($selectedIndices as $idx) {
-                $idx = (int)$idx;
-                $row = $rows[$idx] ?? null;
-                if (!$row) continue;
+        // اندازهٔ هر دسته برای commit میان‌راه (تا پیشرفت با Commیت شود و کل ایمپورت لغو نگردد)
+        $batchSize = 50;
+        $processedInThisTransaction = 0;
+        $inTransaction = false;
 
-                // نگاشت ستون‌ها
-                $data = [];
-                foreach ($mapping as $colIdx => $field) {
-                    if ($field && isset($row[$colIdx])) {
-                        $data[$field] = trim($row[$colIdx]);
+        // تابع کمکی برای commit یک دسته
+        $commitBatch = function () use (&$db, &$inTransaction, &$processedInThisTransaction) {
+            if ($inTransaction) {
+                try { $db->commit(); } catch (\Throwable $e) {}
+                $inTransaction = false;
+                $processedInThisTransaction = 0;
+            }
+        };
+        // تابع کمکی برای شروع تراکنش جدید
+        $beginBatch = function () use (&$db, &$inTransaction) {
+            if (!$inTransaction) {
+                try { $db->beginTransaction(); $inTransaction = true; } catch (\Throwable $e) {}
+            }
+        };
+
+        // پردازش ردیف‌های انتخابی به‌ترتیب اندیس
+        $sortedIndices = $selectedIndices;
+        usort($sortedIndices, fn($a, $b) => (int)$a <=> (int)$b);
+
+        foreach ($sortedIndices as $idx) {
+            $idx = (int)$idx;
+            $row = $rows[$idx] ?? null;
+            if (!$row) continue;
+
+            // نگاشت ستون‌ها
+            $data = [];
+            foreach ($mapping as $colIdx => $field) {
+                if ($field && isset($row[$colIdx])) {
+                    $data[$field] = trim($row[$colIdx]);
+                }
+            }
+
+            // شکستن نام کامل
+            if (!empty($data['full_name']) && empty($data['first_name'])) {
+                $split = split_full_name($data['full_name']);
+                $data['first_name'] = $split['first_name'];
+                $data['last_name'] = $split['last_name'];
+            }
+
+            // نرمال‌سازی کد ملی و موبایل — همان نرمال‌سازی preview
+            $nc = normalize_national_code((string)($data['national_code'] ?? ''));
+            $mb = normalize_mobile((string)($data['mobile'] ?? ''));
+            $fn = $data['first_name'] ?? '';
+            $ln = $data['last_name'] ?? '';
+
+            // ردیف‌های نامعتبر skip می‌شوند (موبایل نامعتبر، کد ملی نامعتبر، نام خالی)
+            if (!is_valid_national_code($nc) || !is_valid_mobile($mb) || $fn === '') {
+                $results[] = [
+                    'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                    'national_code' => $nc, 'mobile' => $mb,
+                    'status' => 'skipped',
+                    'message' => 'نامعتبر — skip شد',
+                ];
+                continue;
+            }
+
+            // سناریوی «merge»: کد ملی قبلاً در همین اجرا پردازش شده → موبایل اضافه کن
+            if (isset($processedInBatch[$nc])) {
+                $info = &$processedInBatch[$nc];
+                // اگر موبایل ورودی همان موبایل اصلی است، چیزی اضافه نکن
+                if ($info['mobile'] === $mb || ($info['mobile_2'] ?? null) === $mb || ($info['mobile_3'] ?? null) === $mb) {
+                    $results[] = [
+                        'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                        'national_code' => $nc, 'mobile' => $mb,
+                        'status' => 'skipped',
+                        'message' => 'موبایل تکراری با ردیف ' . ((int)$info['first_idx'] + 1),
+                    ];
+                    continue;
+                }
+
+                // شروع تراکنش در صورت نیاز
+                $beginBatch();
+
+                try {
+                    $slot = $personModel->addSecondaryMobile((int)$info['person_id'], $mb);
+                    if ($slot === 'mobile_2') {
+                        $info['mobile_2'] = $mb;
+                        $msg = 'ادغام شد — موبایل دوم ثبت شد';
+                    } elseif ($slot === 'mobile_3') {
+                        $info['mobile_3'] = $mb;
+                        $msg = 'ادغام شد — موبایل سوم ثبت شد';
+                    } else {
+                        $msg = 'skip شد — هر سه شماره موبایل قبلاً پر شده‌اند';
                     }
+                    $results[] = [
+                        'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                        'national_code' => $nc, 'mobile' => $mb,
+                        'status' => $slot !== '' ? 'merged' : 'skipped',
+                        'message' => $msg,
+                    ];
+                    $processedInThisTransaction++;
+                } catch (\Throwable $e) {
+                    $results[] = [
+                        'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                        'national_code' => $nc, 'mobile' => $mb,
+                        'status' => 'error',
+                        'message' => 'خطا در ادغام: ' . $e->getMessage(),
+                    ];
                 }
+                unset($info);
 
-                // شکستن نام کامل
-                if (!empty($data['full_name']) && empty($data['first_name'])) {
-                    $split = split_full_name($data['full_name']);
-                    $data['first_name'] = $split['first_name'];
-                    $data['last_name'] = $split['last_name'];
+                // commit دسته‌ای
+                if ($processedInThisTransaction >= $batchSize) {
+                    $commitBatch();
                 }
+                continue;
+            }
 
-                $nc = $data['national_code'] ?? '';
-                $mb = $data['mobile'] ?? '';
-                $fn = $data['first_name'] ?? '';
-                $ln = $data['last_name'] ?? '';
+            // سناریوی جدید: بررسی یکتایی در DB
+            $existingPerson = $personModel->findByNationalCode($nc);
+            if ($existingPerson) {
+                $results[] = [
+                    'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                    'national_code' => $nc, 'mobile' => $mb,
+                    'status' => 'skipped',
+                    'message' => 'کد ملی موجود در دیتابیس — skip شد',
+                ];
+                continue;
+            }
+            $existingUser = $userModel->findByMobile($mb);
+            if ($existingUser) {
+                $results[] = [
+                    'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                    'national_code' => $nc, 'mobile' => $mb,
+                    'status' => 'skipped',
+                    'message' => 'موبایل موجود در دیتابیس — skip شد',
+                ];
+                continue;
+            }
 
-                // بررسی مجدد یکتایی
-                $existingPerson = $personModel->findByNationalCode($nc);
-                if ($existingPerson) {
-                    $results[] = ['idx' => $idx, 'name' => $fn . ' ' . $ln, 'national_code' => $nc, 'mobile' => $mb, 'status' => 'duplicate', 'message' => 'کد ملی موجود است'];
-                    continue;
-                }
-                $existingUser = $userModel->findByMobile($mb);
-                if ($existingUser) {
-                    $results[] = ['idx' => $idx, 'name' => $fn . ' ' . $ln, 'national_code' => $nc, 'mobile' => $mb, 'status' => 'duplicate', 'message' => 'موبایل موجود است'];
-                    continue;
-                }
+            // شروع تراکنش در صورت نیاز
+            $beginBatch();
 
-                // رمز عبور
-                $password = $passwordStrategy === 'fixed' ? $fixedPassword : $nc;
+            // رمز عبور
+            $password = $passwordStrategy === 'fixed' ? $fixedPassword : $nc;
 
+            try {
                 // ۱. Person
                 $personId = $personModel->create([
                     'national_code' => $nc,
@@ -337,7 +459,7 @@ class BulkImportController extends Controller
                     'postal_code' => $data['postal_code'] ?? null,
                 ]);
 
-                // ۲. UserAccount
+                // ۲. UserAccount (داخل create خودش Person را find می‌کند — همین Person تازه ساخته شده را پیدا می‌کند)
                 $accountId = $userModel->create([
                     'national_code' => $nc,
                     'first_name' => $fn,
@@ -374,9 +496,9 @@ class BulkImportController extends Controller
                     (new PropertyDetail())->create([
                         'applicant_id' => $applicantId,
                         'ownership_status' => 'شخص',
-                        'province' => $data['province'] ?? null,
-                        'county' => $data['city'] ?? null,
-                        'city' => $data['city'] ?? null,
+                        'province' => $data['province'] ?? '',
+                        'county' => $data['city'] ?? '',
+                        'city' => $data['city'] ?? '',
                         'electricity_bill_id' => '0000000000',
                         'village' => $data['village'] ?? null,
                     ]);
@@ -394,6 +516,15 @@ class BulkImportController extends Controller
                     );
                 } catch (\Throwable $e) {}
 
+                // ثبت در نقشهٔ batch برای ادغام ردیف‌های بعدی
+                $processedInBatch[$nc] = [
+                    'person_id' => $personId,
+                    'mobile' => $mb,
+                    'mobile_2' => null,
+                    'mobile_3' => null,
+                    'first_idx' => $idx,
+                ];
+
                 $results[] = [
                     'idx' => $idx,
                     'name' => $fn . ' ' . $ln,
@@ -403,14 +534,30 @@ class BulkImportController extends Controller
                     'password' => $password,
                     'status' => 'success',
                 ];
+
+                $processedInThisTransaction++;
+            } catch (\Throwable $e) {
+                // خطای این ردیف نباید کل ایمپورت را متوقف کند
+                $results[] = [
+                    'idx' => $idx, 'name' => $fn . ' ' . $ln,
+                    'national_code' => $nc, 'mobile' => $mb,
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                ];
+                // rollback این تراکنش و شروع تراکنش جدید برای ادامه
+                try { $db->rollBack(); } catch (\Throwable $rbErr) {}
+                $inTransaction = false;
+                $processedInThisTransaction = 0;
             }
 
-            $db->commit();
-        } catch (\Throwable $e) {
-            $db->rollBack();
-            Session::set('bulk_error', 'خطا در اجرای ایمپورت: ' . $e->getMessage());
-            $this->redirect('/admin/bulk-import/preview');
+            // commit دسته‌ای
+            if ($processedInThisTransaction >= $batchSize) {
+                $commitBatch();
+            }
         }
+
+        // commit تراکنش باقی‌مانده
+        $commitBatch();
 
         // پاکسازی نشست
         Session::remove('bulk_rows');
@@ -428,14 +575,18 @@ class BulkImportController extends Controller
         $results = Session::get('bulk_results', []);
         Session::remove('bulk_results');
 
-        $successCount = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'success'));
-        $duplicateCount = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'duplicate'));
-        $errorCount = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'error'));
+        $successCount  = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'success'));
+        $mergedCount   = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'merged'));
+        $skippedCount  = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'skipped'));
+        $duplicateCount= count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'duplicate'));
+        $errorCount    = count(array_filter($results, fn($r) => ($r['status'] ?? '') === 'error'));
 
         $this->render('admin/bulk_result', [
             'title' => 'گزارش ایمپورت',
             'results' => $results,
             'successCount' => $successCount,
+            'mergedCount' => $mergedCount,
+            'skippedCount' => $skippedCount,
             'duplicateCount' => $duplicateCount,
             'errorCount' => $errorCount,
             'currentPage' => 'bulk-import',

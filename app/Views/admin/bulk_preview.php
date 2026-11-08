@@ -20,14 +20,22 @@ $mapFields = [
 $validCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='valid'));
 $dupCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='duplicate'));
 $invalidCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='invalid'));
+$mergeCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='merge'));
 ?>
 <div class="container-fluid py-4">
     <h3 class="fw-bold mb-3"><?= icon('list','me-2',22) ?> پیش‌نمایش ایمپورت</h3>
     <div class="row g-2 mb-3">
         <div class="col-auto"><span class="badge bg-success">🟢 معتبر: <?= $validCount ?></span></div>
-        <div class="col-auto"><span class="badge bg-warning text-dark">🟡 تکراری: <?= $dupCount ?></span></div>
+        <div class="col-auto"><span class="badge bg-info text-dark">🔗 ادغام: <?= $mergeCount ?></span></div>
+        <div class="col-auto"><span class="badge bg-warning text-dark">🟡 تکراری در DB: <?= $dupCount ?></span></div>
         <div class="col-auto"><span class="badge bg-danger">🔴 نامعتبر: <?= $invalidCount ?></span></div>
-        <div class="col-auto"><span class="badge bg-info">کل: <?= count($vr) ?></span></div>
+        <div class="col-auto"><span class="badge bg-secondary">کل: <?= count($vr) ?></span></div>
+    </div>
+
+    <div class="alert alert-info py-2 small mb-3">
+        <strong>راهنما:</strong>
+        ردیف‌های «تکراری در DB» (کد ملی یا موبایل موجود) و «نامعتبر» (موبایل نامعتبر و ...) به‌صورت خودکار <b>skip</b> می‌شوند و قابل انتخاب نیستند.
+        ردیف‌های «ادغام» متقاضیانی هستند که با کد ملی یکسان اما با شماره موبایل متفاوت در فایل آمده‌اند — موبایل دوم/سوم آن‌ها در شخص قبلی ثبت می‌شود.
     </div>
 
     <form method="post" action="<?= $base ?>admin/bulk-import/execute">
@@ -83,10 +91,13 @@ $invalidCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='invalid'));
                         <tbody>
                             <?php foreach($vr as $r):
                                 $d=$r['data']??[];?>
-                                <tr class="<?= $r['status']==='invalid'?'table-danger':($r['status']==='duplicate'?'table-warning':'') ?>">
+                                <tr class="<?= $r['status']==='invalid'?'table-danger':($r['status']==='duplicate'?'table-warning':($r['status']==='merge'?'table-info':'')) ?>">
                                     <td>
-                                        <?php if($r['status']==='valid'||$r['status']==='duplicate'):?>
-                                            <input type="checkbox" name="selected_rows[]" value="<?= (int)$r['idx'] ?>" <?= $r['status']==='valid'?'checked':'' ?>>
+                                        <?php if($r['status']==='valid' || $r['status']==='merge'):?>
+                                            <input type="checkbox" name="selected_rows[]" value="<?= (int)$r['idx'] ?>" <?= $r['status']==='valid'||$r['status']==='merge'?'checked':'' ?>>
+                                        <?php else:?>
+                                            <!-- ردیف‌های تکراری در DB و نامعتبر قابل انتخاب نیستند — skip می‌شوند -->
+                                            <span class="text-muted" title="خودکار skip می‌شود">⊘</span>
                                         <?php endif;?>
                                     </td>
                                     <td class="small"><?= $e($d['first_name']??'') ?></td>
@@ -96,6 +107,8 @@ $invalidCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='invalid'));
                                     <td>
                                         <?php if($r['status']==='valid'):?>
                                             <span class="badge bg-success">🟢 معتبر</span>
+                                        <?php elseif($r['status']==='merge'):?>
+                                            <span class="badge bg-info text-dark">🔗 <?= $e(implode(', ',$r['errors'])) ?></span>
                                         <?php elseif($r['status']==='duplicate'):?>
                                             <span class="badge bg-warning text-dark">🟡 <?= $e(implode(', ',$r['errors'])) ?></span>
                                         <?php else:?>
@@ -118,6 +131,12 @@ $invalidCount=count(array_filter($vr,fn($r)=>($r['status']??'')==='invalid'));
 </div>
 
 <script>
-function selectAllValid(){document.querySelectorAll('input[name="selected_rows[]"]').forEach(function(c){c.checked=true;})}
-function deselectAll(){document.querySelectorAll('input[name="selected_rows[]"]').forEach(function(c){c.checked=false;})}
+// انتخاب فقط ردیف‌های «معتبر» (valid) و «ادغام» (merge)
+// ردیف‌های تکراری در DB و نامعتبر به‌هرحال skip می‌شوند و قابل انتخاب نیستند.
+function selectAllValid(){
+    document.querySelectorAll('input[name="selected_rows[]"]').forEach(function(c){c.checked=true;});
+}
+function deselectAll(){
+    document.querySelectorAll('input[name="selected_rows[]"]').forEach(function(c){c.checked=false;});
+}
 </script>

@@ -2,9 +2,11 @@
 <div class="container-fluid py-4">
     <h3 class="fw-bold mb-3"><?= icon('check-circle','me-2',22) ?> گزارش ایمپورت</h3>
     <div class="row g-2 mb-3">
-        <div class="col-auto"><span class="badge bg-success fs-6">موفق: <?= (int)$successCount ?></span></div>
-        <div class="col-auto"><span class="badge bg-warning text-dark fs-6">تکراری: <?= (int)$duplicateCount ?></span></div>
-        <div class="col-auto"><span class="badge bg-danger fs-6">خطا: <?= (int)$errorCount ?></span></div>
+        <div class="col-auto"><span class="badge bg-success fs-6">✅ موفق: <?= (int)$successCount ?></span></div>
+        <div class="col-auto"><span class="badge bg-info text-dark fs-6">🔗 ادغام: <?= (int)($mergedCount ?? 0) ?></span></div>
+        <div class="col-auto"><span class="badge bg-secondary fs-6">⊘ Skip: <?= (int)($skippedCount ?? 0) ?></span></div>
+        <div class="col-auto"><span class="badge bg-warning text-dark fs-6">🟡 تکراری: <?= (int)($duplicateCount ?? 0) ?></span></div>
+        <div class="col-auto"><span class="badge bg-danger fs-6">🔴 خطا: <?= (int)($errorCount ?? 0) ?></span></div>
     </div>
 
     <div class="card">
@@ -15,8 +17,14 @@
                         <tr><th>#</th><th>نام</th><th>کد ملی</th><th>موبایل</th><th>کد رهگیری</th><th>رمز عبور</th><th>وضعیت</th></tr>
                     </thead>
                     <tbody>
-                        <?php foreach($rs as $i=>$r):?>
-                            <tr class="<?= ($r['status']??'')==='success'?'table-success':(($r['status']??'')==='duplicate'?'table-warning':'table-danger') ?>">
+                        <?php foreach($rs as $i=>$r):
+                            $st = $r['status'] ?? '';
+                            $rowClass = $st==='success' ? 'table-success'
+                                : ($st==='merged' ? 'table-info'
+                                : ($st==='skipped' ? 'table-secondary'
+                                : ($st==='duplicate' ? 'table-warning' : 'table-danger')));
+                        ?>
+                            <tr class="<?= $rowClass ?>">
                                 <td><?= $i+1 ?></td>
                                 <td class="small"><?= $e($r['name']??'') ?></td>
                                 <td class="small"><code dir="ltr"><?= $e($r['national_code']??'') ?></code></td>
@@ -24,12 +32,16 @@
                                 <td class="small"><code dir="ltr"><?= $e($r['tracking_code']??'—') ?></code></td>
                                 <td class="small"><code dir="ltr"><?= $e($r['password']??'—') ?></code></td>
                                 <td>
-                                    <?php if(($r['status']??'')==='success'):?>
+                                    <?php if($st==='success'):?>
                                         <span class="badge bg-success">✅ موفق</span>
-                                    <?php elseif(($r['status']??'')==='duplicate'):?>
+                                    <?php elseif($st==='merged'):?>
+                                        <span class="badge bg-info text-dark">🔗 <?= $e($r['message']??'ادغام شد') ?></span>
+                                    <?php elseif($st==='skipped'):?>
+                                        <span class="badge bg-secondary">⊘ <?= $e($r['message']??'skip شد') ?></span>
+                                    <?php elseif($st==='duplicate'):?>
                                         <span class="badge bg-warning text-dark">🟡 <?= $e($r['message']??'تکراری') ?></span>
                                     <?php else:?>
-                                        <span class="badge bg-danger">🔴 خطا</span>
+                                        <span class="badge bg-danger">🔴 <?= $e($r['message']??'خطا') ?></span>
                                     <?php endif;?>
                                 </td>
                             </tr>

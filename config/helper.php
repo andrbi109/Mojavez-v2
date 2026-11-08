@@ -632,3 +632,80 @@ if (!function_exists('get_upload_path')) {
         ];
     }
 }
+
+if (!function_exists('normalize_national_code')) {
+    /**
+     * نرمال‌سازی کد ملی:
+     *  - حذف کاراکترهای غیرعددی
+     *  - اگر بیشتر از ۱۰ رقم باشد → ۱۰ رقم آخر
+     *  - اگر کمتر از ۱۰ رقم (و غیر صفر) باشد → صفرپَد از ابتدا
+     *  - اگر خالی باشد → رشتهٔ خالی
+     *
+     * @param string $raw کد ملی خام از CSV
+     * @return string کد ملی ۱۰ رقمی نرمال‌شده (یا رشتهٔ خالی)
+     */
+    function normalize_national_code(string $raw): string
+    {
+        $nc = preg_replace('/[^0-9]/', '', $raw);
+        if ($nc === '') return '';
+        if (strlen($nc) > 10) {
+            $nc = substr($nc, -10);
+        } elseif (strlen($nc) < 10) {
+            $nc = str_pad($nc, 10, '0', STR_PAD_LEFT);
+        }
+        return $nc;
+    }
+}
+
+if (!function_exists('normalize_mobile')) {
+    /**
+     * نرمال‌سازی موبایل:
+     *  - حذف کاراکترهای غیرعددی
+     *  - اگر ۱۰ رقم و با ۹ شروع شود → ۰ ابتدا اضافه کن
+     *  - اگر ۱۲ رقم و با ۰۹ شروع شود → ۰ اضافی حذف (۱۱ رقم اول)
+     *  - در غیر این صورت همان اعداد را برمی‌گرداند (اعتبارسنجی جداگانه لازم است)
+     *
+     * @param string $raw موبایل خام از CSV
+     * @return string موبایل نرمال‌شده (می‌تواند نامعتبر باشد)
+     */
+    function normalize_mobile(string $raw): string
+    {
+        $mb = preg_replace('/[^0-9]/', '', $raw);
+        if ($mb === '') return '';
+        // نرمال‌سازی ۹۸+ به ۰۹
+        if (strlen($mb) === 12 && str_starts_with($mb, '989')) {
+            $mb = '0' . substr($mb, 2);
+        } elseif (strlen($mb) === 11 && str_starts_with($mb, '98')) {
+            $mb = '0' . substr($mb, 2);
+        }
+        if (strlen($mb) === 10 && str_starts_with($mb, '9')) {
+            $mb = '0' . $mb;
+        }
+        if (strlen($mb) === 12 && str_starts_with($mb, '09')) {
+            $mb = substr($mb, 0, 11);
+        }
+        return $mb;
+    }
+}
+
+if (!function_exists('is_valid_mobile')) {
+    /**
+     * اعتبارسنجی موبایل ایرانی: باید ۱۱ رقم و با ۰۹ شروع شود.
+     */
+    function is_valid_mobile(string $mobile): bool
+    {
+        return $mobile !== '' && preg_match('/^09\d{9}$/', $mobile);
+    }
+}
+
+if (!function_exists('is_valid_national_code')) {
+    /**
+     * اعتبارسنجی کد ملی: باید ۱۰ رقم باشد.
+     * نکته: برای ایمپورت دسته‌جمعی، رقم کنترل بررسی نمی‌شود
+     * (ممکن است کاربران در دیتابیس‌های قدیمی کد ملی بدون رقم کنترل داشته باشند).
+     */
+    function is_valid_national_code(string $nc): bool
+    {
+        return $nc !== '' && preg_match('/^\d{10}$/', $nc);
+    }
+}

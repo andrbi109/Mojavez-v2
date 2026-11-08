@@ -560,6 +560,8 @@ CREATE TABLE IF NOT EXISTS persons (
     father_name VARCHAR(50) NULL,
     birth_date DATE NULL,
     mobile CHAR(11) NOT NULL,
+    mobile_2 CHAR(11) NULL,                          -- موبایل دوم (برای متقاضیان دارای چند شماره)
+    mobile_3 CHAR(11) NULL,                          -- موبایل سوم
     postal_code CHAR(10) NULL,
     person_type ENUM('حقیقی','حقوقی') NOT NULL DEFAULT 'حقیقی',   -- فاز ۱۰
     -- اطلاعات شخص حقوقی (فاز ۱۰)
@@ -570,7 +572,9 @@ CREATE TABLE IF NOT EXISTS persons (
     company_type VARCHAR(60) NULL,
     economic_code VARCHAR(20) NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_person_mobile (mobile)
+    INDEX idx_person_mobile (mobile),
+    INDEX idx_person_mobile_2 (mobile_2),
+    INDEX idx_person_mobile_3 (mobile_3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ۲. گسترش پرونده‌ها
@@ -983,3 +987,35 @@ CREATE TABLE IF NOT EXISTS user_notifications (
     INDEX idx_notif_user (user_account_id),
     INDEX idx_notif_unread (user_account_id, is_read)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================
+-- ستون‌های موبایل دوم/سوم برای اشخاص (ایمپورت دسته‌جمعی)
+-- -----------------------------------------------------------------
+-- برای متقاضیانی که در فایل CSV با چند شماره موبایل ظاهر می‌شوند،
+-- شماره‌های اضافی در mobile_2 و mobile_3 ذخیره می‌شوند.
+-- این مهاجرت idempotent است و روی پایگاه‌های داده موجود قابل اجراست.
+-- =================================================================
+
+-- mobile_2
+SET @col_m2 = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'persons'
+                 AND COLUMN_NAME = 'mobile_2');
+SET @ddl_m2 = IF(@col_m2 = 0,
+    'ALTER TABLE persons ADD COLUMN mobile_2 CHAR(11) NULL AFTER mobile, ADD INDEX idx_person_mobile_2 (mobile_2)',
+    'SELECT 1');
+PREPARE stmt_m2 FROM @ddl_m2;
+EXECUTE stmt_m2;
+DEALLOCATE PREPARE stmt_m2;
+
+-- mobile_3
+SET @col_m3 = (SELECT COUNT(*) FROM information_schema.COLUMNS
+               WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'persons'
+                 AND COLUMN_NAME = 'mobile_3');
+SET @ddl_m3 = IF(@col_m3 = 0,
+    'ALTER TABLE persons ADD COLUMN mobile_3 CHAR(11) NULL AFTER mobile_2, ADD INDEX idx_person_mobile_3 (mobile_3)',
+    'SELECT 1');
+PREPARE stmt_m3 FROM @ddl_m3;
+EXECUTE stmt_m3;
+DEALLOCATE PREPARE stmt_m3;

@@ -85,21 +85,55 @@ class Person
 
     /**
      * ایجاد شخص جدید (نسخهٔ ساده برای ثبت‌نام کاربر).
+     * mobile_2 و mobile_3 اختیاری هستند و در صورت عدم ارائه NULL ذخیره می‌شوند.
      */
     public function create(array $data): int
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO persons (national_code, first_name, last_name, mobile, postal_code, person_type)
-             VALUES (:nc, :fn, :ln, :mo, :pc, 'حقیقی')"
+            "INSERT INTO persons (national_code, first_name, last_name, mobile, mobile_2, mobile_3, postal_code, person_type)
+             VALUES (:nc, :fn, :ln, :mo, :mo2, :mo3, :pc, 'حقیقی')"
         );
         $stmt->execute([
             'nc' => $data['national_code'],
             'fn' => $data['first_name'] ?? '',
             'ln' => $data['last_name'] ?? '',
             'mo' => $data['mobile'] ?? '',
+            'mo2' => $data['mobile_2'] ?? null,
+            'mo3' => $data['mobile_3'] ?? null,
             'pc' => $data['postal_code'] ?? null,
         ]);
         return (int)$this->db->lastInsertId();
+    }
+
+    /**
+     * افزودن شماره موبایل دوم یا سوم به شخص موجود.
+     * اگر آن اسلات پر باشد، یکی دیگر امتحان می‌شود.
+     *
+     * @param int    $personId شناسهٔ شخص
+     * @param string $mobile   موبایل جدید (نرمال‌شده)
+     * @return string اسلاتی که در آن ذخیره شد: 'mobile_2'، 'mobile_3' یا '' (هیچ‌کدام در دسترس نبود)
+     */
+    public function addSecondaryMobile(int $personId, string $mobile): string
+    {
+        $person = $this->findById($personId);
+        if (!$person) return '';
+
+        // اگر موبایل ورودی قبلاً در یکی از فیلدها ثبت شده، چیزی اضافه نکن
+        if (!empty($person['mobile'])   && $person['mobile']   === $mobile) return '';
+        if (!empty($person['mobile_2']) && $person['mobile_2'] === $mobile) return 'mobile_2';
+        if (!empty($person['mobile_3']) && $person['mobile_3'] === $mobile) return 'mobile_3';
+
+        if (empty($person['mobile_2'])) {
+            $stmt = $this->db->prepare("UPDATE persons SET mobile_2 = :m WHERE id = :id");
+            $stmt->execute(['m' => $mobile, 'id' => $personId]);
+            return 'mobile_2';
+        }
+        if (empty($person['mobile_3'])) {
+            $stmt = $this->db->prepare("UPDATE persons SET mobile_3 = :m WHERE id = :id");
+            $stmt->execute(['m' => $mobile, 'id' => $personId]);
+            return 'mobile_3';
+        }
+        return '';
     }
 
     /**
