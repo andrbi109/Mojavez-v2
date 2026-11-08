@@ -168,16 +168,39 @@ class BulkImportController extends Controller
             $status = 'valid'; // valid, duplicate, invalid
             $errors = [];
 
-            $nc = $rowData['national_code'] ?? '';
+            // کد ملی: فقط ۱۰ رقم کافی است (بدون بررسی رقم کنترل برای ایمپورت دسته‌جمعی)
+            $nc = trim($rowData['national_code'] ?? '');
+            // حذف صفرهای اضافی از ابتدا (اگر بیشتر از ۱۰ رقم باشد)
+            $nc = preg_replace('/[^0-9]/', '', $nc);
+            if (strlen($nc) > 10) {
+                $nc = substr($nc, -10); // ۱۰ رقم آخر
+            } elseif (strlen($nc) < 10 && strlen($nc) > 0) {
+                $nc = str_pad($nc, 10, '0', STR_PAD_LEFT); // صفرپَد از ابتدا
+            }
+            $rowData['national_code'] = $nc;
+
             if (!preg_match('/^\d{10}$/', $nc)) {
                 $status = 'invalid';
-                $errors[] = 'کد ملی نامعتبر';
+                $errors[] = 'کد ملی نامعتبر (باید ۱۰ رقم باشد)';
             }
 
-            $mb = $rowData['mobile'] ?? '';
+            // موبایل: خودکار اصلاح شود
+            $mb = trim($rowData['mobile'] ?? '');
+            $mb = preg_replace('/[^0-9]/', '', $mb); // فقط اعداد
+            // اگر با 9 شروع شده و ۱۰ رقم است → 0 اضافه کن
+            if (strlen($mb) === 10 && str_starts_with($mb, '9')) {
+                $mb = '0' . $mb;
+            }
+            // اگر ۱۱ رقم و با 09 شروع شده → OK
+            // اگر ۱۲ رقم و با 09 شروع شده → ۰ اضافی حذف
+            if (strlen($mb) === 12 && str_starts_with($mb, '09')) {
+                $mb = substr($mb, 0, 11);
+            }
+            $rowData['mobile'] = $mb;
+
             if (!preg_match('/^09\d{9}$/', $mb)) {
                 $status = 'invalid';
-                $errors[] = 'موبایل نامعتبر';
+                $errors[] = 'موبایل نامعتبر (' . $mb . ')';
             }
 
             if (empty($rowData['first_name'] ?? '')) {
