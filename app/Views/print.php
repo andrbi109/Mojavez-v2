@@ -1,120 +1,180 @@
+<?php
+$e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+?>
 <div class="print-container">
-    <!-- سربرگ -->
-    <div class="print-header">
-        <div class="row">
-            <div class="col-6">
+    <!-- === سربرگ === -->
+    <div class="doc-header avoid-break">
+        <div class="row align-items-center">
+            <div class="col-7">
                 <h3>سامانهٔ مجوزهای صنایع دستی</h3>
-                <p>ادارهٔ کل میراث فرهنگی، گردشگری و صنایع دستی</p>
-                <p class="small text-muted">مدیریت سامانه: <?= htmlspecialchars(owner_name()) ?> — <span dir="ltr">@<?= htmlspecialchars(setting('owner_username', 'Derogaramin')) ?></span> (ایتا / روبیکا / بله)</p>
+                <p class="subtitle">ادارهٔ کل میراث فرهنگی، گردشگری و صنایع دستی</p>
+                <p class="meta">مدیریت سامانه: <?= $e(owner_name()) ?> — <span dir="ltr">@<?= $e(setting('owner_username', 'Derogaramin')) ?></span> (ایتا / روبیکا / بله)</p>
             </div>
-            <div class="col-6 text-left">
-                <p><strong>تاریخ چاپ:</strong> <?= jdate('Y/m/d') ?></p>
-                <p><strong>کد رهگیری:</strong> <?= htmlspecialchars($applicant['tracking_code']) ?></p>
+            <div class="col-5">
+                <div class="row g-2 text-end">
+                    <div class="col-6">
+                        <div class="tracking-box">
+                            <div class="label">کد رهگیری</div>
+                            <div class="code" dir="ltr"><?= $e($applicant['tracking_code']) ?></div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="tracking-box">
+                            <div class="label">تاریخ چاپ</div>
+                            <div class="code" dir="ltr"><?= jdate('Y/m/d') ?></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <hr>
     </div>
 
-    <!-- اطلاعات هویتی -->
-    <h4 class="section-title">۱. اطلاعات هویتی</h4>
-    <table class="print-table avoid-break">
-        <tr><td>نام و نام خانوادگی</td><td><?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name']) ?></td></tr>
-        <tr><td>کد ملی</td><td><?= htmlspecialchars($applicant['national_code']) ?></td></tr>
-        <tr><td>کد پستی</td><td><?= htmlspecialchars($applicant['postal_code']) ?></td></tr>
-        <tr><td>شماره همراه</td><td><?= htmlspecialchars($applicant['mobile']) ?></td></tr>
+    <!-- === محتوای اصلی === -->
+    <div class="doc-body">
+
+    <!-- ۱. اطلاعات هویتی -->
+    <div class="section-title avoid-break">
+        <span class="num">۱</span> اطلاعات هویتی
+    </div>
+    <table class="info-table avoid-break">
+        <tr><td>نام و نام خانوادگی</td><td><?= $e($applicant['first_name'] . ' ' . $applicant['last_name']) ?></td></tr>
+        <tr><td>کد ملی</td><td dir="ltr"><?= $e($applicant['national_code']) ?></td></tr>
+        <tr><td>کد پستی</td><td dir="ltr"><?= $e($applicant['postal_code']) ?></td></tr>
+        <tr><td>شماره همراه</td><td dir="ltr"><?= $e($applicant['mobile']) ?></td></tr>
         <tr><td>تاریخ تولد</td><td><?= persianDate((string)$applicant['birth_date']) ?></td></tr>
-        <tr><td>نام پدر</td><td><?= htmlspecialchars($applicant['father_name'] ?? '') ?></td></tr>
-        <tr><td>وضعیت تأهل</td><td><?= htmlspecialchars($applicant['marital_status'] ?? '') ?> <?= $applicant['marital_status'] === 'متأهل' ? '(تعداد فرزندان: '.$applicant['children_count'].')' : '' ?></td></tr>
-        <tr><td>وضعیت جسمانی</td><td><?= htmlspecialchars($applicant['physical_condition'] ?? '') ?><?= $applicant['physical_condition'] === 'معلولیت' ? ' - ' . htmlspecialchars($applicant['disability_details'] ?? '') : '' ?></td></tr>
+        <tr><td>نام پدر</td><td><?= $e($applicant['father_name'] ?? '—') ?></td></tr>
+        <tr><td>وضعیت تأهل</td><td><?= $e($applicant['marital_status'] ?? '—') ?><?= ($applicant['marital_status'] ?? '') === 'متأهل' ? ' (تعداد فرزندان: ' . (int)$applicant['children_count'] . ')' : '' ?></td></tr>
+        <tr><td>وضعیت جسمانی</td><td><?= $e($applicant['physical_condition'] ?? '—') ?><?= ($applicant['physical_condition'] ?? '') === 'معلولیت' ? ' — ' . $e($applicant['disability_details'] ?? '') : '' ?></td></tr>
         <tr><td>دهک درآمدی</td><td><?= $applicant['income_decile'] ?: '—' ?></td></tr>
-        <tr><td>پرونده قضایی / وام / اقساط</td><td><?= htmlspecialchars($applicant['has_court_case']) ?> / <?= htmlspecialchars($applicant['has_active_loan']) ?> / <?= htmlspecialchars($applicant['has_overdue_installments']) ?></td></tr>
+        <tr><td>پرونده قضایی / وام / اقساط</td><td><?= $e($applicant['has_court_case']) ?> / <?= $e($applicant['has_active_loan']) ?> / <?= $e($applicant['has_overdue_installments']) ?></td></tr>
     </table>
 
-    <!-- اطلاعات شغلی -->
-    <h4 class="section-title">۲. اطلاعات شغلی</h4>
+    <!-- ۲. اطلاعات شغلی -->
+    <div class="section-title avoid-break">
+        <span class="num">۲</span> اطلاعات شغلی
+    </div>
     <?php if ($jobDetail): ?>
-    <table class="print-table avoid-break">
-        <tr><td>عنوان مجوز</td><td><?= htmlspecialchars($jobDetail['license_title']) ?></td></tr>
-        <tr><td>سابقه (ماه)</td><td><?= $jobDetail['experience_months'] ?></td></tr>
-        <tr><td>نحوه آموزش</td><td><?= htmlspecialchars($jobDetail['training_method']) ?></td></tr>
+    <table class="info-table avoid-break">
+        <tr><td>عنوان مجوز</td><td><?= $e($jobDetail['license_title']) ?></td></tr>
+        <tr><td>سابقه فعالیت</td><td><?= (int)$jobDetail['experience_months'] ?> ماه</td></tr>
+        <tr><td>نحوه آموزش</td><td><?= $e($jobDetail['training_method']) ?></td></tr>
     </table>
-    <?php else: ?><p>ثبت نشده</p><?php endif; ?>
+    <?php else: ?>
+    <p class="text-muted small">ثبت نشده</p>
+    <?php endif; ?>
 
-    <!-- اطلاعات ملک -->
-    <h4 class="section-title">۳. اطلاعات ملک</h4>
+    <!-- ۳. اطلاعات ملک -->
+    <div class="section-title avoid-break">
+        <span class="num">۳</span> اطلاعات ملک
+    </div>
     <?php if ($propertyDetail): ?>
-    <table class="print-table avoid-break">
-        <tr><td>وضعیت مالکیت</td><td><?= htmlspecialchars($propertyDetail['ownership_status']) ?></td></tr>
-        <tr><td>آدرس کامل</td><td><?= htmlspecialchars(($propertyDetail['province'] ?? '') . ' - ' . ($propertyDetail['county'] ?? '') . ' - ' . ($propertyDetail['city'] ?? '') . ' - خیابان ' . ($propertyDetail['address_street'] ?? '') . ' - کوچه ' . ($propertyDetail['address_alley'] ?? '') . ' - پلاک ' . ($propertyDetail['address_plaque'] ?? '')) ?></td></tr>
-        <tr><td>شناسه قبض برق</td><td><?= htmlspecialchars($propertyDetail['electricity_bill_id']) ?></td></tr>
+    <table class="info-table avoid-break">
+        <tr><td>وضعیت مالکیت</td><td><?= $e($propertyDetail['ownership_status']) ?></td></tr>
+        <tr><td>استان / شهرستان</td><td><?= $e(($propertyDetail['province'] ?? '') . ' / ' . ($propertyDetail['county'] ?? '')) ?></td></tr>
+        <tr><td>شهر / روستا</td><td><?= $e(($propertyDetail['city'] ?? '') . ($propertyDetail['village'] ? ' / ' . $propertyDetail['village'] : '')) ?></td></tr>
+        <tr><td>آدرس کامل</td><td>خیابان <?= $e($propertyDetail['address_street'] ?? '—') ?>، کوچه <?= $e($propertyDetail['address_alley'] ?? '—') ?>، پلاک <?= $e($propertyDetail['address_plaque'] ?? '—') ?></td></tr>
+        <tr><td>شناسه قبض برق</td><td dir="ltr"><?= $e($propertyDetail['electricity_bill_id']) ?></td></tr>
     </table>
-    <?php else: ?><p>ثبت نشده</p><?php endif; ?>
+    <?php else: ?>
+    <p class="text-muted small">ثبت نشده</p>
+    <?php endif; ?>
 
-    <!-- فیلدهای سفارشی -->
+    <!-- ۴. سؤالات تکمیلی (فیلدهای پویا) -->
     <?php if (!empty($dynValues)): ?>
-    <h4 class="section-title">۳-۲. پاسخ به سؤالات تکمیلی پرونده</h4>
+    <div class="section-title avoid-break">
+        <span class="num">۴</span> سؤالات تکمیلی پرونده
+    </div>
     <div class="avoid-break">
         <?php $dynMode = 'print'; require VIEW_PATH . '/_dynamic_values.php'; ?>
     </div>
     <?php endif; ?>
 
-    <!-- تاریخچه وضعیت‌ها -->
-    <h4 class="section-title">۴. تاریخچه وضعیت‌ها</h4>
-    <table class="print-table avoid-break">
-        <thead><tr><th>تاریخ</th><th>رویداد</th><th>توضیحات</th></tr></thead>
+    <!-- ۵. تاریخچه وضعیت‌ها -->
+    <div class="section-title avoid-break">
+        <span class="num"><?= !empty($dynValues) ? '۵' : '۴' ?></span> تاریخچه وضعیت‌ها
+    </div>
+    <table class="log-table avoid-break">
+        <thead><tr><th style="width:18%">تاریخ</th><th style="width:25%">رویداد</th><th>توضیحات</th></tr></thead>
         <tbody>
         <?php foreach ($statusLogs as $log): ?>
             <tr>
                 <td><?= persianDate((string)$log['created_at']) ?></td>
-                <td><?= htmlspecialchars($log['status_name']) ?></td>
-                <td><?= htmlspecialchars($log['description'] ?? '') ?></td>
+                <td><?= $e($log['status_name']) ?></td>
+                <td><?= $e($log['description'] ?? '—') ?></td>
             </tr>
         <?php endforeach; ?>
+        <?php if (empty($statusLogs)): ?>
+            <tr><td colspan="3" class="text-muted text-center">بدون رویداد</td></tr>
+        <?php endif; ?>
         </tbody>
     </table>
 
-    <!-- مدارک -->
-    <h4 class="section-title">۵. فهرست مدارک</h4>
-    <ul>
-    <?php foreach ($documents as $doc): ?>
-        <li><?= htmlspecialchars($doc['original_name']) ?> (<?= $doc['doc_type'] ?>)</li>
-    <?php endforeach; ?>
+    <!-- ۶. فهرست مدارک -->
+    <div class="section-title avoid-break">
+        <span class="num"><?= !empty($dynValues) ? '۶' : '۵' ?></span> فهرست مدارک (<?= count($documents) ?> فایل)
+    </div>
+    <?php if (!empty($documents)): ?>
+    <ul class="doc-list avoid-break">
+        <?php
+        $docLabels = [
+            'national_card' => 'کارت ملی', 'birth_cert' => 'شناسنامه',
+            'ownership_doc' => 'مدرک مالکیت', 'vocational_cert' => 'گواهی فنی',
+            'education_degree' => 'مدرک تحصیلی', 'product_photos' => 'تصویر محصول',
+            'optional' => 'سایر', 'payment_receipt' => 'رسید پرداخت',
+            'avatar' => 'آواتار', 'revision_doc' => 'بازبینی',
+        ];
+        foreach ($documents as $doc):
+            $label = $docLabels[$doc['doc_type']] ?? $doc['doc_type'];
+        ?>
+        <li>
+            <span class="badge bg-info"><?= $e($label) ?></span>
+            <span dir="ltr"><?= $e($doc['original_name']) ?></span>
+        </li>
+        <?php endforeach; ?>
     </ul>
+    <?php else: ?>
+    <p class="text-muted small">مدرکی ثبت نشده است.</p>
+    <?php endif; ?>
 
-    <!-- درخواست‌های تغییر کد پستی -->
-    <h4 class="section-title">۶. درخواست‌های تغییر کد پستی</h4>
+    <!-- ۷. درخواست‌های تغییر کد پستی -->
     <?php if (!empty($postalChanges)): ?>
-        <table class="print-table avoid-break">
-            <thead><tr><th>تاریخ درخواست</th><th>کد قدیم</th><th>کد جدید</th><th>نتیجهٔ بررسی</th></tr></thead>
-            <tbody>
-            <?php foreach ($postalChanges as $pc): ?>
-                <tr>
-                    <td><?= persianDate((string)$pc['requested_at']) ?></td>
-                    <td><?= htmlspecialchars($pc['old_postal_code']) ?></td>
-                    <td><?= htmlspecialchars($pc['new_postal_code']) ?></td>
-                    <td>
-                        <?= htmlspecialchars($pc['status'] ?? 'در انتظار') ?>
-                        <?php if (!empty($pc['reviewed_at'])): ?>
-                            <br><small>(<?= persianDate((string)$pc['reviewed_at']) ?>)</small>
-                        <?php endif; ?>
-                        <?php if (!empty($pc['reject_reason'])): ?>
-                            <br><small>دلیل رد: <?= htmlspecialchars($pc['reject_reason']) ?></small>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php else: ?><p>بدون تغییر</p><?php endif; ?>
+    <div class="section-title avoid-break">
+        <span class="num"><?= !empty($dynValues) ? '۷' : '۶' ?></span> درخواست‌های تغییر کد پستی
+    </div>
+    <table class="log-table avoid-break">
+        <thead><tr><th>تاریخ</th><th>کد قدیم</th><th>کد جدید</th><th>وضعیت</th></tr></thead>
+        <tbody>
+        <?php foreach ($postalChanges as $pc):
+            $st = $pc['status'] ?? 'در انتظار';
+            $stClass = $st === 'تأیید شده' ? 'status-approved' : ($st === 'رد شده' ? 'status-rejected' : 'status-pending');
+        ?>
+        <tr>
+            <td><?= persianDate((string)$pc['requested_at']) ?></td>
+            <td dir="ltr"><?= $e($pc['old_postal_code']) ?></td>
+            <td dir="ltr"><?= $e($pc['new_postal_code']) ?></td>
+            <td>
+                <span class="status-badge <?= $stClass ?>"><?= $e($st) ?></span>
+                <?php if (!empty($pc['reviewed_at'])): ?><br><small><?= persianDate((string)$pc['reviewed_at']) ?></small><?php endif; ?>
+                <?php if (!empty($pc['reject_reason'])): ?><br><small class="text-danger">دلیل: <?= $e($pc['reject_reason']) ?></small><?php endif; ?>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
 
-    <!-- تأییدیه و امضا -->
-    <div class="print-signature avoid-break">
+    <!-- === کادر امضا === -->
+    <div class="sign-area avoid-break">
         <div class="sign-box">امضای متقاضی</div>
-        <div class="sign-box">امضا و مهر متصدی سامانه<br><small><?= htmlspecialchars(owner_name()) ?></small></div>
+        <div class="sign-box">امضا و مهر متصدی سامانه<br><small><?= $e(owner_name()) ?></small></div>
         <div class="sign-box">امضای مسئول صادرکننده</div>
     </div>
-    <p class="text-center mt-4" style="font-size:.75rem;color:#888;">
+
+    </div><!-- /.doc-body -->
+
+    <!-- === پاورقی === -->
+    <div class="doc-footer">
         این برگه به‌صورت خودکار توسط سامانهٔ مجوزهای صنایع دستی تولید شده است —
-        تاریخ تولید: <?= jdate('Y/m/d H:i') ?> — کد رهگیری: <?= htmlspecialchars($applicant['tracking_code']) ?>
-    </p>
+        تاریخ تولید: <?= jdate('Y/m/d H:i') ?> — کد رهگیری: <?= $e($applicant['tracking_code']) ?>
+    </div>
 </div>
