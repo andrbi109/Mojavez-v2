@@ -17,6 +17,17 @@ try {
 </div>
 <?php endif; ?>
 
+<?php if (!empty($isPrefilled)): ?>
+<div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" style="border-radius:12px">
+    <span style="font-size:1.2rem">✨</span>
+    <div>
+        <strong>اطلاعات شما پیش‌فرض شده است.</strong>
+        اطلاعات هویتی از پروندهٔ قبلی شما پر شده. لطفاً بررسی کنید و در صورت نیاز اصلاح نمایید.
+        سپس فقط نوع خدمت و مدارک جدید را ارسال کنید.
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card p-4">
     <form method="post" action="<?= BASE_URL ?>register/step/<?= (int)($stepPosition ?? 1) ?>" novalidate>
         <?= Session::csrfField() ?>

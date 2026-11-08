@@ -4,6 +4,16 @@
 
 <?php $currentStep = 3; require VIEW_PATH . '/registration/_progress.php'; ?>
 
+<?php if (!empty($isPrefilled)): ?>
+<div class="alert alert-info d-flex align-items-center gap-2 py-2 mb-3" style="border-radius:12px">
+    <span style="font-size:1.2rem">🏠</span>
+    <div>
+        <strong>اطلاعات ملک از پروندهٔ قبلی شما پر شده.</strong>
+        در صورت تغییر آدرس، اصلاح کنید.
+    </div>
+</div>
+<?php endif; ?>
+
 <div class="card p-4">
     <form method="post" action="<?= BASE_URL ?>register/step/<?= (int)($stepPosition ?? 3) ?>">
         <?= Session::csrfField() ?>

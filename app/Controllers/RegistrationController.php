@@ -211,6 +211,13 @@ class RegistrationController extends Controller
 
         $step = $steps[$position - 1];
         $stepId = (int)$step['id'];
+
+        // اگر کاربر واردشده است و session خالی است، اطلاعات هویتی را از Person پیش‌فرض کن
+        $prefillData = [];
+        if (Session::get('user_logged_in') && $position === 1) {
+            $prefillData = $this->getPrefillData();
+        }
+
         $common = [
             'wizardSteps' => $steps,
             'stepPosition' => $position,
@@ -221,10 +228,11 @@ class RegistrationController extends Controller
             case 'step1':
                 $this->render('registration/step1', $common + [
                     'title' => 'مرحلهٔ ' . $this->faNum($position) . ' — اطلاعات هویتی',
-                    'stepData' => Session::getStep('step1', []),
+                    'stepData' => !empty($prefillData) ? $prefillData : Session::getStep('step1', []),
                     'dynFields' => $this->customFieldsForStepId($stepId),
                     'sysActive' => $this->fieldModel->systemActiveMap(),
                     'currentStep' => $position,
+                    'isPrefilled' => !empty($prefillData),
                 ]);
                 break;
             case 'step2':
@@ -238,12 +246,18 @@ class RegistrationController extends Controller
                 ]);
                 break;
             case 'step3':
+                // اگر کاربر واردشده و اطلاعات ملک قبلی موجود است، پیش‌فرض کن
+                $step3Prefill = [];
+                if (Session::get('user_logged_in') && empty(Session::getStep('step3', []))) {
+                    $step3Prefill = $this->getPrefillPropertyData();
+                }
                 $this->render('registration/step3', $common + [
                     'title' => 'مرحلهٔ ' . $this->faNum($position) . ' — اطلاعات ملک و مالکیت',
-                    'stepData' => Session::getStep('step3', []),
+                    'stepData' => !empty($step3Prefill) ? $step3Prefill : Session::getStep('step3', []),
                     'dynFields' => $this->customFieldsForStepId($stepId),
                     'sysActive' => $this->fieldModel->systemActiveMap(),
                     'currentStep' => $position,
+                    'isPrefilled' => !empty($step3Prefill),
                 ]);
                 break;
             case 'step4':
@@ -267,6 +281,89 @@ class RegistrationController extends Controller
                 ]);
         }
         Session::remove('errors');
+    }
+
+    /**
+     * پیش‌فرض اطلاعات هویتی از Person برای کاربر واردشده.
+     * فقط وقتی session خالی است فراخوانی می‌شود (درخواست جدید).
+     */
+    private function getPrefillData(): array
+    {
+        $userId = (int)Session::get('user_id', 0);
+        if ($userId <= 0) return [];
+
+        try {
+            $userAccount = (new UserAccount())->findById($userId);
+            if (!$userAccount) return [];
+
+            $data = [
+                'first_name'   => $userAccount['first_name'] ?? '',
+                'last_name'    => $userAccount['last_name'] ?? '',
+                'national_code' => $userAccount['national_code'] ?? '',
+                'mobile'       => $userAccount['mobile'] ?? '',
+                'postal_code'  => $userAccount['postal_code'] ?? '',
+                'father_name'  => $userAccount['father_name'] ?? '',
+            ];
+
+            // تبدیل تاریخ تولد میلادی به سه فیلد شمسی
+            if (!empty($userAccount['birth_date']) && $userAccount['birth_date'] !== '0000-00-00') {
+                $jArr = gregorian_to_jalali_array($userAccount['birth_date']);
+                $data['birth_year']  = (string)$jArr['year'];
+                $data['birth_month'] = (string)$jArr['month'];
+                $data['birth_day']   = (string)$jArr['day'];
+            }
+
+            // فیلدهای تکمیلی
+            $data['marital_status']     = $userAccount['marital_status'] ?? '';
+            $data['children_count']     = $userAccount['children_count'] ?? '';
+            $data['physical_condition'] = $userAccount['physical_condition'] ?? '';
+            $data['disability_details'] = $userAccount['disability_details'] ?? '';
+            $data['income_decile']      = $userAccount['income_decile'] ?? '';
+            $data['has_court_case']          = $userAccount['has_court_case'] ?? '';
+            $data['has_active_loan']         = $userAccount['has_active_loan'] ?? '';
+            $data['has_overdue_installments'] = $userAccount['has_overdue_installments'] ?? '';
+
+            return $data;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * پیش‌فرض اطلاعات ملک از آخرین پروندهٔ کاربر.
+     */
+    private function getPrefillPropertyData(): array
+    {
+        $userId = (int)Session::get('user_id', 0);
+        if ($userId <= 0) return [];
+
+        try {
+            $applications = (new UserAccount())->getApplications($userId);
+            if (empty($applications)) return [];
+
+            // آخرین پرونده با اطلاعات ملک
+            foreach ($applications as $app) {
+                $prop = (new PropertyDetail())->findByApplicantId((int)$app['id']);
+                if ($prop) {
+                    return [
+                        'ownership_status'   => $prop['ownership_status'] ?? '',
+                        'province'           => $prop['province'] ?? '',
+                        'county'             => $prop['county'] ?? '',
+                        'city'               => $prop['city'] ?? '',
+                        'district'           => $prop['district'] ?? '',
+                        'rural_district'     => $prop['rural_district'] ?? '',
+                        'village'            => $prop['village'] ?? '',
+                        'electricity_bill_id' => $prop['electricity_bill_id'] ?? '',
+                        'address_street'     => $prop['address_street'] ?? '',
+                        'address_alley'       => $prop['address_alley'] ?? '',
+                        'address_plaque'      => $prop['address_plaque'] ?? '',
+                    ];
+                }
+            }
+            return [];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     private function processStep(int $position): void
