@@ -52,16 +52,11 @@ class BulkImportController extends Controller
         }
 
         // اعتبارسنجی فایل
-        $validation = validate_uploaded_file($file);
-        if (!$validation['valid']) {
-            Session::set('bulk_error', $validation['error'] ?? 'فایل نامعتبر است.');
-            $this->redirect('/admin/bulk-import');
-        }
-
-        // فقط CSV مجاز است
-        $ext = $validation['ext'];
+        // فایل CSV فقط خوانده می‌شود — از validate_uploaded_file استفاده نمی‌کنیم
+        // چون آن تابع فقط jpg/jpeg/png/pdf را مجاز می‌داند
+        $ext = safe_file_extension((string)$file['name']);
         if ($ext !== 'csv') {
-            Session::set('bulk_error', 'فقط فایل CSV پشتیبانی می‌شود.');
+            Session::set('bulk_error', 'فقط فایل CSV پشتیبانی می‌شود. پسوند فایل شما: ' . $ext);
             $this->redirect('/admin/bulk-import');
         }
 
