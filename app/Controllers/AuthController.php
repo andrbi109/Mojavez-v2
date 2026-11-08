@@ -163,6 +163,12 @@ class AuthController extends Controller
         if (!$this->isPost()) $this->redirect('/login');
         $this->verifyCsrf();
 
+        // رفع H-2: rate limit مبتنی بر IP برای جلوگیری از brute-force
+        if (rate_limit_ip('user_login', 5, 300)) {
+            Session::set('login_error', 'تعداد تلاش‌های ناموفق بیش از حد مجاز است. ۵ دقیقه صبر کنید.');
+            $this->redirect('/login');
+        }
+
         $mobile = trim((string)$this->input('mobile', ''));
         $password = (string)$this->input('password', '');
 
@@ -196,7 +202,10 @@ class AuthController extends Controller
         // ورود موفق
         $this->userModel->updateLastLogin((int)$user['id']);
         $this->setUserSession((int)$user['id']);
-        $this->redirect("/panel");
+        // رفع M-1: مصرف redirect_after_login
+        $next = Session::get('redirect_after_login', '/panel');
+        Session::remove('redirect_after_login');
+        $this->redirect($next);
     }
 
     /* ==================== خروج ==================== */

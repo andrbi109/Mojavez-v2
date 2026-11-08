@@ -32,7 +32,9 @@ class Database
             // تنظیم timezone نشست MySQL بر اساس timezone سرور (برای TIMESTAMPهای صحیح)
             $this->pdo->exec("SET time_zone = '+00:00'");
         } catch (PDOException $e) {
-            die('خطا در اتصال به پایگاه داده: ' . $e->getMessage());
+            // رفع H-1: به‌جای die()، استثنا پرتاب می‌شود تا global handler صفحه ۵۰۰ نمایش دهد
+            error_log('Database connection failed: ' . $e->getMessage());
+            throw new \RuntimeException('خطا در اتصال به پایگاه داده.', 0, $e);
         }
     }
 

@@ -124,11 +124,11 @@ CREATE TABLE IF NOT EXISTS postal_code_changes (
     INDEX idx_applicant_postal (applicant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- درج مدیر پیش‌فرض (نام کاربری: admin، رمز: admin123)
--- رمز عبور با password_hash تولید شده است
-INSERT INTO users (username, password, display_name) VALUES
-('admin', '$2y$10$mzPwgNnWxY74YtWVJYozmupleWLNc8MR.A4.8ph4i4US2Kc7.Aad6', 'امین دروگر بزدی');
--- توجه: لطفاً رمز عبور واقعی را با password_hash('admin123', PASSWORD_BCRYPT) جایگزین کنید
+-- توجه: هیچ مدیر پیش‌فرضی در schema seed نمی‌شود (رفع C-2).
+-- برای ایجاد مدیر، از install scripts استفاده کنید یا دستی:
+--   INSERT INTO users (username, password, display_name, role) VALUES
+--   ('admin', '<bcrypt-hash>', 'نام مدیر', 'admin');
+-- هش را با PHP تولید کنید: php -r "echo password_hash('YOUR_PASSWORD', PASSWORD_BCRYPT);"
 
 
 ALTER TABLE applicants

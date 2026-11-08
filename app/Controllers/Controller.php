@@ -144,6 +144,29 @@ class Controller
     }
 
     /**
+     * بررسی ورود کاربر (مدل فروشگاهی) — در صورت عدم ورود به صفحهٔ لاگین هدایت می‌کند
+     */
+    protected function requireUserLogin(): void
+    {
+        if (!Session::get('user_logged_in')) {
+            Session::set('redirect_after_login', $_SERVER['REQUEST_URI'] ?? '/panel');
+            Session::set('login_error', 'برای دسترسی، ابتدا وارد شوید.');
+            $this->redirect('/login');
+        }
+    }
+
+    /**
+     * بررسی ورود مدیر یا کاربر — هرکدام وارد شده باشد، مجاز است.
+     * برای endpointهایی که هم مدیر و هم کاربر می‌توانند ببینند (مثل آواتار).
+     */
+    protected function requireAnyLogin(): void
+    {
+        if (!Session::get('admin_logged_in') && !Session::get('user_logged_in')) {
+            $this->redirect('/login');
+        }
+    }
+
+    /**
      * بررسی نقش مدیر — فقط نقش‌های فهرست‌شده اجازهٔ عبور دارند
      * @param array $roles نقش‌های مجاز، مثال: ['admin']
      * @param string|null $redirectTo مسیر هدایت در صورت عدم دسترسی (پیش‌فرض: داشبورد)

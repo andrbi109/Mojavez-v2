@@ -58,6 +58,10 @@ class RecordsController extends Controller
      */
     public function verify(): void
     {
+        // رفع M-5: افزودن CSRF حتی برای redirect
+        if ($this->isPost()) {
+            $this->verifyCsrf();
+        }
         $this->redirect('/my-records');
     }
 }
