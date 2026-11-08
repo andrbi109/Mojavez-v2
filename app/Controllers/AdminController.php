@@ -393,234 +393,68 @@ class AdminController extends Controller
             $data['license_title'] = mb_substr(trim($data['custom_license_title']), 0, 100);
         }
 
-        $validator = new Validator($data);
+        // استفاده از سرویس متمرکز برای اعتبارسنجی
+        $registrationService = new ApplicantRegistrationService();
 
-        // ---- اعتبارسنجی هویتی ----
-        $validator->required('first_name', 'نام')
-                ->persianAlpha('first_name', 'نام')
-                ->maxLength('first_name', 50, 'نام')
-                ->required('last_name', 'نام خانوادگی')
-                ->persianAlpha('last_name', 'نام خانوادگی')
-                ->maxLength('last_name', 50, 'نام خانوادگی')
-                ->required('national_code', 'کد ملی')
-                ->nationalCode('national_code', 'کد ملی')
-                ->required('postal_code', 'کد پستی')
-                ->postalCode('postal_code', 'کد پستی')
-                ->required('mobile', 'شماره تلفن همراه')
-                ->mobile('mobile', 'شماره تلفن همراه')
-                ->required('father_name', 'نام پدر')
-                ->persianAlpha('father_name', 'نام پدر')
-                ->maxLength('father_name', 50, 'نام پدر')
-                ->required('marital_status', 'وضعیت تأهل')
-                ->enum('marital_status', ['مجرد','متأهل'], 'وضعیت تأهل')
-                ->required('physical_condition', 'وضعیت جسمانی')
-                ->required('has_court_case', 'پرونده قضایی')
-                ->required('has_active_loan', 'وام فعال')
-                ->required('has_overdue_installments', 'اقساط معوقه');
+        // ---- اعتبارسنجی هویتی (متمرکز در سرویس) ----
+        $idValidation = $registrationService->validateIdentity($data);
+        $errors = $idValidation['errors'];
 
-        // یکتایی موبایل در سطح شخص (چندمجوزی — فاز ۷ نقشهٔ راه)
-        if ((new Person())->mobileBelongsToOtherPerson((string)($data['mobile'] ?? ''), (string)($data['national_code'] ?? ''))) {
-            $validator->addError('mobile', 'این شمارهٔ موبایل به کد ملی دیگری تعلق دارد.');
-        }
-
-        // تاریخ تولد
+        // تاریخ تولد (این بخش کنترلر-specific است — وابسته به سه فیلد سال/ماه/روز)
         if (empty($data['birth_date'])) {
-            $validator->addError('birth_date', 'تاریخ تولد الزامی و معتبر است.');
+            $errors['birth_date'][] = 'تاریخ تولد الزامی و معتبر است.';
         }
-
-        // وضعیت معلولیت
-        if ($data['physical_condition'] === 'معلولیت') {
-            $validator->required('disability_details', 'توضیحات معلولیت');
-        }
-
-        // تأهل
-        if ($data['marital_status'] === 'متأهل') {
-            $validator->required('children_count', 'تعداد فرزندان')
-                    ->unsignedInt('children_count', 'تعداد فرزندان');
-        } else {
+        // تأهل → children_count
+        if (($data['marital_status'] ?? '') !== 'متأهل') {
             $data['children_count'] = 0;
         }
 
-        if (!empty($data['income_decile'])) {
-            $validator->unsignedInt('income_decile', 'دهک درآمدی');
-        }
+        // ---- اعتبارسنجی اطلاعات شغلی ----
+        $jobValidation = $registrationService->validateJobInfo($data);
+        $errors = array_merge($errors, $jobValidation['errors']);
 
-        // ---- اطلاعات شغلی ----
-        $validator->required('license_title', 'عنوان مجوز')
-                ->maxLength('license_title', 100, 'عنوان مجوز')
-                ->required('experience_months', 'سابقه فعالیت')
-                ->unsignedInt('experience_months', 'سابقه فعالیت')
-                ->required('training_method', 'نحوه آموزش')
-                ->enum('training_method', ['در خانه','استاد شاگردی','کارگاهی'], 'نحوه آموزش');
+        // ---- اعتبارسنجی اطلاعات ملک ----
+        $propertyValidation = $registrationService->validatePropertyInfo($data);
+        $errors = array_merge($errors, $propertyValidation['errors']);
 
-        // ---- اطلاعات ملک ----
-        $validator->required('ownership_status', 'وضعیت مالکیت')
-                ->enum('ownership_status', ['شخص','مستأجر','سرپرست'], 'وضعیت مالکیت')
-                ->required('province', 'استان')
-                ->required('county', 'شهرستان')
-                ->required('city', 'شهر')
-                ->required('electricity_bill_id', 'شناسه قبض برق')
-                ->required('address_street', 'خیابان')
-                ->required('address_plaque', 'پلاک');
-
-        if (!empty($data['address_alley'])) {
-            $validator->maxLength('address_alley', 100, 'کوچه');
-        }
-
-        if ($validator->hasErrors()) {
-            Session::set('errors', $validator->getErrors());
+        if (!empty($errors)) {
+            Session::set('errors', $errors);
             Session::set('formData', $data);
             $this->redirect('/admin/register');
         }
 
-        // ---- ذخیره‌سازی ----
+        // ---- ذخیره‌سازی با سرویس متمرکز ----
+        $result = $registrationService->createApplicant($data, [
+            'source' => 'admin',
+            'service_type_id' => (int)($data['service_type_id'] ?? 0),
+            'complete_status' => true,
+            'notify_user' => false,  // ثبت‌نام توسط مدیر — نوتیف برای کاربر بی‌معنی است
+        ]);
+
+        if (!$result['success']) {
+            Session::set('errors', ['system' => $result['errors']]);
+            Session::set('formData', $data);
+            $this->redirect('/admin/register');
+        }
+
+        $applicantId = $result['applicant_id'];
+
+        // ---- ذخیرهٔ مدارک آپلودشده با همان سرویس ----
+        $fileResult = $registrationService->saveAllUploadedFiles($applicantId);
+        if (!empty($fileResult['errors'])) {
+            // خطاهای فایل نباید کل ثبت‌نام را لغو کند — فقط به‌عنوان هشدار نمایش داده شود
+            Session::set('errors', ['document' => implode(' | ', $fileResult['errors'])]);
+        }
+
+        // ثبت تاریخ registration_started/completed_at (مخصوص ثبت‌نام مدیر)
         $db = Database::getInstance()->getConnection();
-        $db->beginTransaction();
+        $nowDate = date('Y-m-d');
+        $stmt = $db->prepare("UPDATE applicants SET registration_started_at = :start_date, registration_completed_at = :end_date WHERE id = :id");
+        $stmt->execute(['start_date' => $nowDate, 'end_date' => $nowDate, 'id' => $applicantId]);
 
-        try {
-            $trackingCode = Applicant::generateTrackingCode();
-
-            $applicantId = $this->applicantModel->create([
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'national_code' => $data['national_code'],
-                'postal_code' => $data['postal_code'],
-                'mobile' => $data['mobile'],
-                'birth_date' => $data['birth_date'],
-                'father_name' => $data['father_name'],
-                'marital_status' => $data['marital_status'] ?? 'مجرد',
-                'children_count' => $data['children_count'] ?? 0,
-                'physical_condition' => $data['physical_condition'] ?? 'سالم',
-                'disability_details' => $data['disability_details'] ?? null,
-                'income_decile' => $data['income_decile'] ?? null,
-                'has_court_case' => $data['has_court_case'] ?? 'خیر',
-                'has_active_loan' => $data['has_active_loan'] ?? 'خیر',
-                'has_overdue_installments' => $data['has_overdue_installments'] ?? 'خیر',
-                'tracking_code' => $trackingCode
-            ]);
-
-            // یافتن/ساخت شخص و اتصال (چندمجوزی — فاز ۷)
-            $personModel = new Person();
-            $personId = $personModel->findOrCreate([
-                'national_code' => $data['national_code'],
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'father_name' => $data['father_name'] ?? null,
-                'birth_date' => $data['birth_date'] ?: null,
-                'mobile' => $data['mobile'],
-                'postal_code' => $data['postal_code'],
-            ]);
-            $personModel->linkApplication($applicantId, $personId);
-
-            // شغلی
-            $this->jobDetailModel->create([
-                'applicant_id' => $applicantId,
-                'license_title' => $data['license_title'],
-                'experience_months' => $data['experience_months'],
-                'training_method' => $data['training_method']
-            ]);
-
-            // ملک
-            $this->propertyDetailModel->create([
-                'applicant_id' => $applicantId,
-                'ownership_status' => $data['ownership_status'],
-                'province' => $data['province'],
-                'county' => $data['county'],
-                'city' => $data['city'],
-                'district' => $data['district'] ?? null,
-                'rural_district' => $data['rural_district'] ?? null,
-                'village' => $data['village'] ?? null,
-                'electricity_bill_id' => $data['electricity_bill_id'],
-                'address_street' => $data['address_street'] ?? null,
-                'address_alley' => $data['address_alley'] ?? null,
-                'address_plaque' => $data['address_plaque'] ?? null
-            ]);
-
-            // مدارک
-            $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            $saveFile = function ($file, $docType) use ($applicantId, $uploadDir) {
-                if (!$file || $file['error'] !== UPLOAD_ERR_OK) return;
-                // اعتبارسنجی چندلایه‌ای هر فایل قبل از ذخیره
-                $validation = validate_uploaded_file($file);
-                if (!$validation['valid']) {
-                    throw new \RuntimeException('فایل نامعتبر: ' . ($validation['error'] ?? 'خطا'));
-                }
-                $ext = $validation['ext'];
-                $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-                $destPath = $uploadDir . '/' . $uniqueName;
-                if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                    throw new \RuntimeException('خطا در ذخیره فایل ' . sanitize_upload_filename((string)$file['name']));
-                }
-                @chmod($destPath, 0640);
-                $this->documentModel->create([
-                    'applicant_id' => $applicantId,
-                    'doc_type' => $docType,
-                    'file_name' => $uniqueName,
-                    'original_name' => sanitize_upload_filename((string)$file['name']),
-                    'file_path' => str_replace(UPLOAD_DIR, '', $destPath)
-                ]);
-            };
-
-            $saveFile($_FILES['national_card_front'] ?? null, 'national_card');
-            $saveFile($_FILES['national_card_back'] ?? null, 'national_card');
-            $saveFile($_FILES['birth_cert'] ?? null, 'birth_cert');
-            $saveFile($_FILES['ownership_doc'] ?? null, 'ownership_doc');
-            $saveFile($_FILES['vocational_cert'] ?? null, 'vocational_cert');
-            $saveFile($_FILES['education_degree'] ?? null, 'education_degree');
-
-            for ($i = 1; $i <= 3; $i++) {
-                $saveFile($_FILES["optional_{$i}"] ?? null, 'optional');
-            }
-
-            if (!empty($_FILES['product_photos']['name']) && is_array($_FILES['product_photos']['name'])) {
-                $ppNames = $_FILES['product_photos']['name'] ?? [];
-                $ppTmpNames = $_FILES['product_photos']['tmp_name'] ?? [];
-                $ppSizes = $_FILES['product_photos']['size'] ?? [];
-                $ppErrors = $_FILES['product_photos']['error'] ?? [];
-                foreach ($ppTmpNames as $index => $tmpName) {
-                    if (($ppErrors[$index] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
-                        $file = [
-                            'name' => $ppNames[$index] ?? '',
-                            'tmp_name' => $tmpName,
-                            'size' => $ppSizes[$index] ?? 0,
-                            'error' => $ppErrors[$index] ?? UPLOAD_ERR_NO_FILE,
-                        ];
-                        $saveFile($file, 'product_photos');
-                    }
-                }
-            }
-
-            $this->applicantModel->updateStatus($applicantId, 'تکمیل اطلاعات');
-            $nowDate = date('Y-m-d');
-            $stmt = $db->prepare("UPDATE applicants SET registration_started_at = :start_date, registration_completed_at = :end_date WHERE id = :id");
-            $stmt->execute([
-                'start_date' => $nowDate,
-                'end_date' => $nowDate,
-                'id' => $applicantId
-            ]);
-
-            $this->statusLogModel->create([
-                'applicant_id' => $applicantId,
-                'status_name' => 'تکمیل اطلاعات',
-                'description' => 'ثبت نام توسط مدیر'
-            ]);
-
-            $db->commit();
-
-            Session::remove('errors');
-            Session::remove('formData');
-
-            $this->redirect('/admin/view/' . $applicantId);
-
-        } catch (\Exception $e) {
-            $db->rollBack();
-            Session::set('errors', ['system' => ['خطا در ثبت نام: ' . $e->getMessage()]]);
-            Session::set('formData', $data);
-            $this->redirect('/admin/register');
-        }
+        Session::remove('errors');
+        Session::remove('formData');
+        $this->redirect('/admin/view/' . $applicantId);
     }
 
     /**

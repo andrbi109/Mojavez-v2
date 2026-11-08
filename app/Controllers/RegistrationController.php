@@ -608,170 +608,110 @@ class RegistrationController extends Controller
         }
 
         /* ---------- تراکنش نهایی‌سازی ---------- */
-        $db = Database::getInstance()->getConnection();
-        $db->beginTransaction();
-        try {
-            $trackingCode = Applicant::generateTrackingCode();
+        // ادغام داده‌های همهٔ مراحل برای ارسال به سرویس متمرکز ثبت‌نام
+        $applicantData = [
+            'first_name'    => $step1['first_name'],
+            'last_name'     => $step1['last_name'],
+            'national_code' => $step1['national_code'],
+            'postal_code'   => $step1['postal_code'],
+            'mobile'        => $step1['mobile'],
+            'birth_date'    => $step1['birth_date'] ?? null,
+            'father_name'   => $step1['father_name'] ?? null,
+            'marital_status' => $step1['marital_status'] ?? 'مجرد',
+            'children_count' => $step1['children_count'] ?? 0,
+            'physical_condition' => $step1['physical_condition'] ?? 'سالم',
+            'disability_details' => $step1['disability_details'] ?? null,
+            'income_decile' => $step1['income_decile'] ?? null,
+            'has_court_case' => $step1['has_court_case'] ?? 'خیر',
+            'has_active_loan' => $step1['has_active_loan'] ?? 'خیر',
+            'has_overdue_installments' => $step1['has_overdue_installments'] ?? 'خیر',
+            'person_type'   => $step1['applicant_type'] ?? 'حقیقی',
+            // فیلدهای شخص حقوقی
+            'company_name'         => $step1['company_name'] ?? null,
+            'company_national_id'  => $step1['company_national_id'] ?? null,
+            'reg_number'           => $step1['reg_number'] ?? null,
+            'reg_date'              => $step1['reg_date'] ?? null,
+            'company_type'         => $step1['company_type'] ?? null,
+            'economic_code'         => $step1['economic_code'] ?? null,
+            // اطلاعات شغلی (از step2)
+            'license_title'     => $step2['license_title'],
+            'experience_months' => $step2['experience_months'],
+            'training_method'   => $step2['training_method'],
+            // اطلاعات ملک (از step3)
+            'ownership_status'   => $step3['ownership_status'],
+            'province'           => $step3['province'],
+            'county'             => $step3['county'],
+            'city'               => $step3['city'],
+            'district'           => $step3['district'] ?? null,
+            'rural_district'     => $step3['rural_district'] ?? null,
+            'village'            => $step3['village'] ?? null,
+            'electricity_bill_id' => $step3['electricity_bill_id'],
+            'address_street'     => $step3['address_street'] ?? null,
+            'address_alley'       => $step3['address_alley'] ?? null,
+            'address_plaque'      => $step3['address_plaque'] ?? null,
+        ];
 
-            $applicantId = $this->applicantModel->create([
-                'first_name' => $step1['first_name'],
-                'last_name' => $step1['last_name'],
-                'national_code' => $step1['national_code'],
-                'postal_code' => $step1['postal_code'],
-                'mobile' => $step1['mobile'],
-                'birth_date' => $step1['birth_date'] ?? null,
-                'father_name' => $step1['father_name'] ?? null,
-                'marital_status' => $step1['marital_status'] ?? 'مجرد',
-                'children_count' => $step1['children_count'] ?? 0,
-                'physical_condition' => $step1['physical_condition'] ?? 'سالم',
-                'disability_details' => $step1['disability_details'] ?? null,
-                'income_decile' => $step1['income_decile'] ?? null,
-                'has_court_case' => $step1['has_court_case'] ?? 'خیر',
-                'has_active_loan' => $step1['has_active_loan'] ?? 'خیر',
-                'has_overdue_installments' => $step1['has_overdue_installments'] ?? 'خیر',
-                'tracking_code' => $trackingCode,
-                'service_type_id' => $this->selectedServiceId(),
-                'applicant_type' => $step1['applicant_type'] ?? 'حقیقی',
-                'user_account_id' => Session::get('user_id') ?: null,
-            ]);
+        $registrationService = new ApplicantRegistrationService();
+        $result = $registrationService->createApplicant($applicantData, [
+            'source' => 'wizard',
+            'service_type_id' => $this->selectedServiceId(),
+            'user_account_id' => Session::get('user_id') ?: null,
+            'complete_status' => true,
+            'notify_user' => false,  // ویزارد عمومی: پیام موفقیت کافی است
+        ]);
 
-            // شخص (چندمجوزی — فاز ۷)
-            $personModel = new Person();
-            $personData = [
-                'national_code' => $step1['national_code'],
-                'first_name' => $step1['first_name'],
-                'last_name' => $step1['last_name'],
-                'father_name' => $step1['father_name'] ?? null,
-                'birth_date' => $step1['birth_date'] ?? null,
-                'mobile' => $step1['mobile'],
-                'postal_code' => $step1['postal_code'],
-            ];
-            if (($step1['applicant_type'] ?? 'حقیقی') === 'حقوقی') {
-                $personData += [
-                    'person_type' => 'حقوقی',
-                    'company_name' => $step1['company_name'] ?? null,
-                    'company_national_id' => $step1['company_national_id'] ?? null,
-                    'reg_number' => $step1['reg_number'] ?? null,
-                    'reg_date' => $step1['reg_date'] ?? null,
-                    'company_type' => $step1['company_type'] ?? null,
-                    'economic_code' => $step1['economic_code'] ?? null,
-                ];
-            }
-            $personId = $personModel->findOrCreate($personData);
-            $personModel->linkApplication($applicantId, $personId);
-
-            // شغلی
-            if (str_starts_with($step2['license_title'], 'سایر') && !empty($step2['custom_license_title'])) {
-                $step2['license_title'] = mb_substr(trim($step2['custom_license_title']), 0, 100);
-            }
-            $this->jobDetailModel->create([
-                'applicant_id' => $applicantId,
-                'license_title' => $step2['license_title'],
-                'experience_months' => $step2['experience_months'],
-                'training_method' => $step2['training_method'],
-            ]);
-
-            // ملک
-            $this->propertyDetailModel->create([
-                'applicant_id' => $applicantId,
-                'ownership_status' => $step3['ownership_status'],
-                'province' => $step3['province'],
-                'county' => $step3['county'],
-                'city' => $step3['city'],
-                'district' => $step3['district'] ?? null,
-                'rural_district' => $step3['rural_district'] ?? null,
-                'village' => $step3['village'] ?? null,
-                'electricity_bill_id' => $step3['electricity_bill_id'],
-                'address_street' => $step3['address_street'] ?? null,
-                'address_alley' => $step3['address_alley'] ?? null,
-                'address_plaque' => $step3['address_plaque'] ?? null,
-            ]);
-
-            // مدارک
-            $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            $saveFile = function ($file, $docType) use ($applicantId, $uploadDir) {
-                // اعتبارسنجی مجدد فایل با رویکرد چندلایه‌ای
-                $validation = validate_uploaded_file($file);
-                if (!$validation['valid']) {
-                    throw new \RuntimeException('فایل نامعتبر: ' . ($validation['error'] ?? 'خطای ناشناخته'));
-                }
-                $ext = $validation['ext']; // پسوند تأیید شده (از نام یا MIME)
-                $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-                $destPath = $uploadDir . '/' . $uniqueName;
-                if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                    throw new \RuntimeException('خطا در ذخیره فایل ' . sanitize_upload_filename((string)$file['name']));
-                }
-                @chmod($destPath, 0640);
-                return $this->documentModel->create([
-                    'applicant_id' => $applicantId,
-                    'doc_type' => $docType,
-                    'file_name' => $uniqueName,
-                    'original_name' => sanitize_upload_filename((string)$file['name']),
-                    'file_path' => str_replace(UPLOAD_DIR, '', $destPath),
-                ]);
-            };
-
-            if ($nationalCardFront && $nationalCardFront['error'] === UPLOAD_ERR_OK) $saveFile($nationalCardFront, 'national_card');
-            if ($nationalCardBack && $nationalCardBack['error'] === UPLOAD_ERR_OK) $saveFile($nationalCardBack, 'national_card');
-            $saveFile($birthCert, 'birth_cert');
-            $saveFile($ownershipDoc, 'ownership_doc');
-            if ($vocationalCert && $vocationalCert['error'] === UPLOAD_ERR_OK) $saveFile($vocationalCert, 'vocational_cert');
-            if ($educationDegree && $educationDegree['error'] === UPLOAD_ERR_OK) $saveFile($educationDegree, 'education_degree');
-            foreach ($productPhotos as $file) $saveFile($file, 'product_photos');
-            foreach ($optionalFiles as $file) $saveFile($file, 'optional');
-
-            /* ---------- مقادیر فیلدهای سفارشی همهٔ مراحل ---------- */
-            $dynValues = [];
-            // فایل‌های سفارشی این مرحله
-            foreach ($dynFileFields as $f) {
-                $file = $_FILES['dyn_' . (int)$f['id']] ?? null;
-                if ($file && $file['error'] === UPLOAD_ERR_OK) {
-                    $docId = $saveFile($file, 'dynamic');
-                    $dynValues[(int)$f['id']] = 'doc:' . $docId;
-                }
-            }
-            // داده‌های مراحل سیستمی ۱ تا ۳ + مراحل سفارشی میانی + مرحلهٔ جاری
-            foreach ($steps as $i => $st) {
-                $sid = (int)$st['id'];
-                $sessKey = $this->sessionKey($st);
-                $stData = ($i === $position - 1) ? $postAll : Session::getStep($sessKey, []);
-                foreach ($this->customFieldsForStepId($sid) as $f) {
-                    if ($f['field_type'] === 'file') continue;
-                    $key = 'dyn_' . (int)$f['id'];
-                    if (array_key_exists($key, $stData)) {
-                        $dynValues[(int)$f['id']] = (string)$stData[$key];
-                    }
-                }
-            }
-            if ($dynValues) {
-                $this->fieldValueModel->saveMany($applicantId, $dynValues);
-            }
-
-            $this->applicantModel->completeRegistration($applicantId);
-            $this->statusLogModel->create([
-                'applicant_id' => $applicantId,
-                'status_name' => 'تکمیل اطلاعات',
-                'description' => 'ثبت‌نام نهایی توسط متقاضی انجام شد.',
-            ]);
-
-            $db->commit();
-            Session::clearRegistration();
-
-            // اگر کاربر وارد شده → به پنل کاربری
-            if (Session::get('user_logged_in')) {
-                Session::set('signup_success', 'درخواست شما با موفقیت ثبت شد. کد رهگیری: ' . $trackingCode);
-                $this->redirect('/panel');
-            }
-            $this->redirect('/register/success/' . $trackingCode);
-        } catch (\Exception $e) {
-            $db->rollBack();
-            error_log('registration finalize failed: ' . $e->getMessage());
+        if (!$result['success']) {
+            error_log('registration finalize failed: ' . implode(' | ', $result['errors']));
             Session::set('errors', ['system' => ['خطایی در ثبت‌نام رخ داد. لطفاً دوباره تلاش کنید.']]);
             $this->redirect('/register/step/' . $position);
         }
+
+        $applicantId = $result['applicant_id'];
+        $trackingCode = $result['tracking_code'];
+
+        // ---- ذخیرهٔ مدارک با همان سرویس (یک الگوی واحد) ----
+        $fileSaveResult = $registrationService->saveAllUploadedFiles($applicantId);
+        if (!empty($fileSaveResult['errors'])) {
+            error_log('registration file save errors: ' . implode(' | ', $fileSaveResult['errors']));
+        }
+
+        // ---- فایل‌های سفارشی (dynamic) — خاص ویزارد، با doc_type='dynamic' ----
+        $dynValues = [];
+        foreach ($dynFileFields as $f) {
+            $file = $_FILES['dyn_' . (int)$f['id']] ?? null;
+            if ($file && $file['error'] === UPLOAD_ERR_OK) {
+                $fileResult = $registrationService->saveUploadedFile($file, $applicantId, 'dynamic');
+                if ($fileResult['success'] && $fileResult['document_id']) {
+                    $dynValues[(int)$f['id']] = 'doc:' . $fileResult['document_id'];
+                }
+            }
+        }
+
+        // ---- مقادیر داده‌های فیلدهای سفارشی همهٔ مراحل ----
+        foreach ($steps as $i => $st) {
+            $sid = (int)$st['id'];
+            $sessKey = $this->sessionKey($st);
+            $stData = ($i === $position - 1) ? $postAll : Session::getStep($sessKey, []);
+            foreach ($this->customFieldsForStepId($sid) as $f) {
+                if ($f['field_type'] === 'file') continue;
+                $key = 'dyn_' . (int)$f['id'];
+                if (array_key_exists($key, $stData)) {
+                    $dynValues[(int)$f['id']] = (string)$stData[$key];
+                }
+            }
+        }
+        if ($dynValues) {
+            $this->fieldValueModel->saveMany($applicantId, $dynValues);
+        }
+
+        Session::clearRegistration();
+
+        // اگر کاربر وارد شده → به پنل کاربری
+        if (Session::get('user_logged_in')) {
+            Session::set('signup_success', 'درخواست شما با موفقیت ثبت شد. کد رهگیری: ' . $trackingCode);
+            $this->redirect('/panel');
+        }
+        $this->redirect('/register/success/' . $trackingCode);
     }
 
     /* ==================== اعتبارسنجی فیلدهای پویا ==================== */

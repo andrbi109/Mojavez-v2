@@ -298,8 +298,7 @@ class BulkImportController extends Controller
         $personModel = new Person();
         $userModel = new UserAccount();
         $applicantModel = new Applicant();
-        $jobModel = new JobDetail();
-        $notifModel = new UserNotification();
+        $registrationService = new ApplicantRegistrationService();
 
         $db = Database::getInstance()->getConnection();
         $results = [];
@@ -443,123 +442,73 @@ class BulkImportController extends Controller
                 continue;
             }
 
-            // شروع تراکنش در صورت نیاز
-            $beginBatch();
-
             // رمز عبور
             $password = $passwordStrategy === 'fixed' ? $fixedPassword : $nc;
 
-            try {
-                // ۱. Person
-                $personId = $personModel->create([
+            // استفاده از سرویس متمرکز ثبت‌نام (یکپارچه با ویزارد و ثبت‌نام دستی)
+            $result = $registrationService->createApplicant(
+                [
                     'national_code' => $nc,
                     'first_name' => $fn,
                     'last_name' => $ln,
                     'mobile' => $mb,
                     'postal_code' => $data['postal_code'] ?? null,
-                ]);
-
-                // ۲. UserAccount (داخل create خودش Person را find می‌کند — همین Person تازه ساخته شده را پیدا می‌کند)
-                $accountId = $userModel->create([
-                    'national_code' => $nc,
-                    'first_name' => $fn,
-                    'last_name' => $ln,
-                    'mobile' => $mb,
-                    'password' => $password,
-                ]);
-
-                // ۳. Applicant
-                $trackingCode = Applicant::generateTrackingCode();
-                $applicantId = $applicantModel->create([
-                    'first_name' => $fn,
-                    'last_name' => $ln,
-                    'national_code' => $nc,
-                    'postal_code' => $data['postal_code'] ?? null,
-                    'mobile' => $mb,
-                    'tracking_code' => $trackingCode,
-                    'service_type_id' => $serviceTypeId,
-                    'user_account_id' => $accountId,
-                    'income_decile' => $data['income_decile'] ?? null,
                     'father_name' => $data['father_name'] ?? null,
-                ]);
-
-                // ۴. JobDetail
-                $jobModel->create([
-                    'applicant_id' => $applicantId,
+                    'income_decile' => $data['income_decile'] ?? null,
                     'license_title' => $licenseTitle,
                     'experience_months' => 0,
                     'training_method' => 'کارگاهی',
-                ]);
+                    'province' => $data['province'] ?? null,
+                    'city' => $data['city'] ?? null,
+                    'village' => $data['village'] ?? null,
+                    'ownership_status' => !empty($data['province']) || !empty($data['city']) ? 'شخص' : null,
+                    'electricity_bill_id' => !empty($data['province']) || !empty($data['city']) ? '0000000000' : null,
+                ],
+                [
+                    'source' => 'bulk',
+                    'service_type_id' => $serviceTypeId,
+                    'create_user_account' => true,
+                    'default_password' => $password,
+                    'complete_status' => true,
+                    'notify_user' => true,
+                ]
+            );
 
-                // ۵. PropertyDetail (اگر آدرس موجود)
-                if (!empty($data['province']) || !empty($data['city'])) {
-                    (new PropertyDetail())->create([
-                        'applicant_id' => $applicantId,
-                        'ownership_status' => 'شخص',
-                        'province' => $data['province'] ?? '',
-                        'county' => $data['city'] ?? '',
-                        'city' => $data['city'] ?? '',
-                        'electricity_bill_id' => '0000000000',
-                        'village' => $data['village'] ?? null,
-                    ]);
-                }
-
-                // ۶. linkApplication
-                $personModel->linkApplication($applicantId, $personId);
-
-                // ۷. ارتقا به «تکمیل اطلاعات» + ثبت در status_log
-                //    (تطبیق با جریان ویزارد و ثبت‌نام دستی مدیر)
-                $applicantModel->completeRegistration($applicantId);
-                $statusLogModel = new StatusLog();
-                $statusLogModel->create([
-                    'applicant_id' => $applicantId,
-                    'status_name' => 'تکمیل اطلاعات',
-                    'description' => 'ثبت‌نام توسط ایمپورت دسته‌جمعی — رشته: ' . $licenseTitle
-                        . ' (توسط: ' . Session::get('admin_username', 'نامشخص') . ')'
-                ]);
-
-                // ۸. اعلان
-                try {
-                    $notifModel->create($accountId, 'registration',
-                        'ثبت‌نام شما تکمیل شد',
-                        'کد رهگیری شما: ' . $trackingCode . ' — رشته: ' . $licenseTitle,
-                        $applicantId
-                    );
-                } catch (\Throwable $e) {}
-
-                // ثبت در نقشهٔ batch برای ادغام ردیف‌های بعدی
-                $processedInBatch[$nc] = [
-                    'person_id' => $personId,
-                    'mobile' => $mb,
-                    'mobile_2' => null,
-                    'mobile_3' => null,
-                    'first_idx' => $idx,
-                ];
-
-                $results[] = [
-                    'idx' => $idx,
-                    'name' => $fn . ' ' . $ln,
-                    'national_code' => $nc,
-                    'mobile' => $mb,
-                    'tracking_code' => $trackingCode,
-                    'password' => $password,
-                    'status' => 'success',
-                ];
-
-                $processedInThisTransaction++;
-            } catch (\Throwable $e) {
-                // خطای این ردیف نباید کل ایمپورت را متوقف کند
+            if (!$result['success']) {
                 $results[] = [
                     'idx' => $idx, 'name' => $fn . ' ' . $ln,
                     'national_code' => $nc, 'mobile' => $mb,
                     'status' => 'error',
-                    'message' => $e->getMessage(),
+                    'message' => implode(' | ', $result['errors']),
                 ];
-                // rollback این تراکنش و شروع تراکنش جدید برای ادامه
-                try { $db->rollBack(); } catch (\Throwable $rbErr) {}
-                $inTransaction = false;
-                $processedInThisTransaction = 0;
+                continue;
             }
+
+            $applicantId = $result['applicant_id'];
+            $trackingCode = $result['tracking_code'];
+            $personId = $result['person_id'];
+            $accountId = $result['account_id'];
+
+            // ثبت در نقشهٔ batch برای ادغام ردیف‌های بعدی
+            $processedInBatch[$nc] = [
+                'person_id' => $personId,
+                'mobile' => $mb,
+                'mobile_2' => null,
+                'mobile_3' => null,
+                'first_idx' => $idx,
+            ];
+
+            $results[] = [
+                'idx' => $idx,
+                'name' => $fn . ' ' . $ln,
+                'national_code' => $nc,
+                'mobile' => $mb,
+                'tracking_code' => $trackingCode,
+                'password' => $password,
+                'status' => 'success',
+            ];
+
+            $processedInThisTransaction++;
 
             // commit دسته‌ای
             if ($processedInThisTransaction >= $batchSize) {
