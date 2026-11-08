@@ -1125,6 +1125,19 @@ class AdminController extends Controller
                 : 'درخواست پرداخت توسط مدیر غیرفعال شد.',
         ]);
 
+        // ارسال اعلان به کاربر در صورت فعال‌سازی پرداخت
+        if ($enable && !empty($applicant['user_account_id'])) {
+            try {
+                (new UserNotification())->create(
+                    (int)$applicant['user_account_id'],
+                    'payment_request',
+                    'درخواست پرداخت هزینهٔ ثبت‌نام',
+                    'مبلغ: ' . number_format($amount) . ' تومان — کد رهگیری: ' . ($applicant['tracking_code'] ?? ''),
+                    $applicantId
+                );
+            } catch (\Throwable $e) {}
+        }
+
         $this->redirect('/admin/view/' . $applicantId);
     }
 
