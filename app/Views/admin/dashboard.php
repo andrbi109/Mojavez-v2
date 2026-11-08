@@ -513,13 +513,15 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
 </div>
 
 <!-- ===== مجوزهای منقضی‌شده یا در حال انقضا ===== -->
-<?php if (!empty($expiringLicenses)): ?>
 <div class="card mt-4">
     <div class="card-header fw-bold d-flex justify-content-between align-items-center" style="background:linear-gradient(135deg,rgba(181,73,63,.08),rgba(181,73,63,.02)); border-color:rgba(181,73,63,.2)">
         <span><?= icon('alert-triangle','me-1',18) ?> مجوزهای منقضی‌شده یا در آستانه انقضا</span>
-        <span class="badge bg-danger"><?= count($expiringLicenses) ?> مورد</span>
+        <?php if (!empty($expiringLicenses)): ?>
+            <span class="badge bg-danger"><?= count($expiringLicenses) ?> مورد</span>
+        <?php endif; ?>
     </div>
     <div class="card-body p-0">
+        <?php if (!empty($expiringLicenses)): ?>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead>
@@ -562,9 +564,15 @@ $successRate = $total > 0 ? round(($issued / $total) * 100) : 0;
                 </tbody>
             </table>
         </div>
+        <?php else: ?>
+        <div class="text-center py-4 text-muted">
+            <?= icon('check-circle','',28) ?>
+            <p class="mt-2 mb-0">در حال حاضر مجوز منقضی‌شده یا در آستانه انقضایی وجود ندارد.</p>
+            <small class="text-muted">برای فعال شدن این بخش، در پروندهٔ متقاضیانِ دارای مجوز، «تاریخ انقضای مجوز» را تنظیم کنید.</small>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
-<?php endif; ?>
 
 <!-- ===== آخرین رویدادها (تایم‌لاین) ===== -->
 <?php if (!empty($recentLogs)): ?>
