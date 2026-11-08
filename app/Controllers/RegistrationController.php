@@ -284,8 +284,10 @@ class RegistrationController extends Controller
     }
 
     /**
-     * پیش‌فرض اطلاعات هویتی از Person برای کاربر واردشده.
+     * پیش‌فرض اطلاعات هویتی از Person + آخرین Applicant برای کاربر واردشده.
      * فقط وقتی session خالی است فراخوانی می‌شود (درخواست جدید).
+     * نکته: فیلدهای marital_status, physical_condition, has_* در جدول applicants هستند،
+     * نه persons یا user_accounts.
      */
     private function getPrefillData(): array
     {
@@ -313,15 +315,19 @@ class RegistrationController extends Controller
                 $data['birth_day']   = (string)$jArr['day'];
             }
 
-            // فیلدهای تکمیلی
-            $data['marital_status']     = $userAccount['marital_status'] ?? '';
-            $data['children_count']     = $userAccount['children_count'] ?? '';
-            $data['physical_condition'] = $userAccount['physical_condition'] ?? '';
-            $data['disability_details'] = $userAccount['disability_details'] ?? '';
-            $data['income_decile']      = $userAccount['income_decile'] ?? '';
-            $data['has_court_case']          = $userAccount['has_court_case'] ?? '';
-            $data['has_active_loan']         = $userAccount['has_active_loan'] ?? '';
-            $data['has_overdue_installments'] = $userAccount['has_overdue_installments'] ?? '';
+            // فیلدهای تکمیلی از آخرین پروندهٔ کاربر (applicants table)
+            $applications = (new UserAccount())->getApplications($userId);
+            if (!empty($applications)) {
+                $latestApp = $applications[0]; // جدیدترین پرونده
+                $data['marital_status']          = $latestApp['marital_status'] ?? '';
+                $data['children_count']          = $latestApp['children_count'] ?? '';
+                $data['physical_condition']      = $latestApp['physical_condition'] ?? '';
+                $data['disability_details']      = $latestApp['disability_details'] ?? '';
+                $data['income_decile']           = $latestApp['income_decile'] ?? '';
+                $data['has_court_case']          = $latestApp['has_court_case'] ?? '';
+                $data['has_active_loan']         = $latestApp['has_active_loan'] ?? '';
+                $data['has_overdue_installments'] = $latestApp['has_overdue_installments'] ?? '';
+            }
 
             return $data;
         } catch (\Throwable $e) {
