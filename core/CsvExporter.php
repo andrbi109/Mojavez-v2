@@ -63,7 +63,7 @@ class CsvExporter
         fprintf($output, "\xEF\xBB\xBF");
 
         // نوشتن هدرها (با sanitize برای جلوگیری از injection در عنوان ستون)
-        fputcsv($output, array_map([self::class, 'sanitizeCell'], $headers));
+        fputcsv($output, array_map([self::class, 'sanitizeCell'], $headers), ',', '"', '\\');
 
         // نوشتن داده‌ها — هر سلول ابتدا sanitize می‌شود
         foreach ($rows as $row) {
@@ -71,7 +71,7 @@ class CsvExporter
             foreach ($row as $cell) {
                 $sanitizedRow[] = self::sanitizeCell($cell);
             }
-            fputcsv($output, $sanitizedRow);
+            fputcsv($output, $sanitizedRow, ',', '"', '\\');
         }
 
         fclose($output);
