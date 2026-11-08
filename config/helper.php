@@ -425,6 +425,11 @@ if (!function_exists('validate_uploaded_file')) {
 
         // ۵. بررسی حجم
         $size = (int)($file['size'] ?? 0);
+        // fallback: اگر size در آرایه فایل موجود نبود، از filesize() استفاده کن
+        // (این مشکل در آپلود چندفایلی product_photos رخ می‌دهد)
+        if ($size <= 0 && !empty($tmpPath) && is_file($tmpPath)) {
+            $size = (int)filesize($tmpPath);
+        }
         if ($size <= 0) {
             $result['error'] = 'حجم فایل «' . $result['safe_name'] . '» قابل تشخیص نیست یا صفر است.';
             $result['reason'] = 'zero_size';

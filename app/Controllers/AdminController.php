@@ -906,12 +906,14 @@ class AdminController extends Controller
         if (!empty($_FILES['product_photos']) && is_array($_FILES['product_photos']['name'])) {
             $ppNames = $_FILES['product_photos']['name'];
             $ppTmp   = $_FILES['product_photos']['tmp_name'];
+            $ppSize  = $_FILES['product_photos']['size'];
             $ppErr   = $_FILES['product_photos']['error'];
             foreach ($ppTmp as $i => $tmpName) {
                 if (($ppErr[$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
                 $saveSingleFile([
                     'name'     => $ppNames[$i] ?? '',
                     'tmp_name' => $tmpName,
+                    'size'     => $ppSize[$i] ?? 0,
                     'error'    => $ppErr[$i],
                 ], 'product_photos');
             }
