@@ -543,11 +543,22 @@ class AdminController extends Controller
         }
         $this->verifyCsrf();
 
-        // بررسی post_max_size — اگر $_POST خالی است ولی CONTENT_LENGTH بزرگ بود،
-        // یعنی درخواست از حد مجاز عبور کرده و PHP آن را حذف کرده است.
+        // لاگ قابل مشاهده — در uploads/debug.log
+        $debugLog = UPLOAD_DIR . '/debug.log';
+        $debugWrite = function(string $msg) use ($debugLog) {
+            @file_put_contents($debugLog, date('Y-m-d H:i:s') . ' ' . $msg . "\n", FILE_APPEND);
+        };
+        $debugWrite('=== updateApplication START ===');
+        $debugWrite('POST keys: ' . implode(',', array_keys($_POST)));
+        $debugWrite('FILES keys: ' . implode(',', array_keys($_FILES)));
+        $debugWrite('CONTENT_LENGTH: ' . ($_SERVER['CONTENT_LENGTH'] ?? 'n/a'));
+        $debugWrite('post_max_size: ' . ini_get('post_max_size'));
+        $debugWrite('upload_max_filesize: ' . ini_get('upload_max_filesize'));
+
+        // بررسی post_max_size
         if (empty($_POST)) {
             $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
-            error_log('[updateApplication] $_POST is empty! CONTENT_LENGTH=' . $contentLength);
+            $debugWrite('ERROR: $_POST is empty! CONTENT_LENGTH=' . $contentLength);
             $postMax = ini_get('post_max_size');
             $uploadMax = ini_get('upload_max_filesize');
             Session::set('errors', ['system' => [
@@ -556,24 +567,33 @@ class AdminController extends Controller
                 . 'post_max_size=' . $postMax . '، upload_max_filesize=' . $uploadMax . '. '
                 . 'لطفاً فایل‌های کوچک‌تر آپلود کنید یا مقادیر را در php.ini افزایش دهید.'
             ]]);
-            // بازگشت به صفحه ویرایش اگر applicant_id از GET قابل استخراج است
             $backId = (int)($_GET['id'] ?? 0);
             if ($backId > 0) {
+                $debugWrite('REDIRECT: /admin/edit/' . $backId . ' (POST empty)');
                 $this->redirect('/admin/edit/' . $backId);
             }
+            $debugWrite('REDIRECT: /admin/dashboard (POST empty, no id)');
             $this->redirect('/admin/dashboard');
         }
 
         $applicantId = (int)$this->input('applicant_id', 0);
+        $debugWrite('applicant_id: ' . $applicantId);
         $applicant = $this->applicantModel->findById($applicantId);
         if (!$applicant) {
-            error_log('[updateApplication] applicant not found, id=' . $applicantId . ', _POST keys: ' . implode(',', array_keys($_POST)));
-            Session::set('errors', ['system' => ['متقاضی با شناسه ' . $applicantId . ' یافت نشد. ممکن است applicant_id در فرم ارسال نشده باشد.']]);
+            $debugWrite('ERROR: applicant not found, id=' . $applicantId);
+            Session::set('errors', ['system' => ['متقاضی با شناسه ' . $applicantId . ' یافت نشد.']]);
+            $debugWrite('REDIRECT: /admin/dashboard (applicant not found)');
             $this->redirect('/admin/dashboard');
         }
 
         $data = $this->allInputs();
-        error_log('[updateApplication] starting update for applicant #' . $applicantId . ', data keys: ' . implode(',', array_keys($data)));
+        $debugWrite('data keys: ' . implode(',', array_keys($data)));
+        $debugWrite('first_name: ' . ($data['first_name'] ?? 'MISSING'));
+        $debugWrite('mobile: ' . ($data['mobile'] ?? 'MISSING'));
+        $debugWrite('license_title: ' . ($data['license_title'] ?? 'MISSING'));
+        $debugWrite('experience_months: ' . ($data['experience_months'] ?? 'MISSING'));
+        $debugWrite('training_method: ' . ($data['training_method'] ?? 'MISSING'));
+        $debugWrite('ownership_status: ' . ($data['ownership_status'] ?? 'MISSING'));
 
         // تاریخ تولد: تبدیل و اعتبارسنجی
         if (!empty($data['birth_year']) && !empty($data['birth_month']) && !empty($data['birth_day'])) {
@@ -711,17 +731,20 @@ class AdminController extends Controller
         }
 
         if ($validator->hasErrors()) {
-            error_log('[updateApplication] validation failed: ' . json_encode($validator->getErrors(), JSON_UNESCAPED_UNICODE));
+            $debugWrite('VALIDATION FAILED: ' . json_encode($validator->getErrors(), JSON_UNESCAPED_UNICODE));
+            $debugWrite('REDIRECT: /admin/edit/' . $applicantId . ' (validation failed)');
             Session::set('errors', $validator->getErrors());
             Session::set('formData', $data);
             $this->redirect('/admin/edit/' . $applicantId);
         }
 
+        $debugWrite('Validation passed, starting transaction...');
+
         // ---- ذخیره‌سازی در تراکنش ----
         $db = Database::getInstance()->getConnection();
         $db->beginTransaction();
         try {
-            error_log('[updateApplication] starting transaction for #' . $applicantId);
+            $debugWrite('Transaction started');
             // ۱. به‌روزرسانی applicants
             $this->applicantModel->update($applicantId, [
                 'first_name' => $data['first_name'],
@@ -789,23 +812,26 @@ class AdminController extends Controller
             ]);
 
             $db->commit();
-            error_log('[updateApplication] commit successful for #' . $applicantId . ', redirecting to view');
+            $debugWrite('COMMIT SUCCESSFUL for #' . $applicantId);
 
             // ۷. ذخیرهٔ مدارک جدید (در صورت آپلود) — بعد از commit
-            // این بخش بعد از commit است تا خطای آپلود، ذخیره‌سازی داده‌ها را لغو نکند
             $uploadErrors = $this->saveUploadedDocuments($applicantId);
             if (!empty($uploadErrors)) {
-                error_log('[updateApplication] upload errors: ' . implode(' | ', $uploadErrors));
+                $debugWrite('Upload errors: ' . implode(' | ', $uploadErrors));
                 Session::set('errors', ['document' => implode(' ', $uploadErrors)]);
             } else {
-                error_log('[updateApplication] no upload errors, uploaded files: ' . count(array_filter($_FILES, fn($f) => $f['error'] === UPLOAD_ERR_OK)));
+                $uploadedCount = count(array_filter($_FILES, fn($f) => is_array($f) && isset($f['error']) && $f['error'] === UPLOAD_ERR_OK));
+                $debugWrite('No upload errors, uploaded files: ' . $uploadedCount);
             }
 
+            $debugWrite('REDIRECT: /admin/view/' . $applicantId . ' (SUCCESS)');
             Session::remove('formData');
             $this->redirect('/admin/view/' . $applicantId);
         } catch (\Throwable $e) {
             $db->rollBack();
-            error_log('[updateApplication] EXCEPTION: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            $debugWrite('EXCEPTION: ' . $e->getMessage());
+            $debugWrite('EXCEPTION trace: ' . $e->getTraceAsString());
+            $debugWrite('REDIRECT: /admin/edit/' . $applicantId . ' (exception)');
             Session::set('errors', ['system' => ['خطا در ذخیره‌سازی: ' . $e->getMessage()]]);
             Session::set('formData', $data);
             $this->redirect('/admin/edit/' . $applicantId);

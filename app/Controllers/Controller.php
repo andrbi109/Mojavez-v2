@@ -41,7 +41,12 @@ class Controller
     {
         // جلوگیری از تولید آدرس با دو اسلش (//) وقتی BASE_URL برابر '/' است
         $base = rtrim(BASE_URL, '/');
-        header('Location: ' . $base . '/' . ltrim($url, '/'));
+        $location = $base . '/' . ltrim($url, '/');
+        // لاگ تشخیصی — برای رفع مشکل ذخیره‌سازی
+        if (APP_DEBUG) {
+            error_log('[redirect] to: ' . $location . ' from: ' . ($_SERVER['REQUEST_URI'] ?? '?') . ' method: ' . ($_SERVER['REQUEST_METHOD'] ?? '?'));
+        }
+        header('Location: ' . $location);
         exit;
     }
 
