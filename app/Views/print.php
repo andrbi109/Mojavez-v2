@@ -8,8 +8,11 @@ $docLabels = [
     'optional' => 'سایر', 'payment_receipt' => 'رسید پرداخت',
     'avatar' => 'آواتار', 'revision_doc' => 'بازبینی',
 ];
+// شمارندهٔ بخش‌ها (by-reference تا در هر فراخوانی افزایش یابد)
 $sectionNum = 0;
-$nextNum = fn() => ++$sectionNum;
+
+// تبدیل اعداد انگلیسی به فارسی — برای اعداد داخل متن (نه کد رهگیری و نام فایل)
+$faNum = fn($s) => str_replace(['0','1','2','3','4','5','6','7','8','9'], ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'], (string)$s);
 ?>
 <div class="print-container">
     <!-- === سربرگ === -->
@@ -31,7 +34,7 @@ $nextNum = fn() => ++$sectionNum;
                     <div class="col-6">
                         <div class="tracking-box">
                             <div class="label">تاریخ چاپ</div>
-                            <div class="code" dir="ltr"><?= jdate('Y/m/d') ?></div>
+                            <div class="code" dir="ltr"><?= $faNum(jdate('Y/m/d')) ?></div>
                         </div>
                     </div>
                 </div>
@@ -45,7 +48,7 @@ $nextNum = fn() => ++$sectionNum;
     <!-- ۱. اطلاعات هویتی -->
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> اطلاعات هویتی
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> اطلاعات هویتی
             <span class="ornament">❖</span>
         </div>
         <table class="info-table">
@@ -55,9 +58,9 @@ $nextNum = fn() => ++$sectionNum;
             <tr><td>شماره همراه</td><td dir="ltr"><?= $e($applicant['mobile']) ?></td></tr>
             <tr><td>تاریخ تولد</td><td><?= persianDate((string)$applicant['birth_date']) ?></td></tr>
             <tr><td>نام پدر</td><td><?= $e($applicant['father_name'] ?? '—') ?></td></tr>
-            <tr><td>وضعیت تأهل</td><td><?= $e($applicant['marital_status'] ?? '—') ?><?= ($applicant['marital_status'] ?? '') === 'متأهل' ? ' (فرزندان: ' . (int)$applicant['children_count'] . ')' : '' ?></td></tr>
+            <tr><td>وضعیت تأهل</td><td><?= $e($applicant['marital_status'] ?? '—') ?><?= ($applicant['marital_status'] ?? '') === 'متأهل' ? ' (فرزندان: ' . $faNum((int)$applicant['children_count']) . ')' : '' ?></td></tr>
             <tr><td>وضعیت جسمانی</td><td><?= $e($applicant['physical_condition'] ?? '—') ?><?= ($applicant['physical_condition'] ?? '') === 'معلولیت' ? ' — ' . $e($applicant['disability_details'] ?? '') : '' ?></td></tr>
-            <tr><td>دهک درآمدی</td><td><?= $applicant['income_decile'] ?: '—' ?></td></tr>
+            <tr><td>دهک درآمدی</td><td><?= $applicant['income_decile'] ? $faNum($applicant['income_decile']) : '—' ?></td></tr>
             <tr><td>پرونده قضایی / وام / اقساط</td><td><?= $e($applicant['has_court_case']) ?> / <?= $e($applicant['has_active_loan']) ?> / <?= $e($applicant['has_overdue_installments']) ?></td></tr>
         </table>
     </div>
@@ -65,13 +68,13 @@ $nextNum = fn() => ++$sectionNum;
     <!-- ۲. اطلاعات شغلی -->
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> اطلاعات شغلی
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> اطلاعات شغلی
             <span class="ornament">❖</span>
         </div>
         <?php if ($jobDetail): ?>
         <table class="info-table">
             <tr><td>عنوان مجوز</td><td><?= $e($jobDetail['license_title']) ?></td></tr>
-            <tr><td>سابقه فعالیت</td><td><?= (int)$jobDetail['experience_months'] ?> ماه</td></tr>
+            <tr><td>سابقه فعالیت</td><td><?= $faNum((int)$jobDetail['experience_months']) ?> ماه</td></tr>
             <tr><td>نحوه آموزش</td><td><?= $e($jobDetail['training_method']) ?></td></tr>
         </table>
         <?php else: ?>
@@ -82,7 +85,7 @@ $nextNum = fn() => ++$sectionNum;
     <!-- ۳. اطلاعات ملک -->
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> اطلاعات ملک
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> اطلاعات ملک
             <span class="ornament">❖</span>
         </div>
         <?php if ($propertyDetail): ?>
@@ -102,7 +105,7 @@ $nextNum = fn() => ++$sectionNum;
     <?php if (!empty($dynValues)): ?>
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> سؤالات تکمیلی پرونده
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> سؤالات تکمیلی پرونده
             <span class="ornament">❖</span>
         </div>
         <?php $dynMode = 'print'; require VIEW_PATH . '/_dynamic_values.php'; ?>
@@ -112,7 +115,7 @@ $nextNum = fn() => ++$sectionNum;
     <!-- ۵. تاریخچه وضعیت‌ها -->
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> تاریخچه وضعیت‌ها
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> تاریخچه وضعیت‌ها
             <span class="ornament">❖</span>
         </div>
         <table class="log-table">
@@ -135,7 +138,7 @@ $nextNum = fn() => ++$sectionNum;
     <!-- ۶. فهرست مدارک -->
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> فهرست مدارک (<?= count($documents) ?> فایل)
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> فهرست مدارک (<?= $faNum(count($documents)) ?> فایل)
             <span class="ornament">❖</span>
         </div>
         <?php if (!empty($documents)): ?>
@@ -158,7 +161,7 @@ $nextNum = fn() => ++$sectionNum;
     <?php if (!empty($postalChanges)): ?>
     <div class="doc-section">
         <div class="doc-section-title">
-            <span class="num"><?= $nextNum() ?></span> درخواست‌های تغییر کد پستی
+            <span class="num"><?= $faNum(++$sectionNum) ?></span> درخواست‌های تغییر کد پستی
             <span class="ornament">❖</span>
         </div>
         <table class="log-table">
@@ -196,6 +199,6 @@ $nextNum = fn() => ++$sectionNum;
     <!-- === پاورقی === -->
     <div class="doc-footer">
         این برگه به‌صورت خودکار توسط سامانهٔ مجوزهای صنایع دستی تولید شده است —
-        تاریخ تولید: <?= jdate('Y/m/d H:i') ?> — کد رهگیری: <?= $e($applicant['tracking_code']) ?>
+        تاریخ تولید: <?= $faNum(jdate('Y/m/d H:i')) ?> — کد رهگیری: <?= $e($applicant['tracking_code']) ?>
     </div>
 </div>

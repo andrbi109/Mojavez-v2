@@ -84,7 +84,7 @@ $base = rtrim(BASE_URL, '/') . '/';
         .doc-header {
             background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
             color: #fff;
-            padding: 20px 28px;
+            padding: 20px 10px 10px;
             position: relative;
             overflow: hidden;
         }
@@ -108,7 +108,7 @@ $base = rtrim(BASE_URL, '/') . '/';
             text-align: center;
         }
         .doc-header .tracking-box .label { font-size: .65rem; opacity: .7; }
-        .doc-header .tracking-box .code { font-size: 1rem; font-weight: 700; color: var(--saffron); }
+        .doc-header .tracking-box .code { font-weight: 700; color: var(--saffron); }
 
         /* === محتوای برگه === */
         .doc-body { padding: 20px 28px; }
