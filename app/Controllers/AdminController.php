@@ -858,10 +858,12 @@ class AdminController extends Controller
 
     /**
      * حذف یک مدرک از پروندهٔ متقاضی (با حذف فیزیکی فایل از دیسک).
+     *
+     * نقش‌های مجاز: admin، expert، document_uploader (یکسان با addDocument — رفع D-F-4)
      */
     public function deleteDocument(): void
     {
-        $this->requireRole(['admin']);
+        $this->requireRole(['admin', 'expert', 'document_uploader']);
         if (!$this->isPost()) $this->redirect('/admin/dashboard');
         $this->verifyCsrf();
 
@@ -887,10 +889,14 @@ class AdminController extends Controller
 
     /**
      * افزودن مدرک جدید به پرونده — با اعتبارسنجی پسوند، حجم و نوع واقعی فایل
+     *
+     * نقش‌های مجاز: admin، expert، document_uploader
+     * (رفع D-F-4 / D-J-4: قبلاً checkAuth استفاده می‌شد که همهٔ نقش‌ها را مجاز می‌کرد،
+     *  ولی deleteDocument فقط admin مجاز بود — ناسازگار. اکنون هر دو یکسان.)
      */
     public function addDocument(): void
     {
-        $this->checkAuth();
+        $this->requireRole(['admin', 'expert', 'document_uploader']);
         if (!$this->isPost()) {
             $this->redirect('/admin/dashboard');
         }
