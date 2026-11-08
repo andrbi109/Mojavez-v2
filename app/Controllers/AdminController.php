@@ -691,11 +691,15 @@ class AdminController extends Controller
         }
 
         // ---- فیلدهای پویا: اعتبارسنجی ----
+        // فقط فیلدهای سفارشی (is_system=0) اعتبارسنجی می‌شوند.
+        // فیلدهای سیستمی (is_system=1) قبلاً به‌صورت hardcode در اعتبارسنجی بالا بررسی شده‌اند.
         $formFieldModel = new FormField();
         $appFieldValueModel = new ApplicantFieldValue();
         $wizardSteps = (new WizardStep())->orderedActive((int)$applicant['service_type_id']);
         foreach ($wizardSteps as $wstep) {
-            $fields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)$applicant['service_type_id']);
+            $allFields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)$applicant['service_type_id']);
+            // فقط فیلدهای سفارشی — فیلدهای سیستمی در فرم hardcode شده‌اند
+            $fields = array_filter($allFields, fn($f) => (int)$f['is_system'] === 0);
             foreach ($fields as $f) {
                 $fid = (int)$f['id'];
                 $name = 'dyn_' . $fid;
@@ -786,10 +790,11 @@ class AdminController extends Controller
                 'address_plaque' => $data['address_plaque'],
             ]);
 
-            // ۴. ذخیرهٔ فیلدهای پویا
+            // ۴. ذخیرهٔ فیلدهای پویا (فقط سفارشی — is_system=0)
             $dynValuesToSave = []; // field_id => value
             foreach ($wizardSteps as $wstep) {
-                $fields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)($data['service_type_id'] ?? $applicant['service_type_id']));
+                $allFields = $formFieldModel->activeByStepId((int)$wstep['id'], (int)($data['service_type_id'] ?? $applicant['service_type_id']));
+                $fields = array_filter($allFields, fn($f) => (int)$f['is_system'] === 0);
                 foreach ($fields as $f) {
                     $fid = (int)$f['id'];
                     $name = 'dyn_' . $fid;
