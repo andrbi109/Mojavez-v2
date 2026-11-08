@@ -44,21 +44,6 @@ class DocumentController extends Controller
     }
 
     /**
-     * نمایش فایل با آدرس مستقیم (شناسهٔ عددی — غیرقابل حدس نبودن نام فایل‌ها لایهٔ دوم است)
-     */
-    public function serve(int|string $id): void
-    {
-        $this->requireLogin();
-
-        $document = $this->documentModel->findById((int)$id);
-        if (!$document) {
-            $this->deny(404, 'فایل یافت نشد.');
-        }
-
-        $this->stream($document, 'inline');
-    }
-
-    /**
      * بندانگشتی مدرک (در فهرست پرونده) — فعلاً همان فایل اصلی با هدرهای محدودکنندهٔ کش
      */
     public function thumb(int|string $id): void

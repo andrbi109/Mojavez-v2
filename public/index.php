@@ -51,17 +51,10 @@ Session::start();
 
 $router = new Router(BASE_URL);
 
-// Home
+// صفحهٔ اصلی
 $router->get('/', ['HomeController', 'index']);
 $router->get('/guide', ['HomeController', 'guide']);
 $router->get('/about', ['HomeController', 'about']);
-/*$router->get('/', function () {
-    $controller = new class extends Controller {}; // anonymous
-    $controller->render('home', ['title' => 'سامانه مجوز صنایع دستی']);
-});*/
-
-// صفحات عمومی
-$router->get('/', ['HomeController', 'index']);
 
 // احراز هویت کاربران (مدل فروشگاهی)
 $router->get('/signup', ['AuthController', 'signupForm']);
@@ -243,9 +236,8 @@ $router->post('/admin/license-titles/toggle/{id}', ['LicenseTitleController', 't
 
 // Documents
 $router->post('/document/view', ['DocumentController', 'view']);
-// Thumbnail
+// بندانگشتی مدرک
 $router->get('/document/thumb/{id}', ['DocumentController', 'thumb']);
-//$router->get('/document/{id}', ['DocumentController', 'serve']);
 
 // Check cancel — نیاز به رمز مشترک (CRON_SECRET) دارد
 // برای فراخوانی: GET /check-cancel?key=SECRET یا با هدر X-Cron-Secret
