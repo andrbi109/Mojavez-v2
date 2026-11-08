@@ -74,13 +74,13 @@ class BulkImportController extends Controller
         $firstLine = fgets($handle);
         if ($firstLine !== false) {
             $firstLine = preg_replace('/^\xEF\xBB\xBF/', '', $firstLine);
-            $headers = str_getcsv($firstLine);
+            $headers = str_getcsv($firstLine, ',', '"', '\\');
             if ($headers === false) $headers = [];
         }
 
         $lineCount = 0;
         while (($line = fgets($handle)) !== false && $lineCount < 1000) {
-            $row = str_getcsv($line);
+            $row = str_getcsv($line, ',', '"', '\\');
             if ($row === false || (count($row) === 1 && $row[0] === '')) continue;
             $rows[] = $row;
             $lineCount++;

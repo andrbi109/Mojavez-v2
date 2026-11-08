@@ -260,7 +260,7 @@ $ownerImg = setting('owner_image', '');
     <div class="px-3 py-2 d-flex align-items-center justify-content-between flex-shrink-0">
         <small style="color:#5A6B7D; font-size:.7rem;">
             <?= htmlspecialchars(owner_name()) ?>
-            <span style="opacity:.6">v<?= defined('APP_VERSION') ? APP_VERSION : '0.5.1' ?></span>
+            <span style="opacity:.6">v<?= defined('APP_VERSION') ? APP_VERSION : '0.5.2' ?></span>
         </small>
         <button type="button" class="theme-toggle d-none d-lg-inline-flex" data-theme-toggle onclick="mojavezToggleTheme()" aria-label="تغییر تم روز/شب" style="width:28px;height:28px;">
             <span class="icon-sun"><?= icon('sun', '', 13) ?></span><span class="icon-moon"><?= icon('moon', '', 13) ?></span>
