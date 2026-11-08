@@ -137,84 +137,35 @@ class LicenseController extends Controller
             $this->redirect($back);
         }
 
-        // اعتبارسنجی مشابه گردش پرداخت ثبت‌نام
+        // اعتبارسنجی با سرویس متمرکز — حداقل مبلغ = مبلغ درخواست
         $data = $this->allInputs();
-        $validator = new Validator($data);
-        $validator->required('payment_channel_id', 'کانال پرداخت')->unsignedInt('amount', 'مبلغ');
-        $channelModel = new PaymentChannel();
-        $channel = $channelModel->findById((int)($data['payment_channel_id'] ?? 0));
-        if (!$channel || !(int)$channel['is_active']) {
-            $validator->addError('payment_channel_id', 'کانال پرداخت معتبر نیست.');
-        }
-        $amount = (int)($data['amount'] ?? 0);
-        if ($amount < (int)$latest['amount']) {
-            $validator->addError('amount', 'مبلغ واریزی نباید کمتر از مبلغ تعیین‌شده (' . number_format((int)$latest['amount']) . ' تومان) باشد.');
-        }
-        $paidAt = null;
-        if (!empty($data['paid_year']) && !empty($data['paid_month']) && !empty($data['paid_day'])) {
-            $jy = (int)$data['paid_year']; $jm = (int)$data['paid_month']; $jd = (int)$data['paid_day'];
-            if (is_valid_persian_date($jy, $jm, $jd)) {
-                $paidAt = persian_to_gregorian($jy, $jm, $jd);
-            } else {
-                $validator->addError('paid_at', 'تاریخ واریز معتبر نیست.');
-            }
-        } else {
-            $validator->addError('paid_at', 'تاریخ واریز الزامی است.');
-        }
-
         $file = $_FILES['receipt_file'] ?? null;
-        $receiptValidation = null;
-        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-            $validator->addError('receipt_file', 'بارگذاری تصویر رسید الزامی است.');
-        } else {
-            // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
-            $receiptValidation = validate_uploaded_file($file);
-            if (!$receiptValidation['valid']) {
-                $validator->addError('receipt_file', $receiptValidation['error'] ?? 'فایل رسید نامعتبر است.');
-            }
-        }
+        $paymentService = new PaymentReceiptService();
+        $validated = $paymentService->validateReceipt($data, $file ?: [], (int)$latest['amount']);
 
-        if ($validator->hasErrors()) {
-            Session::set('license_message', $validator->firstError());
+        if (!$validated['valid']) {
+            Session::set('license_message', $validated['first_error']);
             $this->redirect($back);
         }
 
-        // ذخیرهٔ رسید (با پسوند تأیید شده از اعتبارسنجی)
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-        $ext = $receiptValidation ? $receiptValidation['ext'] : safe_file_extension((string)$file['name']);
-        $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-        if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
-            Session::set('license_message', 'خطا در ذخیرهٔ فایل رسید.');
+        // ثبت رسید با سرویس متمرکز
+        $result = $paymentService->submitReceipt(
+            (int)$applicant['id'],
+            $file,
+            $validated,
+            [
+                'purpose' => 'هزینهٔ دریافت مجدد تصویر مجوز',
+                'linked_request_id' => (int)$latest['id'],
+            ]
+        );
+
+        if (!$result['success']) {
+            Session::set('license_message', $result['error']);
             $this->redirect($back);
         }
-        @chmod($uploadDir . '/' . $uniqueName, 0640);
 
-        $docId = $this->documentModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'doc_type' => 'payment_receipt',
-            'file_name' => $uniqueName,
-            'original_name' => sanitize_upload_filename((string)$file['name']),
-            'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
-        ]);
-
-        $paymentId = $payModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'payment_channel_id' => (int)$data['payment_channel_id'],
-            'purpose' => 'هزینهٔ دریافت مجدد تصویر مجوز',
-            'amount' => $amount,
-            'reference_code' => trim((string)($data['reference_code'] ?? '')) ?: null,
-            'paid_at' => $paidAt,
-            'receipt_document_id' => $docId,
-            'linked_request_id' => (int)$latest['id'],
-        ]);
-        $this->requestModel->attachPayment((int)$latest['id'], $paymentId);
-
-        $this->statusLogModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'status_name' => 'ثبت رسید پرداخت',
-            'description' => 'هزینهٔ دریافت مجدد تصویر مجوز — مبلغ ' . number_format($amount) . ' تومان — در انتظار بررسی',
-        ]);
+        // اتصال پرداخت به درخواست
+        $this->requestModel->attachPayment((int)$latest['id'], $result['payment_id']);
 
         Session::set('license_message', 'رسید پرداخت ثبت شد؛ پس از تأیید مدیر، لینک دریافت تصویر مجوز فعال می‌شود.');
         $this->redirect($back);

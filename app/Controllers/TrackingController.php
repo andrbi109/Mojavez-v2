@@ -281,121 +281,41 @@ class TrackingController extends Controller
             $this->redirect($back);
         }
 
-        // اعتبارسنجی فیلدها
+        // اعتبارسنجی با سرویس متمرکز
         $data = $this->allInputs();
-        $validator = new Validator($data);
-        $validator->required('payment_channel_id', 'کانال پرداخت')
-            ->required('amount', 'مبلغ واریزی')
-            ->unsignedInt('amount', 'مبلغ واریزی');
-
-        $channelId = (int)($data['payment_channel_id'] ?? 0);
-        $channel = $channelId > 0 ? $this->channelModel->findById($channelId) : null;
-        if (!$channel || !(int)$channel['is_active']) {
-            $validator->addError('payment_channel_id', 'کانال پرداخت معتبر نیست.');
-        }
-        $amount = (int)($data['amount'] ?? 0);
-        if ($amount <= 0 || $amount > 1000000000) {
-            $validator->addError('amount', 'مبلغ را به تومان و به‌درستی وارد کنید.');
-        }
-
-        // تاریخ واریز شمسی → میلادی
-        $paidAt = null;
-        if (!empty($data['paid_year']) && !empty($data['paid_month']) && !empty($data['paid_day'])) {
-            $jy = (int)$data['paid_year']; $jm = (int)$data['paid_month']; $jd = (int)$data['paid_day'];
-            if (is_valid_persian_date($jy, $jm, $jd)) {
-                $paidAt = persian_to_gregorian($jy, $jm, $jd);
-            } else {
-                $validator->addError('paid_at', 'تاریخ واریز معتبر نیست.');
-            }
-        } else {
-            $validator->addError('paid_at', 'تاریخ واریز الزامی است.');
-        }
-
-        // فایل رسید
         $file = $_FILES['receipt_file'] ?? null;
-        if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-            $validator->addError('receipt_file', 'بارگذاری تصویر رسید پرداخت الزامی است.');
-        } else {
-            // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
-            $validation = validate_uploaded_file($file);
-            if (!$validation['valid']) {
-                $validator->addError('receipt_file', $validation['error'] ?? 'فایل رسید نامعتبر است.');
-            }
-        }
+        $paymentService = new PaymentReceiptService();
+        $validated = $paymentService->validateReceipt($data, $file ?: []);
 
-        if ($validator->hasErrors()) {
-            Session::set('payment_error', $validator->firstError());
+        if (!$validated['valid']) {
+            Session::set('payment_error', $validated['first_error']);
             $this->redirect($back);
         }
 
         Session::hit('payment_submit');
 
-        // ذخیرهٔ تصویر رسید (با پسوند تأیید شده از اعتبارسنجی)
-        $validation = validate_uploaded_file($file);
-        $ext = $validation['ext'];
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        // ext از validation بالا گرفته شده است (پسوند تأیید شده)
-        $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-        if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
-            Session::set('payment_error', 'خطا در ذخیرهٔ فایل رسید.');
-            $this->redirect($back);
-        }
-        @chmod($uploadDir . '/' . $uniqueName, 0640);
-
-        $docId = $this->documentModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'doc_type' => 'payment_receipt',
-            'file_name' => $uniqueName,
-            'original_name' => sanitize_upload_filename((string)$file['name']),
-            'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
-        ]);
-
-        // به‌روزرسانی رکورد پرداخت موجود (که مدیر با وضعیت 'در انتظار رسید' ایجاد کرده)
-        // یا ایجاد رکورد جدید اگر وجود ندارد
+        // ثبت رسید با سرویس متمرکز
+        // اگر رکورد payments موجود است (با وضعیت 'در انتظار رسید')، آن را به‌روزرسانی کن
+        $existingPaymentId = null;
         $existingPayment = $this->paymentModel->findLatestByApplicant((int)$applicant['id'], 'هزینهٔ ثبت‌نام');
         if ($existingPayment && in_array($existingPayment['status'], ['در انتظار رسید', 'در انتظار بررسی'], true)) {
-            // به‌روزرسانی رکورد موجود با اطلاعات رسید
-            $db = Database::getInstance()->getConnection();
-            $stmt = $db->prepare(
-                "UPDATE payments
-                 SET payment_channel_id = :chid,
-                     amount = :amt,
-                     reference_code = :ref,
-                     paid_at = :paid,
-                     receipt_document_id = :docid,
-                     status = 'در انتظار بررسی'
-                 WHERE id = :pid"
-            );
-            $stmt->execute([
-                'chid' => $channelId,
-                'amt' => $amount,
-                'ref' => trim((string)($data['reference_code'] ?? '')) ?: null,
-                'paid' => $paidAt,
-                'docid' => $docId,
-                'pid' => (int)$existingPayment['id'],
-            ]);
-        } else {
-            // ایجاد رکورد جدید (در حالت نادر که رکوردی موجود نیست)
-            $this->paymentModel->create([
-                'applicant_id' => (int)$applicant['id'],
-                'payment_channel_id' => $channelId,
-                'purpose' => 'هزینهٔ ثبت‌نام',
-                'amount' => $amount,
-                'reference_code' => trim((string)($data['reference_code'] ?? '')) ?: null,
-                'paid_at' => $paidAt,
-                'receipt_document_id' => $docId,
-            ]);
+            $existingPaymentId = (int)$existingPayment['id'];
         }
 
-        $this->statusLogModel->create([
-            'applicant_id' => (int)$applicant['id'],
-            'status_name' => 'ثبت رسید پرداخت',
-            'description' => ($channel['title'] ?? '') . ' — مبلغ ' . number_format($amount) . ' تومان'
-                . ' — در انتظار بررسی مدیر',
-        ]);
+        $result = $paymentService->submitReceipt(
+            (int)$applicant['id'],
+            $file,
+            $validated,
+            [
+                'purpose' => 'هزینهٔ ثبت‌نام',
+                'existing_payment_id' => $existingPaymentId,
+            ]
+        );
+
+        if (!$result['success']) {
+            Session::set('payment_error', $result['error']);
+            $this->redirect($back);
+        }
 
         Session::set('payment_success', 'رسید پرداخت ثبت شد و پس از بررسی مدیر، نتیجه در پنل کاربری نمایش داده می‌شود.');
 
