@@ -546,10 +546,13 @@ class AdminController extends Controller
         $applicantId = (int)$this->input('applicant_id', 0);
         $applicant = $this->applicantModel->findById($applicantId);
         if (!$applicant) {
+            error_log('[updateApplication] applicant not found, id=' . $applicantId);
+            Session::set('errors', ['system' => ['متقاضی با شناسه ' . $applicantId . ' یافت نشد.']]);
             $this->redirect('/admin/dashboard');
         }
 
         $data = $this->allInputs();
+        error_log('[updateApplication] starting update for applicant #' . $applicantId . ', data keys: ' . implode(',', array_keys($data)));
 
         // تاریخ تولد: تبدیل و اعتبارسنجی
         if (!empty($data['birth_year']) && !empty($data['birth_month']) && !empty($data['birth_day'])) {
@@ -687,6 +690,7 @@ class AdminController extends Controller
         }
 
         if ($validator->hasErrors()) {
+            error_log('[updateApplication] validation failed: ' . json_encode($validator->getErrors(), JSON_UNESCAPED_UNICODE));
             Session::set('errors', $validator->getErrors());
             Session::set('formData', $data);
             $this->redirect('/admin/edit/' . $applicantId);
@@ -696,6 +700,7 @@ class AdminController extends Controller
         $db = Database::getInstance()->getConnection();
         $db->beginTransaction();
         try {
+            error_log('[updateApplication] starting transaction for #' . $applicantId);
             // ۱. به‌روزرسانی applicants
             $this->applicantModel->update($applicantId, [
                 'first_name' => $data['first_name'],
@@ -755,13 +760,7 @@ class AdminController extends Controller
             // ۵. همگام‌سازی رکورد person
             (new Person())->syncFromApplicant($applicantId);
 
-            // ۶. ذخیرهٔ مدارک جدید (در صورت آپلود)
-            $uploadErrors = $this->saveUploadedDocuments($applicantId);
-            if (!empty($uploadErrors)) {
-                Session::set('errors', ['document' => implode(' ', $uploadErrors)]);
-            }
-
-            // ۷. لاگ ممیزی
+            // ۶. لاگ ممیزی
             $this->statusLogModel->create([
                 'applicant_id' => $applicantId,
                 'status_name' => 'ویرایش اطلاعات توسط مدیر',
@@ -769,10 +768,23 @@ class AdminController extends Controller
             ]);
 
             $db->commit();
+            error_log('[updateApplication] commit successful for #' . $applicantId . ', redirecting to view');
+
+            // ۷. ذخیرهٔ مدارک جدید (در صورت آپلود) — بعد از commit
+            // این بخش بعد از commit است تا خطای آپلود، ذخیره‌سازی داده‌ها را لغو نکند
+            $uploadErrors = $this->saveUploadedDocuments($applicantId);
+            if (!empty($uploadErrors)) {
+                error_log('[updateApplication] upload errors: ' . implode(' | ', $uploadErrors));
+                Session::set('errors', ['document' => implode(' ', $uploadErrors)]);
+            } else {
+                error_log('[updateApplication] no upload errors, uploaded files: ' . count(array_filter($_FILES, fn($f) => $f['error'] === UPLOAD_ERR_OK)));
+            }
+
             Session::remove('formData');
             $this->redirect('/admin/view/' . $applicantId);
         } catch (\Throwable $e) {
             $db->rollBack();
+            error_log('[updateApplication] EXCEPTION: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
             Session::set('errors', ['system' => ['خطا در ذخیره‌سازی: ' . $e->getMessage()]]);
             Session::set('formData', $data);
             $this->redirect('/admin/edit/' . $applicantId);
