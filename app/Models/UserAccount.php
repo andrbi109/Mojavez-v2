@@ -166,6 +166,8 @@ class UserAccount
 
     /**
      * دریافت تمام پرداخت‌های یک کاربر.
+     * نکته: از طریق applicants.user_account_id فیلتر می‌کند، نه payments.user_account_id.
+     * این کار پرداخت‌های قدیمی (که user_account_id در payments ست نشده) را هم پوشش می‌دهد.
      */
     public function getPayments(int $accountId): array
     {
@@ -174,7 +176,7 @@ class UserAccount
              FROM payments p
              JOIN applicants a ON a.id = p.applicant_id
              LEFT JOIN payment_channels c ON c.id = p.payment_channel_id
-             WHERE p.user_account_id = :uid
+             WHERE a.user_account_id = :uid
              ORDER BY p.id DESC"
         );
         $stmt->execute(['uid' => $accountId]);

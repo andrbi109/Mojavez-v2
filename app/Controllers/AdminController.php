@@ -341,6 +341,20 @@ class AdminController extends Controller
                 . ' (از: ' . $currentStatus . ')'
         ]);
 
+        // ارسال اعلان به کاربر دربارهٔ تغییر وضعیت پرونده
+        if (!empty($applicant['user_account_id'])) {
+            try {
+                (new UserNotification())->create(
+                    (int)$applicant['user_account_id'],
+                    'status_change',
+                    'وضعیت پرونده به‌روزرسانی شد',
+                    'وضعیت پروندهٔ شما از «' . $currentStatus . '» به «' . $newStatus
+                    . '» تغییر یافت. — کد رهگیری: ' . ($applicant['tracking_code'] ?? ''),
+                    $applicantId
+                );
+            } catch (\Throwable $e) {}
+        }
+
         $this->redirect('/admin/view/' . $applicantId);
     }
 
@@ -1078,16 +1092,17 @@ class AdminController extends Controller
                 // وضعیت 'در انتظار رسید' یعنی مدیر درخواست داده، ولی متقاضی هنوز رسید آپلود نکرده
                 $stmt = $db->prepare(
                     "INSERT INTO payments
-                        (applicant_id, payment_channel_id, purpose, amount, original_amount,
+                        (applicant_id, user_account_id, payment_channel_id, purpose, amount, original_amount,
                          final_amount, fee_group_id, is_rural_exempt, fallback_used,
                          suspicion_flags, status, created_at)
                      VALUES
-                        (:aid, NULL, 'هزینهٔ ثبت‌نام', :amount, :orig,
+                        (:aid, :uid, NULL, 'هزینهٔ ثبت‌نام', :amount, :orig,
                          :final, :gid, :rural, :fallback,
                          :flags, 'در انتظار رسید', NOW())"
                 );
                 $stmt->execute([
                     'aid' => $applicantId,
+                    'uid' => $applicant['user_account_id'] ?? null,
                     'amount' => $amount,
                     'orig' => $amount,
                     'final' => $amount,
