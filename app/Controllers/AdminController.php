@@ -1051,15 +1051,22 @@ class AdminController extends Controller
 
         $db = Database::getInstance()->getConnection();
 
-        // محاسبهٔ گروه قیمتی و مبلغ (فقط هنگام فعال‌سازی)
+        // محاسبهٔ گروه قیمتی (فقط هنگام فعال‌سازی)
         $feeInfo = null;
         if ($enable) {
             $feeInfo = FeeCalculatorService::calculateForApplicant($applicantId);
-            $amount = $feeInfo['amount'];
             $groupId = $feeInfo['group']['id'] ?? null;
             $isRural = $feeInfo['is_rural'] ? 1 : 0;
             $fallback = $feeInfo['fallback_used'] ? 1 : 0;
             $flags = !empty($feeInfo['suspicion_flags']) ? implode(',', $feeInfo['suspicion_flags']) : null;
+
+            // مبلغ: اولویت با مبلغ دلخواه مدیر؛ در صورت عدم ارائه، مبلغ محاسبه‌شده سامانه
+            $customAmount = (int)$this->input('custom_amount', 0);
+            if ($customAmount >= 1000 && $customAmount <= 100000000) {
+                $amount = $customAmount;
+            } else {
+                $amount = $feeInfo['amount'];
+            }
         } else {
             $amount = 0;
             $groupId = null;

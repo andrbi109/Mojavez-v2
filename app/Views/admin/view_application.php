@@ -383,16 +383,42 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                 <?php endif; ?>
 
                 <?php if ($showRequestButton): ?>
-                    <!-- دکمه درخواست پرداخت -->
-                    <form method="post" action="<?= $base ?>admin/request-payment">
-                        <?= Session::csrfField() ?>
-                        <input type="hidden" name="applicant_id" value="<?= (int)$applicant['id'] ?>">
-                        <input type="hidden" name="enable" value="1">
-                        <button type="submit" class="btn btn-sm <?= $hasApprovedPayment ? 'btn-outline-primary' : 'btn-gold' ?>"
-                                onclick="return confirm('پرداخت هزینهٔ ثبت‌نام (<?= $requestConfirmAmount ?> تومان) برای متقاضی فعال شود؟');">
-                            <?= icon('money', '', 14) ?> <?= $requestLabel ?>
-                        </button>
-                    </form>
+                    <!-- دکمه باز کردن مودال درخواست پرداخت -->
+                    <button type="button" class="btn btn-sm <?= $hasApprovedPayment ? 'btn-outline-primary' : 'btn-gold' ?>"
+                            data-bs-toggle="modal" data-bs-target="#requestPaymentModal">
+                        <?= icon('money', '', 14) ?> <?= $requestLabel ?>
+                    </button>
+
+                    <!-- مودال درخواست پرداخت با مبلغ دلخواه -->
+                    <div class="modal fade" id="requestPaymentModal" tabindex="-1" aria-labelledby="requestPaymentModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <form method="post" action="<?= $base ?>admin/request-payment">
+                                    <?= Session::csrfField() ?>
+                                    <input type="hidden" name="applicant_id" value="<?= (int)$applicant['id'] ?>">
+                                    <input type="hidden" name="enable" value="1">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="requestPaymentModalLabel"><?= icon('money','me-2',18) ?> درخواست پرداخت</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="text-muted small">مبلغ پیشنهادی سامانه: <strong><?= number_format((int)$feeAmount) ?></strong> تومان</p>
+                                        <label class="form-label fw-bold">مبلغ مورد نظر (تومان) <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-lg" name="custom_amount"
+                                               value="<?= (int)$feeAmount ?>" min="1000" max="100000000" step="1000" required
+                                               dir="ltr" style="text-align:right; font-size:1.2rem">
+                                        <small class="text-muted">مبلغ به تومان وارد شود. حداقل: ۱٬۰۰۰ — حداکثر: ۱۰۰٬۰۰۰٬۰۰۰</small>
+                                        <hr>
+                                        <p class="small text-muted mb-0">پس از ارسال، به کاربر اعلان می‌رود و در «پرداخت‌های من» فرم رسید نمایش داده می‌شود.</p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">انصراف</button>
+                                        <button type="submit" class="btn btn-gold"><?= icon('check','',16) ?> ارسال درخواست پرداخت</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 <?php endif; ?>
             </div>
 
