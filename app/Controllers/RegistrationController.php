@@ -262,12 +262,14 @@ class RegistrationController extends Controller
                 break;
             case 'step4':
                 $step3Data = Session::getStep('step3', []);
+                $serviceId = $this->selectedServiceId();
                 $this->render('registration/step4', $common + [
                     'title' => 'مرحلهٔ ' . $this->faNum($position) . ' — بارگذاری مدارک',
                     'currentStep' => $position,
                     'ownershipStatus' => $step3Data['ownership_status'] ?? '',
                     'dynFields' => $this->customFieldsForStepId($stepId),
                     'sysActive' => $this->fieldModel->systemActiveMap(),
+                    'skipDocuments' => ($serviceId === 2),
                 ]);
                 break;
             default:
@@ -614,24 +616,31 @@ class RegistrationController extends Controller
             $this->redirect('/register');
         }
 
+        $serviceId = $this->selectedServiceId();
         $ownershipStatus = $step3['ownership_status'];
         $errors = [];
         $sysActive = $this->fieldModel->systemActiveMap();
 
+        // خدمت مشاغل خانگی مستقل (id=2): نیازی به مدارک نیست
+        // فقط عکس پرسنلی که قبلاً به‌عنوان آواتار دریافت شده است
+        $skipDocuments = ($serviceId === 2);
+
         /* ---------- مدارک سیستمی ---------- */
-        $nationalCardFront = $_FILES['national_card_front'] ?? null;
-        $nationalCardBack = $_FILES['national_card_back'] ?? null;
-        if ((!$nationalCardFront || $nationalCardFront['error'] !== UPLOAD_ERR_OK) &&
-            (!$nationalCardBack || $nationalCardBack['error'] !== UPLOAD_ERR_OK)) {
-            $errors['national_card'][] = 'تصویر کارت ملی (پشت یا رو) الزامی است.';
-        }
-        $birthCert = $_FILES['birth_cert'] ?? null;
-        if (!$birthCert || $birthCert['error'] !== UPLOAD_ERR_OK) {
-            $errors['birth_cert'][] = 'تصویر شناسنامه الزامی است.';
-        }
-        $ownershipDoc = $_FILES['ownership_doc'] ?? null;
-        if (!$ownershipDoc || $ownershipDoc['error'] !== UPLOAD_ERR_OK) {
-            $errors['ownership_doc'][] = 'بارگذاری مدرک مربوط به وضعیت مالکیت الزامی است.';
+        if (!$skipDocuments) {
+            $nationalCardFront = $_FILES['national_card_front'] ?? null;
+            $nationalCardBack = $_FILES['national_card_back'] ?? null;
+            if ((!$nationalCardFront || $nationalCardFront['error'] !== UPLOAD_ERR_OK) &&
+                (!$nationalCardBack || $nationalCardBack['error'] !== UPLOAD_ERR_OK)) {
+                $errors['national_card'][] = 'تصویر کارت ملی (پشت یا رو) الزامی است.';
+            }
+            $birthCert = $_FILES['birth_cert'] ?? null;
+            if (!$birthCert || $birthCert['error'] !== UPLOAD_ERR_OK) {
+                $errors['birth_cert'][] = 'تصویر شناسنامه الزامی است.';
+            }
+            $ownershipDoc = $_FILES['ownership_doc'] ?? null;
+            if (!$ownershipDoc || $ownershipDoc['error'] !== UPLOAD_ERR_OK) {
+                $errors['ownership_doc'][] = 'بارگذاری مدرک مربوط به وضعیت مالکیت الزامی است.';
+            }
         }
 
         $vocationalCert = ($sysActive['vocational_cert'] ?? true) ? ($_FILES['vocational_cert'] ?? null) : null;
@@ -799,7 +808,12 @@ class RegistrationController extends Controller
                 if ($f['field_type'] === 'file') continue;
                 $key = 'dyn_' . (int)$f['id'];
                 if (array_key_exists($key, $stData)) {
-                    $dynValues[(int)$f['id']] = (string)$stData[$key];
+                    $val = $stData[$key];
+                    // اگر checkbox چندانتخابی است (آرایه)، با \n بچسبان
+                    if (is_array($val)) {
+                        $val = implode("\n", $val);
+                    }
+                    $dynValues[(int)$f['id']] = (string)$val;
                 }
             }
         }
@@ -823,9 +837,26 @@ class RegistrationController extends Controller
     {
         foreach ($fields as $f) {
             $name = 'dyn_' . (int)$f['id'];
-            $value = trim((string)($data[$name] ?? ''));
             $rules = FormField::parseRules($f['validation_json']);
             $label = $f['label'];
+
+            // پشتیبانی از checkbox چندانتخابی (آرایه)
+            if ($f['field_type'] === 'checkbox' && isset($data[$name]) && is_array($data[$name])) {
+                $selectedValues = $data[$name];
+                $validOptions = FormField::parseOptions($f['options']);
+                foreach ($selectedValues as $sel) {
+                    if (!in_array($sel, $validOptions, true)) {
+                        $validator->addError($name, $label . ' مقدار معتبری نیست.');
+                        break;
+                    }
+                }
+                if ((int)$f['is_required'] === 1 && empty($selectedValues)) {
+                    $validator->addError($name, $label . ' الزامی است.');
+                }
+                continue;
+            }
+
+            $value = trim((string)($data[$name] ?? ''));
 
             if ((int)$f['is_required'] === 1 && $value === '') {
                 $validator->addError($name, $label . ' الزامی است.');

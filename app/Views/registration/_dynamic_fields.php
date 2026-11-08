@@ -68,13 +68,33 @@ $typeLabels = FormField::TYPES;
                 </div>
 
             <?php elseif ($f['field_type'] === 'checkbox'): ?>
-                <div class="form-check pt-2">
-                    <input class="form-check-input" type="checkbox" name="<?= $name ?>" value="بله"
-                           id="<?= $name ?>" <?= $value ? 'checked' : '' ?>>
-                    <label class="form-check-label" for="<?= $name ?>">
-                        <?= htmlspecialchars($f['placeholder'] ?: $f['label']) ?>
-                    </label>
+                <?php
+                $checkboxOptions = FormField::parseOptions($f['options']);
+                if (!empty($checkboxOptions)):
+                    // چندانتخابی: هر گزینه یک checkbox جداگانه با name[] (آرایه)
+                    $selectedValues = array_filter(array_map('trim', explode("\n", $value)));
+                ?>
+                <div class="d-flex flex-wrap gap-2 pt-1">
+                    <?php foreach ($checkboxOptions as $ci => $opt): ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   name="<?= $name ?>[]" value="<?= htmlspecialchars($opt) ?>"
+                                   id="<?= $name . '_' . $ci ?>"
+                                   <?= in_array($opt, $selectedValues, true) ? 'checked' : '' ?>>
+                            <label class="form-check-label" for="<?= $name . '_' . $ci ?>"><?= htmlspecialchars($opt) ?></label>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
+                <?php else: ?>
+                    <!-- تک‌کلیدی (بله/خیر) -->
+                    <div class="form-check pt-2">
+                        <input class="form-check-input" type="checkbox" name="<?= $name ?>" value="بله"
+                               id="<?= $name ?>" <?= $value ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="<?= $name ?>">
+                            <?= htmlspecialchars($f['placeholder'] ?: $f['label']) ?>
+                        </label>
+                    </div>
+                <?php endif; ?>
 
             <?php elseif ($f['field_type'] === 'number'): ?>
                 <input type="number" class="form-control <?= $invalid ?>" id="<?= $name ?>" name="<?= $name ?>"

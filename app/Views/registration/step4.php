@@ -4,16 +4,47 @@
  * -----------------------------------------------
  * مدارک اجباری + مدارک مشروط (قابل حذف توسط مدیر از فرم‌ساز)
  * + فیلدهای سفارشی پویا (شامل فیلد فایلی سفارشی)
+ *
+ * نکته: برای مشاغل خانگی مستقل (skipDocuments=true)، مرحلهٔ مدارک
+ * به‌جای فرم آپلود، فقط پیام تأیید و دکمهٔ نهایی‌سازی نمایش می‌دهد.
  */
 $sysActive = $sysActive ?? [];
 $on = fn(string $key): bool => $sysActive[$key] ?? true;
+$skipDocuments = $skipDocuments ?? false;
 ?>
+<?php $currentStep = 4; require VIEW_PATH . '/registration/_progress.php'; ?>
+
+<?php if ($skipDocuments): ?>
+<!-- مشاغل خانگی مستقل: بدون مدارک — فقط تأیید و نهایی‌سازی -->
+<div class="mb-4">
+    <h2 class="fw-bold">تأیید و ثبت نهایی</h2>
+</div>
+
+<div class="card p-4">
+    <div class="alert alert-info d-flex align-items-center gap-2 py-3 mb-3" style="border-radius:12px">
+        <span style="font-size:1.4rem">✨</span>
+        <div>
+            <strong>برای مشاغل خانگی مستقل نیازی به بارگذاری مدارک نیست.</strong><br>
+            عکس پرسنلی شما قبلاً در پروفایل کاربری دریافت شده است.
+            لطفاً اطلاعات واردشده را بررسی کرده و دکمهٔ «تأیید و نهایی‌سازی» را بزنید.
+        </div>
+    </div>
+
+    <form method="post" action="<?= BASE_URL ?>register/step/<?= (int)($stepPosition ?? 4) ?>">
+        <?= Session::csrfField() ?>
+        <div class="d-flex justify-content-between mt-4">
+            <?php $pp = max(1, (int)($stepPosition ?? 4) - 1); ?><a href="<?= BASE_URL ?>register/step/<?= $pp ?>" class="btn btn-outline-secondary">→ مرحلهٔ قبل</a>
+            <button type="submit" class="btn btn-gold px-4">✔ تأیید و نهایی‌سازی</button>
+        </div>
+    </form>
+</div>
+
+<?php else: ?>
+<!-- حالت عادی: فرم بارگذاری مدارک -->
 <div class="mb-4">
     <h2 class="fw-bold">بارگذاری مدارک</h2>
     <p class="text-muted small mb-0">فقط jpg، jpeg، png و pdf — حداکثر ۲ مگابایت برای هر فایل</p>
 </div>
-
-<?php $currentStep = 4; require VIEW_PATH . '/registration/_progress.php'; ?>
 
 <div class="card p-4">
     <?php if (!empty($errors['files'])): ?>
@@ -177,3 +208,5 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[id^="file_"]').forEach(el => el.dataset.default = el.textContent.trim());
 });
 </script>
+
+<?php endif; ?>
