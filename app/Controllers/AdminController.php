@@ -543,11 +543,32 @@ class AdminController extends Controller
         }
         $this->verifyCsrf();
 
+        // بررسی post_max_size — اگر $_POST خالی است ولی CONTENT_LENGTH بزرگ بود،
+        // یعنی درخواست از حد مجاز عبور کرده و PHP آن را حذف کرده است.
+        if (empty($_POST)) {
+            $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+            error_log('[updateApplication] $_POST is empty! CONTENT_LENGTH=' . $contentLength);
+            $postMax = ini_get('post_max_size');
+            $uploadMax = ini_get('upload_max_filesize');
+            Session::set('errors', ['system' => [
+                'حجم کل داده‌های ارسالی (' . number_format($contentLength / 1024 / 1024, 2) . ' MB) '
+                . 'از حد مجاز سرور تجاوز کرده است. '
+                . 'post_max_size=' . $postMax . '، upload_max_filesize=' . $uploadMax . '. '
+                . 'لطفاً فایل‌های کوچک‌تر آپلود کنید یا مقادیر را در php.ini افزایش دهید.'
+            ]]);
+            // بازگشت به صفحه ویرایش اگر applicant_id از GET قابل استخراج است
+            $backId = (int)($_GET['id'] ?? 0);
+            if ($backId > 0) {
+                $this->redirect('/admin/edit/' . $backId);
+            }
+            $this->redirect('/admin/dashboard');
+        }
+
         $applicantId = (int)$this->input('applicant_id', 0);
         $applicant = $this->applicantModel->findById($applicantId);
         if (!$applicant) {
-            error_log('[updateApplication] applicant not found, id=' . $applicantId);
-            Session::set('errors', ['system' => ['متقاضی با شناسه ' . $applicantId . ' یافت نشد.']]);
+            error_log('[updateApplication] applicant not found, id=' . $applicantId . ', _POST keys: ' . implode(',', array_keys($_POST)));
+            Session::set('errors', ['system' => ['متقاضی با شناسه ' . $applicantId . ' یافت نشد. ممکن است applicant_id در فرم ارسال نشده باشد.']]);
             $this->redirect('/admin/dashboard');
         }
 
