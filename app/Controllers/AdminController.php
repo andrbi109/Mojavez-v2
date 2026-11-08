@@ -667,13 +667,20 @@ class AdminController extends Controller
         $documents = $this->documentModel->findByApplicantId($id);
 
         // فیلدهای پویا (custom fields) — برای هر ۴ مرحله
+        // توجه: فقط فیلدهای سفارشی (is_system=0) نمایش داده می‌شوند.
+        // فیلدهای سیستمی (is_system=1) قبلاً به‌صورت hardcode در فرم رندر شده‌اند.
         $formFieldModel = new FormField();
         $appFieldValueModel = new ApplicantFieldValue();
         $wizardSteps = (new WizardStep())->orderedActive((int)$applicant['service_type_id']);
-        $dynFieldsByStep = []; // step_position => [field rows]
+        $dynFieldsByStep = []; // step_position => [custom field rows only]
         foreach ($wizardSteps as $pos => $wstep) {
             $stepId = (int)$wstep['id'];
-            $dynFieldsByStep[$pos + 1] = $formFieldModel->activeByStepId($stepId, (int)$applicant['service_type_id']);
+            $allFields = $formFieldModel->activeByStepId($stepId, (int)$applicant['service_type_id']);
+            // فقط فیلدهای سفارشی — فیلدهای سیستمی در فرم hardcode شده‌اند
+            $dynFieldsByStep[$pos + 1] = array_values(array_filter(
+                $allFields,
+                fn($f) => (int)$f['is_system'] === 0
+            ));
         }
 
         // مقادیر ذخیره‌شدهٔ فیلدهای پویا — نگاشت field_id → value

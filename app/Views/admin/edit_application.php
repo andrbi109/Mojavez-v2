@@ -328,10 +328,14 @@ $productPhotos = array_filter($documents, fn($d) => $d['doc_type'] === 'product_
         <fieldset class="border rounded p-3 mb-4">
             <legend class="float-none w-auto px-2 h5">سؤالات تکمیلی — <?= $e($stepTitle) ?></legend>
             <?php
+            // تنظیم متغیرهای مورد انتظار partial _dynamic_fields.php
             $dynStep = $stepPos;
+            $dynFields = $dynFieldsForStep;       // ← انتساب ضروری (بدون این خط، partial برمی‌گردد)
             $dynErrorsBackup = $dynErrors ?? [];
             $dynErrors = $dynErrorsFiltered;
             include VIEW_PATH . '/registration/_dynamic_fields.php';
+            // پاک‌سازی متغیر برای جلوگیری از نشت به تکرار بعدی
+            unset($dynFields);
             $dynErrors = $dynErrorsBackup;
             ?>
         </fieldset>
