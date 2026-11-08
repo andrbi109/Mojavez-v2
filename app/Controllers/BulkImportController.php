@@ -620,79 +620,52 @@ class BulkImportController extends Controller
 
         $applicantId = (int)$applicant['id'];
         $trackingCode = $applicant['tracking_code'];
-        $documentModel = new Document();
 
-        // انواع مدارک قابل آپلود
-        $docTypes = [
-            'national_card_front' => 'تصویر کارت ملی (رو)',
-            'national_card_back' => 'تصویر کارت ملی (پشت)',
-            'birth_cert' => 'تصویر شناسنامه',
-            'ownership_doc' => 'مدرک مالکیت/اجاره',
-            'vocational_cert' => 'گواهینامه فنی‌وحرفه‌ای',
-            'education_degree' => 'مدرک تحصیلی',
-            'product_photos' => 'تصاویر محصولات',
-            'optional_1' => 'مدارک اختیاری ۱',
-            'optional_2' => 'مدارک اختیاری ۲',
-            'optional_3' => 'مدارک اختیاری ۳',
-        ];
-
+        // استفاده از سرویس متمرکز برای ذخیرهٔ مدارک (یک الگوی واحد — رفع D-F-2)
+        $registrationService = new ApplicantRegistrationService();
         $uploaded = 0;
-        foreach ($docTypes as $docType => $label) {
-            $file = $_FILES['doc_' . $docType] ?? null;
-            if (!$file || $file['error'] !== UPLOAD_ERR_OK) continue;
+        $errors = [];
 
-            $validation = validate_uploaded_file($file);
-            if (!$validation['valid']) continue;
-
-            $ext = $validation['ext'];
-            $index = ($docType === 'product_photos' || $docType === 'optional_1' || $docType === 'optional_2' || $docType === 'optional_3')
-                ? (count($_FILES) % 10) : 0;
-
-            $uploadInfo = get_upload_path($trackingCode, $docType, $ext, $index);
-
-            if (!move_uploaded_file($file['tmp_name'], $uploadInfo['path'])) continue;
-            @chmod($uploadInfo['path'], 0640);
-
-            $documentModel->create([
-                'applicant_id' => $applicantId,
-                'doc_type' => $docType,
-                'file_name' => $uploadInfo['filename'],
-                'original_name' => sanitize_upload_filename((string)$file['name']),
-                'file_path' => $uploadInfo['relative_path'],
-            ]);
-            $uploaded++;
-        }
-
-        // تصاویر محصولات (چندفایلی)
-        if (!empty($_FILES['product_photos'])) {
-            $ppFiles = $_FILES['product_photos'];
-            $ppCount = is_array($ppFiles['name']) ? count($ppFiles['name']) : 0;
-            for ($i = 0; $i < $ppCount; $i++) {
-                if ($ppFiles['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $tmpFile = [
-                    'name' => $ppFiles['name'][$i],
-                    'tmp_name' => $ppFiles['tmp_name'][$i],
-                    'size' => $ppFiles['size'][$i],
-                    'error' => $ppFiles['error'][$i],
-                ];
-                $validation = validate_uploaded_file($tmpFile);
-                if (!$validation['valid']) continue;
-                $ext = $validation['ext'];
-                $uploadInfo = get_upload_path($trackingCode, 'product_photos', $ext, $i + 1);
-                if (!move_uploaded_file($tmpFile['tmp_name'], $uploadInfo['path'])) continue;
-                @chmod($uploadInfo['path'], 0640);
-                $documentModel->create([
-                    'applicant_id' => $applicantId,
-                    'doc_type' => 'product_photos',
-                    'file_name' => $uploadInfo['filename'],
-                    'original_name' => sanitize_upload_filename((string)$tmpFile['name']),
-                    'file_path' => $uploadInfo['relative_path'],
-                ]);
+        // فایل‌های تکی (مطابق DocTypes::USER_UPLOAD)
+        foreach (DocTypes::allowedForUserUpload() as $docInputName) {
+            $fileInput = $_FILES['doc_' . $docInputName] ?? null;
+            if (!$fileInput || $fileInput['error'] !== UPLOAD_ERR_OK) continue;
+            // نگاشت نام ورودی → doc_type ذخیره‌شده در documents
+            $docType = ApplicantRegistrationService::FILE_INPUT_TO_DOC_TYPE[$docInputName] ?? $docInputName;
+            $result = $registrationService->saveUploadedFile($fileInput, $applicantId, $docType);
+            if ($result['success']) {
                 $uploaded++;
+            } elseif ($result['error']) {
+                $errors[] = $result['error'];
             }
         }
 
-        Session::set('bulk_success', $uploaded . ' مدرک بارگذاری شد.');
+        // تصاویر محصولات (چندفایلی)
+        if (!empty($_FILES['product_photos']) && is_array($_FILES['product_photos']['name'] ?? null)) {
+            $ppFiles = $_FILES['product_photos'];
+            $ppCount = is_array($ppFiles['name']) ? count($ppFiles['name']) : 0;
+            for ($i = 0; $i < $ppCount; $i++) {
+                if (($ppFiles['error'][$i] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+                $tmpFile = [
+                    'name'     => $ppFiles['name'][$i] ?? '',
+                    'tmp_name' => $ppFiles['tmp_name'][$i] ?? '',
+                    'size'     => $ppFiles['size'][$i] ?? 0,
+                    'error'    => $ppFiles['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                ];
+                $result = $registrationService->saveUploadedFile($tmpFile, $applicantId, 'product_photos');
+                if ($result['success']) {
+                    $uploaded++;
+                } elseif ($result['error']) {
+                    $errors[] = $result['error'];
+                }
+            }
+        }
+
+        $msg = $uploaded . ' مدرک بارگذاری شد.';
+        if (!empty($errors)) {
+            $msg .= ' خطاها: ' . implode(' | ', $errors);
+        }
+        Session::set('bulk_success', $msg);
         $this->redirect('/admin/bulk-import/documents/' . $code);
     }
 }
