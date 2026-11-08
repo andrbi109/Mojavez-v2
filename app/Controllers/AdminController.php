@@ -167,7 +167,10 @@ class AdminController extends Controller
         )->fetchAll();
 
         // مجوزهای منقضی‌شده یا در حال انقضا (برای تماس با متقاضی)
-        // مجوزهایی که license_state = 'صادر شده' و license_valid_until در ۳۰ روز آینده یا گذشته است
+        // شامل: license_state='صادر شده' یا current_status در ('صدور مجوز','تحویل مجوز')
+        // و license_valid_until در ۳۰ روز آینده یا گذشته
+        // نکته: شرط current_status برای متقاضیان قدیمی اضافه شده که license_state
+        // هنوز روی پیش‌فرض 'جاری' است (قبل از v2 ثبت شده‌اند).
         $stmt = $db->prepare(
             "SELECT a.id, a.tracking_code, a.first_name, a.last_name, a.national_code,
                     a.mobile, a.license_valid_until,
@@ -177,7 +180,8 @@ class AdminController extends Controller
              FROM applicants a
              LEFT JOIN service_types st ON st.id = a.service_type_id
              LEFT JOIN job_details j ON j.applicant_id = a.id
-             WHERE a.license_state = 'صادر شده'
+             WHERE (a.license_state = 'صادر شده'
+                   OR a.current_status IN ('صدور مجوز', 'تحویل مجوز'))
                AND a.license_valid_until IS NOT NULL
                AND a.license_valid_until <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
              ORDER BY a.license_valid_until ASC
