@@ -306,7 +306,7 @@ class AdminController extends Controller
         $this->verifyCsrf();
 
         $applicantId = (int)$this->input('applicant_id', 0);
-        $newStatus = $this->input('new_status', '');
+        $newStatus = (string)$this->input('new_status', '');
 
         $applicant = $this->applicantModel->findById($applicantId);
         if (!$applicant) {
@@ -316,43 +316,17 @@ class AdminController extends Controller
         $currentStatus = $applicant['current_status'];
         $role = Session::get('admin_role', 'admin');
 
-        // بارگذاری workflow
-        $workflow = require CONFIG_PATH . '/workflow.php';
-        $transitions = $workflow['transitions'];
-
-        // admin مجاز به همه تغییرات
-        $allowed = ($role === 'admin');
-        if (!$allowed && isset($transitions[$role])) {
-            $rule = $transitions[$role];
-            if (in_array($currentStatus, $rule['from']) && in_array($newStatus, $rule['to'])) {
-                $allowed = true;
-            }
-        }
-
-        if (!$allowed) {
-            $this->redirect('/admin/view/' . $applicantId);
-        }
-
         // وضعیت‌های مجاز برای تغییر — از مرجع مرکزی
         $statusCfg = (require CONFIG_PATH . '/statuses.php')['statuses'];
-        $allowedStatuses = array_keys(array_filter($statusCfg, fn($m) => $m['manual']));
-
+        $allowedStatuses = array_keys(array_filter($statusCfg, fn($m) => !empty($m['manual'])));
         if (!in_array($newStatus, $allowedStatuses, true)) {
             $this->redirect('/admin/view/' . $applicantId);
         }
 
-        // جلوگیری از بازگشت به وضعیت قبلی (مسیر یکطرفه)
-        $currentStatus = $applicant['current_status'];
-        $currentOrder = $statusCfg[$currentStatus]['order'] ?? 0;
-        $newOrder = $statusCfg[$newStatus]['order'] ?? 0;
-
-        // وضعیت‌های پایانیِ منفی (لغو/رد) همیشه مجازند؛ بازگشت به عقب ممنوع
-        if (!in_array($newStatus, ['لغو', 'رد درخواست'], true) && $newOrder <= $currentOrder) {
-            $this->redirect('/admin/view/' . $applicantId);
-        }
-        // پرونده‌های بسته‌شده (صادر/تحویل/رد/لغو) دیگر تغییر نمی‌کنند
-        $terminal = (require CONFIG_PATH . '/statuses.php')['terminal'];
-        if (in_array($currentStatus, $terminal, true)) {
+        // اعتبارسنجی مرکزی: workflow.php + مسیر یکطرفه + terminal
+        $validation = $this->validateStatusTransition($currentStatus, $newStatus, $role);
+        if (!$validation['allowed']) {
+            // در صورت عدم مجوز، بدون تغییر وضعیت برمی‌گردیم
             $this->redirect('/admin/view/' . $applicantId);
         }
 

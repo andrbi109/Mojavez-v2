@@ -164,4 +164,64 @@ class Controller
     {
         return Session::get('admin_logged_in') && Session::get('admin_role') === 'admin';
     }
+
+    /**
+     * بررسی مجاز بودن انتقال وضعیت بر اساس نقش کاربر و قواعد workflow.php.
+     *
+     * این متد مرکزی برای جلوگیری از تکرار منطق در چند کنترلر (مثل AdminController::changeStatus
+     * و SmsController::reviewEntry). admin همیشه مجاز است؛ سایر نقش‌ها بر اساس
+     * transitions[$role]['from']/['to'] بررسی می‌شوند.
+     *
+     * @param string $currentStatus وضعیت فعلی پرونده
+     * @param string $newStatus     وضعیت مقصد
+     * @param string $role          نقش کاربر ('admin', 'expert', 'document_uploader', ...)
+     * @return bool                 true = انتقال مجاز
+     */
+    protected function isStatusTransitionAllowed(string $currentStatus, string $newStatus, string $role): bool
+    {
+        // admin مجاز به همهٔ انتقال‌ها
+        if ($role === 'admin') return true;
+
+        $workflow = require CONFIG_PATH . '/workflow.php';
+        $transitions = $workflow['transitions'] ?? [];
+        $rule = $transitions[$role] ?? null;
+        if (!$rule) return false;
+
+        $fromOk = in_array($currentStatus, $rule['from'] ?? [], true);
+        $toOk   = in_array($newStatus, $rule['to'] ?? [], true);
+        return $fromOk && $toOk;
+    }
+
+    /**
+     * اعتبارسنجی کامل انتقال وضعیت شامل: workflow + مسیر یکطرفه + terminal.
+     *
+     * @param string $currentStatus
+     * @param string $newStatus
+     * @param string $role
+     * @return array{allowed: bool, reason: string}
+     */
+    protected function validateStatusTransition(string $currentStatus, string $newStatus, string $role): array
+    {
+        $statusCfg = (require CONFIG_PATH . '/statuses.php')['statuses'];
+        $terminal  = (require CONFIG_PATH . '/statuses.php')['terminal'];
+
+        // پرونده‌های بسته‌شده (terminal) قابل تغییر نیستند
+        if (in_array($currentStatus, $terminal, true)) {
+            return ['allowed' => false, 'reason' => 'پرونده در وضعیت پایانی است و قابل تغییر نیست.'];
+        }
+
+        // بررسی قواعد workflow.php بر اساس نقش
+        if (!$this->isStatusTransitionAllowed($currentStatus, $newStatus, $role)) {
+            return ['allowed' => false, 'reason' => "نقش «{$role}» مجاز به این انتقال نیست ({$currentStatus} → {$newStatus})."];
+        }
+
+        // مسیر یکطرفه (به‌جز لغو/رد که همیشه مجازند)
+        $currentOrder = $statusCfg[$currentStatus]['order'] ?? 0;
+        $newOrder     = $statusCfg[$newStatus]['order'] ?? 0;
+        if (!in_array($newStatus, ['لغو', 'رد درخواست'], true) && $newOrder <= $currentOrder) {
+            return ['allowed' => false, 'reason' => 'مسیر یکطرفه — بازگشت به عقب مجاز نیست.'];
+        }
+
+        return ['allowed' => true, 'reason' => ''];
+    }
 }
