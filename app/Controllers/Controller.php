@@ -234,7 +234,13 @@ class Controller
         $terminal  = (require CONFIG_PATH . '/statuses.php')['terminal'];
 
         // پرونده‌های بسته‌شده (terminal) قابل تغییر نیستند
-        if (in_array($currentStatus, $terminal, true)) {
+        // اما لغو/رد همیشه مجازند حتی از terminal
+        if (in_array($currentStatus, $terminal, true) && !in_array($newStatus, ['لغو', 'رد درخواست'], true)) {
+            // استثنا: برای مشاغل خانگی مستقل، «صدور مجوز» terminal نیست
+            // چون مراحل بعدی (دریافت تصویر، تأیید اولیه، تأیید نهایی) وجود دارد.
+            // اما چون validateStatusTransition نوع خدمت را نمی‌داند، این بررسی
+            // در AdminController::changeStatus انجام شده و جلوی terminal را می‌گیرد.
+            // اینجا فقط اگر currentStatus terminal باشد و newStatus لغو/رد نباشد، رد می‌کنیم.
             return ['allowed' => false, 'reason' => 'پرونده در وضعیت پایانی است و قابل تغییر نیست.'];
         }
 
