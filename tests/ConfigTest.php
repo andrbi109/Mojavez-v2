@@ -55,6 +55,42 @@ class ConfigTest extends TestCase
         $this->assertContains('service_type_id', $content, "schema باید service_type_id داشته باشد");
     }
 
+    public function testInstallSqlExists(): void
+    {
+        $this->assertTrue(file_exists(ROOT_PATH . '/database/install.sql'), "install.sql باید موجود باشد");
+        $content = file_get_contents(ROOT_PATH . '/database/install.sql');
+        $this->assertNotEmpty($content, "install.sql نباید خالی باشد");
+
+        // install.sql نباید شامل دستورات مشکل‌ساز باشد
+        $this->assertNotContains('SET @', $content, "install.sql نباید SET @ داشته باشد");
+        $this->assertNotContains('PREPARE ', $content, "install.sql نباید PREPARE داشته باشد");
+        $this->assertNotContains('EXECUTE ', $content, "install.sql نباید EXECUTE داشته باشد");
+        $this->assertNotContains('DEALLOCATE ', $content, "install.sql نباید DEALLOCATE داشته باشد");
+
+        // باید CREATE TABLE و INSERT داشته باشد
+        $this->assertContains('CREATE TABLE IF NOT EXISTS', $content);
+        $this->assertContains('INSERT INTO', $content);
+    }
+
+    public function testSeedAdminSqlExists(): void
+    {
+        $this->assertTrue(file_exists(ROOT_PATH . '/database/seed-admin.sql'), "seed-admin.sql باید موجود باشد");
+        $content = file_get_contents(ROOT_PATH . '/database/seed-admin.sql');
+        $this->assertContains("username = 'admin'", $content);
+        $this->assertContains('$2y$10$', $content, "باید هش bcrypt با cost=10 داشته باشد");
+        $this->assertContains("'admin'", $content);
+        $this->assertContains('Mojavez@2026', $content, "باید رمز پیش‌فرض را در کامنت ذکر کند");
+    }
+
+    public function testDatabaseReadmeExists(): void
+    {
+        $this->assertTrue(file_exists(ROOT_PATH . '/database/README.md'), "database/README.md باید موجود باشد");
+        $content = file_get_contents(ROOT_PATH . '/database/README.md');
+        $this->assertContains('install.sql', $content);
+        $this->assertContains('seed-admin.sql', $content);
+        $this->assertContains('migrations', $content);
+    }
+
     public function testMigrationsExist(): void
     {
         $expected = [

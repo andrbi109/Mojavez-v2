@@ -8,6 +8,66 @@
 
 ---
 
+## [0.6.2] — ۲۰۲۶-۱۱-۱۰ — فایل نصب واحد + حساب مدیر پیش‌فرض
+
+### 🎯 هدف
+تجمیع همهٔ فایل‌های SQL در یک فایل واحد برای نصب تازه بدون نیاز به
+اجرای مهاجرت‌ها. همچنین افزودن حساب مدیر پیش‌فرض برای راه‌اندازی سریع.
+
+### ✨ قابلیت‌های جدید
+
+#### ۱) فایل نصب واحد (`database/install.sql`)
+- **یک فایل واحد** شامل همهٔ جداول، داده‌های اولیه و محدودیت‌ها
+- **بدون نیاز به مهاجرت‌ها** — فقط همین فایل را اجرا کنید
+- **Idempotent** — اجرای چندباره خطا نمی‌دهد (`CREATE TABLE IF NOT EXISTS`)
+- **سازگار با MySQL 5.7+، MariaDB 10.3+**
+- شامل ۲۹ جدول، ۴۹ INSERT، ۲۲ ALTER TABLE
+- حذف دستورات مشکل‌ساز: `SET @`, `PREPARE`, `EXECUTE`, `DEALLOCATE`
+- حذف `USE` های اضافی (فقط یک `USE` در ابتدا)
+- حذف `SELECT` های تشخیصی
+
+#### ۲) فایل ساخت حساب مدیر (`database/seed-admin.sql`)
+- ساخت حساب `admin` با رمز `Mojavez@2026` (هش bcrypt با cost=10)
+- Idempotent — اجرای مجدد حساب قبلی را حذف و دوباره می‌سازد
+- هشدار واضح برای تغییر رمز پس از اولین ورود
+
+#### ۳) راهنمای جامع پایگاه داده (`database/README.md`)
+- توضیح فایل‌های مختلف (install.sql، schema.sql، seed-admin.sql، migrations/)
+- نحوهٔ نصب در محیط‌های مختلف (سرور، هاست اشتراکی، Docker)
+- نحوهٔ پشتیبان‌گیری و بازیابی
+- رفع مشکلات رایج
+
+### 🔧 تغییرات فنی
+
+#### `deploy/shared-hosting/install.php`
+- اکنون از `database/install.sql` استفاده می‌کند (به‌جای `schema.sql`)
+- Fallback به `schema.sql` اگر `install.sql` موجود نباشد
+
+#### `deploy/shared-hosting/README.md`
+- گام ۵ به‌روزرسانی شد: ساخت حساب مدیر با `seed-admin.sql`
+- افزودن «روش جایگزین: نصب دستی با فایل SQL»
+
+### 📦 فایل‌های جدید
+- `database/install.sql` — فایل نصب واحد (۷۳ کیلوبایت، ۱۲۷۹ خط)
+- `database/seed-admin.sql` — ساخت حساب مدیر پیش‌فرض
+- `database/README.md` — راهنمای جامع پایگاه داده
+
+### 📝 فایل‌های تغییر یافته
+- `deploy/shared-hosting/install.php` — استفاده از install.sql
+- `deploy/shared-hosting/README.md` — به‌روزرسانی گام ۵
+- `VERSION` → `0.6.2`
+- `config/config.php` → `APP_VERSION` → `0.6.2`
+
+### 📊 آمار فایل `install.sql`
+- ۲۹ `CREATE TABLE IF NOT EXISTS`
+- ۴۹ `INSERT INTO` (با `ON DUPLICATE KEY UPDATE`)
+- ۲۲ `ALTER TABLE` (برای افزودن محدودیت‌ها و ستون‌ها)
+- ۱۰۱ دستور کل
+- ۸۰۷ پرانتز باز/بسته (متعادل)
+- ۰ دستور `SET @` / `PREPARE` / `EXECUTE` (حذف شدند)
+
+---
+
 ## [0.6.1] — ۲۰۲۶-۱۱-۰۹ — استقرار روی هاست اشتراکی (نت افراز)
 
 ### 🎯 هدف

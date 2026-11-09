@@ -7,7 +7,7 @@
  *
  * این نصب‌کننده:
  *   ۱) فایل .env می‌سازد (با اطلاعات دیتابیس)
- *   ۲) پایگاه داده را با اجرای schema.sql راه‌اندازی می‌کند
+ *   ۲) پایگاه داده را با اجرای install.sql راه‌اندازی می‌کند
  *   ۳) گزارش نهایی نمایش می‌دهد
  *
  * پس از نصب موفق، این فایل را حذف کنید.
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
     }
 }
 
-// ==================== گام ۲: اجرای schema.sql ====================
+// ==================== گام ۲: اجرای install.sql ====================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
     session_start();
     $info = $_SESSION['install_db'] ?? null;
@@ -77,10 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
 
-            // مسیر schema.sql
-            $schemaPath = dirname(__DIR__, 2) . '/database/schema.sql';
+            // مسیر install.sql (فایل واحد نصب — بدون نیاز به مهاجرت‌ها)
+            $schemaPath = dirname(__DIR__, 2) . '/database/install.sql';
             if (!file_exists($schemaPath)) {
-                throw new \Exception("فایل schema.sql یافت نشد: {$schemaPath}");
+                // fallback به schema.sql اگر install.sql موجود نبود
+                $schemaPath = dirname(__DIR__, 2) . '/database/schema.sql';
+            }
+            if (!file_exists($schemaPath)) {
+                throw new \Exception("فایل install.sql یافت نشد");
             }
 
             $sql = file_get_contents($schemaPath);
@@ -333,7 +337,7 @@ button:hover { background: #0096B8; }
         <?php elseif ($step === 2): ?>
             <span class="step">گام ۲ از ۲</span>
             <h2>نصب schema دیتابیس</h2>
-            <p>اتصال موفق بود! اکنون فایل schema.sql اجرا می‌شود تا همهٔ جداول ساخته شوند.</p>
+            <p>اتصال موفق بود! اکنون فایل install.sql اجرا می‌شود تا همهٔ جداول ساخته شوند.</p>
             <div class="warning">
                 <strong>توجه:</strong> اگر قبلاً دیتابیس را نصب کرده‌اید، این کار داده‌های جدیدی اضافه می‌کند
                 ولی داده‌های موجود را حذف نمی‌کند (دستورات با ON DUPLICATE KEY اجرا می‌شوند).

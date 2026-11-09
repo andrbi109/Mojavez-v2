@@ -166,23 +166,36 @@ rm public_html/install.php
 
 ### گام ۵: ساخت حساب مدیر
 
-۱) با مرورگر به آدرس بروید: `https://your-domain.com/admin/login`
+۱) در DirectAdmin → **phpMyAdmin** → دیتابیس خود را انتخاب کنید
 
-۲) چون هنوز حساب مدیر وجود ندارد، باید از طریق دیتابیس یکی بسازید. در DirectAdmin → **phpMyAdmin**:
+۲) به تب **Import** بروید
 
-```sql
-INSERT INTO users (username, password, display_name) VALUES (
-    'admin',
-    '$2y$10$YOUR_BCRYPT_HASH_HERE',
-    'مدیر کل'
-);
-```
+۳) فایل `database/seed-admin.sql` را آپلود کنید و **Go** را بزنید
 
-برای تولید bcrypt hash، از این ابزار استفاده کنید:
-- https://bcrypt-generator.com/
-- یا اسکریپت PHP: `php -r "echo password_hash('YOUR_PASSWORD', PASSWORD_BCRYPT);"`
+۴) حساب مدیر با مشخصات زیر ساخته می‌شود:
+   - **نام کاربری**: `admin`
+   - **رمز عبور**: `Mojavez@2026`
+   - **نقش**: مدیر کل
 
-۳) با نام کاربری `admin` و رمز انتخاب‌شده وارد شوید.
+۵) با مرورگر به آدرس بروید: `https://your-domain.com/admin/login`
+
+۶) با حساب پیش‌فرض وارد شوید
+
+۷) ⚠️ **بلافاصله رمز را تغییر دهید!** (از پنل → کاربران → ویرایش admin)
+
+### روش جایگزین: نصب دستی با فایل SQL
+
+اگر نمی‌خواهید از `install.php` استفاده کنید، می‌توانید مستقیماً فایل SQL را در phpMyAdmin اجرا کنید:
+
+۱) در DirectAdmin → **phpMyAdmin** → دیتابیس خود را انتخاب کنید
+
+۲) به تب **Import** بروید
+
+۳) فایل `database/install.sql` را آپلود کنید و **Go** را بزنید
+
+۴) مجدداً **Import** → فایل `database/seed-admin.sql` را آپلود کنید
+
+۵) به `https://your-domain.com/admin/login` بروید و وارد شوید
 
 ### گام ۶: تنظیم cron job
 
