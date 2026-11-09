@@ -342,8 +342,16 @@ class AdminController extends Controller
         $role = Session::get('admin_role', 'admin');
 
         // وضعیت‌های مجاز برای تغییر — از مرجع مرکزی
+        // فیلتر بر اساس نوع خدمت متقاضی (برخی وضعیت‌ها مختص خدمت خاصی هستند)
         $statusCfg = (require CONFIG_PATH . '/statuses.php')['statuses'];
-        $allowedStatuses = array_keys(array_filter($statusCfg, fn($m) => !empty($m['manual'])));
+        $serviceTypeId = (int)$applicant['service_type_id'];
+        $allowedStatuses = array_keys(array_filter($statusCfg, function($m) use ($serviceTypeId) {
+            if (empty($m['manual'])) return false;
+            // اگر services تعریف نشده → مشترک برای همه
+            if (!isset($m['services'])) return true;
+            // اگر تعریف شده → فقط برای آن خدمت‌ها
+            return in_array($serviceTypeId, $m['services'], true);
+        }));
         if (!in_array($newStatus, $allowedStatuses, true)) {
             $this->redirect('/admin/view/' . $applicantId);
         }
