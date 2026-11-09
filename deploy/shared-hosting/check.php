@@ -13,6 +13,9 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
+// ارسال هدر Content-Type با charset درست — جلوگیری از mojibake متن فارسی
+header('Content-Type: text/html; charset=utf-8');
+
 $checks = [];
 $allPass = true;
 

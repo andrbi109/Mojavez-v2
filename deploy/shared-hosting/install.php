@@ -13,9 +13,12 @@
  * پس از نصب موفق، این فایل را حذف کنید.
  */
 
-error_reporting(E_ALL);
+error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 ini_set('display_errors', '1');
 set_time_limit(120); // ۲ دقیقه برای اجرای schema
+
+// ارسال هدر Content-Type با charset درست — جلوگیری از mojibake متن فارسی
+header('Content-Type: text/html; charset=utf-8');
 
 $step = (int)($_POST['step'] ?? 1);
 $message = '';
@@ -46,7 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
             ]);
 
             // ذخیره در سشن برای گام ۲
-            session_start();
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
             $_SESSION['install_db'] = [
                 'host' => $dbHost, 'name' => $dbName,
                 'user' => $dbUser, 'pass' => $dbPass,
@@ -63,8 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 1) {
 }
 
 // ==================== گام ۲: اجرای install.sql ====================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
-    session_start();
+// نکته: elseif استفاده شد تا اگر گام ۱ موفق شد و $step را به ۲ تغییر داد،
+// این بلوک در همان درخواست اجرا نشود (جلوگیری از session_start دوبار).
+elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
     $info = $_SESSION['install_db'] ?? null;
     if (!$info) {
         $errors[] = 'اطلاعات دیتابیس یافت نشد. از ابتدا شروع کنید.';
@@ -77,14 +86,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             ]);
 
-            // مسیر install.sql (فایل واحد نصب — بدون نیاز به مهاجرت‌ها)
-            $schemaPath = dirname(__DIR__, 2) . '/database/install.sql';
-            if (!file_exists($schemaPath)) {
-                // fallback به schema.sql اگر install.sql موجود نبود
-                $schemaPath = dirname(__DIR__, 2) . '/database/schema.sql';
+            // جستجوی هوشمند فایل install.sql در چندین مکان کاندید
+            // (install.php ممکن است در ریشهٔ پروژه، public_html، یا deploy/shared-hosting باشد)
+            $candidates = [
+                __DIR__ . '/database/install.sql',                    // install.php در ریشهٔ پروژه
+                dirname(__DIR__) . '/database/install.sql',           // install.php در public_html
+                dirname(__DIR__, 2) . '/database/install.sql',        // install.php دو سطح عمیق
+                __DIR__ . '/../database/install.sql',                 // مسیر نسبی
+            ];
+            $schemaPath = null;
+            foreach ($candidates as $c) {
+                if (file_exists($c)) {
+                    $schemaPath = $c;
+                    break;
+                }
             }
-            if (!file_exists($schemaPath)) {
-                throw new \Exception("فایل install.sql یافت نشد");
+            // fallback به schema.sql اگر install.sql موجود نبود
+            if (!$schemaPath) {
+                $candidates2 = [
+                    __DIR__ . '/database/schema.sql',
+                    dirname(__DIR__) . '/database/schema.sql',
+                    dirname(__DIR__, 2) . '/database/schema.sql',
+                    __DIR__ . '/../database/schema.sql',
+                ];
+                foreach ($candidates2 as $c) {
+                    if (file_exists($c)) {
+                        $schemaPath = $c;
+                        break;
+                    }
+                }
+            }
+            if (!$schemaPath) {
+                throw new \Exception("فایل install.sql یافت نشد. مسیرهای بررسی‌شده: " . implode('، ', $candidates));
             }
 
             $sql = file_get_contents($schemaPath);
@@ -138,8 +171,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $step === 2) {
 
             $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 
-            // ساخت فایل .env
-            $envPath = dirname(__DIR__, 2) . '/.env';
+            // جستجوی هوشمند مسیر فایل .env
+            $envCandidates = [
+                __DIR__ . '/.env',                    // install.php در ریشهٔ پروژه
+                dirname(__DIR__) . '/.env',           // install.php در public_html
+                dirname(__DIR__, 2) . '/.env',        // install.php دو سطح عمیق
+                __DIR__ . '/../.env',                 // مسیر نسبی
+            ];
+            $envPath = null;
+            foreach ($envCandidates as $c) {
+                // بررسی اینکه آیا پوشهٔ والد قابل نوشتن است
+                $parentDir = dirname($c);
+                if (is_dir($parentDir) && is_writable($parentDir)) {
+                    $envPath = $c;
+                    break;
+                }
+            }
+            // اگر هیچ مسیر قابل نوشتن پیدا نشد، از اولین کاندید استفاده کن
+            if (!$envPath) {
+                $envPath = $envCandidates[0];
+            }
             $envContent = "# تولیدشده توسط install.php در " . date('Y-m-d H:i:s') . "\n";
             $envContent .= "APP_DEBUG=false\n";
             $envContent .= "DB_HOST={$info['host']}\n";

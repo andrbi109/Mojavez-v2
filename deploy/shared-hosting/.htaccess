@@ -123,7 +123,7 @@ AddDefaultCharset UTF-8
 # --- ETag برای کش‌گذاری شرطی ---
 FileETag MTime Size
 
-# --- صفحات خطای سفارشی ---
-ErrorDocument 410 "دسترسی برای خزنده‌ها مسدود است — این سامانه خصوصی است."
-ErrorDocument 403 "دسترسی ممنوع"
-ErrorDocument 404 "صفحه یافت نشد"
+# --- صفحات خطای سفارشی (با HTML و charset درست برای جلوگیری از mojibake) ---
+ErrorDocument 410 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><meta name='robots' content='noindex,nofollow'><title>دسترسی مسدود</title><style>body{font-family:Tahoma,sans-serif;text-align:center;padding:3rem;background:#f8f9fa;color:#495057}h1{color:#6c757d}</style></head><body><h1>۴۱۰ — دسترسی برای خزنده‌ها مسدود است</h1><p>این سامانه خصوصی است.</p></body></html>"
+ErrorDocument 403 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><meta name='robots' content='noindex,nofollow'><title>دسترسی ممنوع</title><style>body{font-family:Tahoma,sans-serif;text-align:center;padding:3rem;background:#f8f9fa;color:#495057}h1{color:#dc3545}</style></head><body><h1>۴۰۳ — دسترسی ممنوع</h1></body></html>"
+ErrorDocument 404 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><meta name='robots' content='noindex,nofollow'><title>یافت نشد</title><style>body{font-family:Tahoma,sans-serif;text-align:center;padding:3rem;background:#f8f9fa;color:#495057}h1{color:#ffc107}</style></head><body><h1>۴۰۴ — صفحه یافت نشد</h1></body></html>"
