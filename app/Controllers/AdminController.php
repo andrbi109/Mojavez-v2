@@ -1228,10 +1228,27 @@ class AdminController extends Controller
                 $parentId = 0;
             }
         }
-        $db->prepare("UPDATE applicants SET parent_application_id = :pid WHERE id = :id")
-            ->execute(['pid' => $parentId > 0 ? $parentId : null, 'id' => $applicantId]);
 
-        (new Person())->updateLicenseState($applicantId, $state, $validUntil);
+        // به‌روزرسانی parent_application_id (با try/catch برای دیتابیس‌های قدیمی)
+        try {
+            $db->prepare("UPDATE applicants SET parent_application_id = :pid WHERE id = :id")
+                ->execute(['pid' => $parentId > 0 ? $parentId : null, 'id' => $applicantId]);
+        } catch (\Throwable $e) {
+            error_log('[updateLicenseState] parent_application_id update failed: ' . $e->getMessage());
+        }
+
+        try {
+            (new Person())->updateLicenseState($applicantId, $state, $validUntil);
+        } catch (\Throwable $e) {
+            error_log('[updateLicenseState] FAILED: ' . $e->getMessage());
+            Session::set('errors', ['license' => 'خطا در ذخیرهٔ وضعیت مجوز: ' . $e->getMessage()]);
+            $this->redirect('/admin/view/' . $applicantId);
+        }
+
+        // لاگ تشخیصی
+        if (APP_DEBUG) {
+            error_log("[updateLicenseState] OK: applicantId=$applicantId state=$state validUntil=" . ($validUntil ?? 'NULL'));
+        }
 
         $this->statusLogModel->create([
             'applicant_id' => $applicantId,
