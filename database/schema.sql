@@ -2,17 +2,28 @@
 -- سامانهٔ مدیریت ثبت‌نام و پیگیری صدور مجوز صنایع دستی
 -- MySQL/MariaDB — نصب تازه با اجرای همین یک فایل انجام می‌شود
 -- -----------------------------------------------------------------
--- تولید شده است. ترتیب اجرا برای جلوگیری از تداخل FOREIGN KEY
--- و وابستگی ستون‌ها (ALTER TABLE) به‌دقت حفظ شده است.
--- -----------------------------------------------------------------
+-- این فایل یکپارچه است و شامل همهٔ جداول، داده‌های اولیه و
+-- محدودیت‌ها است. نیازی به اجرای مهاجرت‌های جداگانه نیست.
+--
+-- ویژگی‌ها:
+--   ✓ بدون ALTER TABLE — همهٔ ستون‌ها مستقیماً در CREATE TABLE
+--   ✓ بدون SET @ / PREPARE / EXECUTE / DEALLOCATE
+--   ✓ Idempotent — CREATE TABLE IF NOT EXISTS + ON DUPLICATE KEY UPDATE
+--   ✓ سازگار با MySQL 5.7+، MariaDB 10.3+
+--   ✓ کاراکترست utf8mb4 با collation utf8mb4_unicode_ci
+--   ✓ شامل ۲۹ جدول، ۵ سرویس، ۱۸ وضعیت، ۲۳۰+ رشتهٔ مجوز
+--   ✓ شامل ۲۸ فیلد فرم سیستمی و اختصاصی، ۴ گروه قیمتی با ۱۲ خدمت
+--
+-- نحوهٔ اجرا:
+--   mysql -u <user> -p < database/schema.sql
+--   یا در phpMyAdmin: Import → انتخاب این فایل → Go
+--
+-- برای ساخت حساب مدیر، پس از اجرای این فایل، فایل seed-admin.sql
+-- را اجرا کنید.
+--
 -- طراح و توسعه‌دهنده: امین دروگر بزدی (Derogaramin@)
+-- نسخهٔ پروژه: 0.6.3
 -- =================================================================
-
-
--- ================================================================
--- schema.sql
--- ================================================================
-
 
 CREATE DATABASE IF NOT EXISTS handicraft_license
     CHARACTER SET utf8mb4
@@ -20,48 +31,136 @@ CREATE DATABASE IF NOT EXISTS handicraft_license
 
 USE handicraft_license;
 
+-- برای جلوگیری از خطای ترتیب FOREIGN KEY هنگام نصب تازه
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ================================================================
 -- ۱. جدول مدیران سیستم
+-- ================================================================
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     display_name VARCHAR(100) NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'admin',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۲. جدول متقاضیان (اطلاعات اصلی)
-CREATE TABLE IF NOT EXISTS applicants (
+-- ================================================================
+-- ۲. جدول اشخاص (لنگر هویت = کد ملی)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS persons (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    national_code CHAR(10) NOT NULL UNIQUE,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    national_code CHAR(10) NOT NULL UNIQUE,
+    father_name VARCHAR(50) NULL,
+    birth_date DATE NULL,
+    mobile CHAR(11) NOT NULL,
+    mobile_2 CHAR(11) NULL,
+    mobile_3 CHAR(11) NULL,
+    postal_code CHAR(10) NULL,
+    person_type ENUM('حقیقی','حقوقی') NOT NULL DEFAULT 'حقیقی',
+    -- اطلاعات شخص حقوقی
+    company_name VARCHAR(150) NULL,
+    company_national_id CHAR(11) NULL,
+    reg_number VARCHAR(30) NULL,
+    reg_date DATE NULL,
+    company_type VARCHAR(60) NULL,
+    economic_code VARCHAR(20) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_person_mobile (mobile),
+    INDEX idx_person_mobile_2 (mobile_2),
+    INDEX idx_person_mobile_3 (mobile_3)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۳. جدول سرویس‌ها (نوع خدمت)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS service_types (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(120) NOT NULL UNIQUE,
+    authority VARCHAR(150) NULL,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۴. جدول متقاضیان (اطلاعات اصلی)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS applicants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT NULL,
+    parent_application_id INT NULL,
+    service_type_id INT NULL,
+    user_account_id INT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    national_code CHAR(10) NOT NULL,
     postal_code CHAR(10) NOT NULL,
-    mobile CHAR(11) NOT NULL UNIQUE,
+    mobile CHAR(11) NOT NULL,
     tracking_code VARCHAR(20) NOT NULL UNIQUE,
+    birth_date DATE NULL,
+    father_name VARCHAR(50) NULL,
     current_status ENUM(
         'پیش‌نویس',
         'تکمیل اطلاعات',
         'احراز نشانی',
+        'بررسی کارشناسی رشته',
         'ثبت درخواست صدور',
         'بارگذاری مدارک به سازمان',
+        'درخواست اصلاح مدارک',
         'تأیید اولیه',
+        'تأیید نهایی',
         'صدور مجوز',
+        'تحویل مجوز',
         'مشاهده و چاپ',
-        'لغو'
+        'رد درخواست',
+        'لغو',
+        'تطبیق آدرس با ثبت احوال',
+        'دریافت تصویر مجوز',
+        'تأیید اولیه در سامانه مشاغل خانگی',
+        'تأیید نهایی دریافت کد رهگیری'
     ) DEFAULT 'پیش‌نویس',
+    applicant_type ENUM('حقیقی','حقوقی') NOT NULL DEFAULT 'حقیقی',
+    marital_status ENUM('مجرد','متأهل') DEFAULT 'مجرد',
+    children_count TINYINT UNSIGNED DEFAULT 0,
+    physical_condition ENUM('سالم','معلولیت') DEFAULT 'سالم',
+    disability_details VARCHAR(255) NULL,
+    income_decile TINYINT UNSIGNED NULL,
+    has_court_case ENUM('بله','خیر') DEFAULT 'خیر',
+    has_active_loan ENUM('بله','خیر') DEFAULT 'خیر',
+    has_overdue_installments ENUM('بله','خیر') DEFAULT 'خیر',
     priority TINYINT(1) DEFAULT 0,
+    payment_required TINYINT(1) NOT NULL DEFAULT 0,
+    payment_requested_at DATETIME NULL,
+    license_state ENUM('جاری','صادر شده','باطل شده','منقضی') NOT NULL DEFAULT 'جاری',
+    license_valid_until DATE NULL,
     registration_started_at DATETIME NULL,
     registration_completed_at DATETIME NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE SET NULL,
+    FOREIGN KEY (parent_application_id) REFERENCES applicants(id) ON DELETE SET NULL,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE SET NULL,
     INDEX idx_tracking_code (tracking_code),
     INDEX idx_national_code (national_code),
     INDEX idx_status (current_status),
     INDEX idx_priority (priority),
-    INDEX idx_mobile (mobile)
+    INDEX idx_mobile (mobile),
+    INDEX idx_completed_priority (registration_completed_at, priority),
+    INDEX idx_person (person_id),
+    INDEX idx_parent_app (parent_application_id),
+    INDEX idx_license_state (license_state),
+    INDEX idx_applicant_type (applicant_type),
+    INDEX idx_applicant_user (user_account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۳. جدول اطلاعات شغلی (۱:۱ با applicants)
+-- ================================================================
+-- ۵. جدول اطلاعات شغلی (۱:۱ با applicants)
+-- ================================================================
 CREATE TABLE IF NOT EXISTS job_details (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
@@ -72,7 +171,9 @@ CREATE TABLE IF NOT EXISTS job_details (
     UNIQUE INDEX idx_applicant_job (applicant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۴. جدول اطلاعات ملک (۱:۱ با applicants)
+-- ================================================================
+-- ۶. جدول اطلاعات ملک (۱:۱ با applicants)
+-- ================================================================
 CREATE TABLE IF NOT EXISTS property_details (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
@@ -84,11 +185,16 @@ CREATE TABLE IF NOT EXISTS property_details (
     rural_district VARCHAR(50) NULL,
     village VARCHAR(50) NULL,
     electricity_bill_id VARCHAR(20) NOT NULL,
+    address_street VARCHAR(100) NULL,
+    address_alley VARCHAR(100) NULL,
+    address_plaque VARCHAR(20) NULL,
     FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
     UNIQUE INDEX idx_applicant_property (applicant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۵. جدول مدارک (۱:N با applicants)
+-- ================================================================
+-- ۷. جدول مدارک (۱:N با applicants)
+-- ================================================================
 CREATE TABLE IF NOT EXISTS documents (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
@@ -101,7 +207,9 @@ CREATE TABLE IF NOT EXISTS documents (
     INDEX idx_applicant_docs (applicant_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۶. جدول تاریخچه وضعیت‌ها
+-- ================================================================
+-- ۸. جدول تاریخچه وضعیت‌ها
+-- ================================================================
 CREATE TABLE IF NOT EXISTS status_log (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
@@ -113,98 +221,79 @@ CREATE TABLE IF NOT EXISTS status_log (
     INDEX idx_status_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۷. جدول تاریخچه تغییرات کد پستی
+-- ================================================================
+-- ۹. جدول تاریخچه تغییرات کد پستی
+-- ================================================================
 CREATE TABLE IF NOT EXISTS postal_code_changes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
     old_postal_code CHAR(10) NOT NULL,
     new_postal_code CHAR(10) NOT NULL,
+    status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار',
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    reject_reason VARCHAR(255) NULL,
     requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    INDEX idx_applicant_postal (applicant_id)
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_applicant_postal (applicant_id),
+    INDEX idx_postal_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- توجه: هیچ مدیر پیش‌فرضی در schema seed نمی‌شود (رفع C-2).
--- برای ایجاد مدیر، از install scripts استفاده کنید یا دستی:
---   INSERT INTO users (username, password, display_name, role) VALUES
---   ('admin', '<bcrypt-hash>', 'نام مدیر', 'admin');
--- هش را با PHP تولید کنید: php -r "echo password_hash('YOUR_PASSWORD', PASSWORD_BCRYPT);"
-
-
-ALTER TABLE applicants
-ADD COLUMN birth_date DATE NULL AFTER mobile,
-ADD COLUMN father_name VARCHAR(50) NULL AFTER birth_date,
-ADD COLUMN marital_status ENUM('مجرد','متأهل') DEFAULT 'مجرد' AFTER father_name,
-ADD COLUMN children_count TINYINT UNSIGNED DEFAULT 0 AFTER marital_status,
-ADD COLUMN physical_condition ENUM('سالم','معلولیت') DEFAULT 'سالم' AFTER children_count,
-ADD COLUMN disability_details VARCHAR(255) NULL AFTER physical_condition,
-ADD COLUMN income_decile TINYINT UNSIGNED NULL AFTER disability_details,
-ADD COLUMN has_court_case ENUM('بله','خیر') DEFAULT 'خیر' AFTER income_decile,
-ADD COLUMN has_active_loan ENUM('بله','خیر') DEFAULT 'خیر' AFTER has_court_case,
-ADD COLUMN has_overdue_installments ENUM('بله','خیر') DEFAULT 'خیر' AFTER has_active_loan;
-
-ALTER TABLE property_details
-ADD COLUMN address_street VARCHAR(100) NULL AFTER electricity_bill_id,
-ADD COLUMN address_alley VARCHAR(100) NULL AFTER address_street,
-ADD COLUMN address_plaque VARCHAR(20) NULL AFTER address_alley;
-
-
-ALTER TABLE `users` ADD COLUMN `role` VARCHAR(50) NOT NULL DEFAULT 'admin' AFTER `display_name`;
-
-
-USE handicraft_license;
-
--- وضعیت بررسی درخواست تغییر کد پستی:
---   در انتظار  → کاربر درخواست داده و مدیر هنوز بررسی نکرده
---   تأیید شده → مدیر کد پستی جدید را در جدول applicants اعمال کرده
---   رد شده    → مدیر درخواست را نپذیرفته
-ALTER TABLE postal_code_changes
-    ADD COLUMN status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار' AFTER new_postal_code,
-    ADD COLUMN reviewed_by INT NULL AFTER status,
-    ADD COLUMN reviewed_at DATETIME NULL AFTER reviewed_by,
-    ADD COLUMN reject_reason VARCHAR(255) NULL AFTER reviewed_at,
-    ADD INDEX idx_postal_status (status);
-
--- کلید خارجی reviewed_by به جدول مدیران (در صورت حذف مدیر، مقدار NULL می‌شود)
-ALTER TABLE postal_code_changes
-    ADD CONSTRAINT fk_postal_reviewer
-    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL;
-
--- ایندکس ترکیبی برای گزارش‌گیری سریع‌تر بر اساس تاریخ ثبت
-ALTER TABLE applicants
-    ADD INDEX idx_completed_priority (registration_completed_at, priority);
-
-
-USE handicraft_license;
-
--- ۱. تنظیمات کلید/مقداری سامانه (از پنل مدیریت قابل تغییر)
+-- ================================================================
+-- ۱۰. تنظیمات کلید/مقداری سامانه
+-- ================================================================
 CREATE TABLE IF NOT EXISTS settings (
     setting_key VARCHAR(64) PRIMARY KEY,
     setting_value TEXT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۲. تعریف فیلدهای فرم ثبت‌نام (سیستمی و سفارشی)
+-- ================================================================
+-- ۱۱. مراحل ویزارد
+-- ================================================================
+CREATE TABLE IF NOT EXISTS wizard_steps (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    view_key VARCHAR(30) NULL,
+    title VARCHAR(100) NOT NULL,
+    description VARCHAR(255) NULL,
+    icon VARCHAR(30) NULL,
+    service_type_id INT NULL,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 50,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۲. فیلدهای فرم ثبت‌نام
+-- ================================================================
 CREATE TABLE IF NOT EXISTS form_fields (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    step TINYINT NOT NULL,                     -- مرحلهٔ ویزارد: ۱ تا ۴
-    field_key VARCHAR(64) NOT NULL UNIQUE,     -- کلید فنی (برای فیلدهای سیستمی = نام ستون)
-    label VARCHAR(150) NOT NULL,               -- برچسب فارسی نمایشی
+    step TINYINT NOT NULL,
+    wizard_step_id INT NULL,
+    service_type_id INT NULL,
+    field_key VARCHAR(64) NOT NULL UNIQUE,
+    label VARCHAR(150) NOT NULL,
     field_type VARCHAR(30) NOT NULL DEFAULT 'text',
-        -- text | number | textarea | select | radio | checkbox | date_jalali | file
-    options TEXT NULL,                         -- گزینه‌ها (select/radio) — هر خط یکی
+    options TEXT NULL,
     is_required TINYINT(1) NOT NULL DEFAULT 0,
-    is_system TINYINT(1) NOT NULL DEFAULT 0,   -- فیلد داخلی سامانه: حذف‌شدنی نیست
-    is_active TINYINT(1) NOT NULL DEFAULT 1,   -- مدیر می‌تواند غیرفعال (حذف از فرم) کند
-    validation_json TEXT NULL,                 -- {"min":..,"max":..,"maxlength":..,"pattern":..}
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    validation_json TEXT NULL,
     placeholder VARCHAR(150) NULL,
     help_text VARCHAR(255) NULL,
     sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (wizard_step_id) REFERENCES wizard_steps(id) ON DELETE SET NULL,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE,
     INDEX idx_step_active (step, is_active, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ۳. مقادیر فیلدهای پویا برای هر متقاضی
+-- ================================================================
+-- ۱۳. مقادیر فیلدهای پویا برای هر متقاضی
+-- ================================================================
 CREATE TABLE IF NOT EXISTS applicant_field_values (
     id INT AUTO_INCREMENT PRIMARY KEY,
     applicant_id INT NOT NULL,
@@ -215,9 +304,311 @@ CREATE TABLE IF NOT EXISTS applicant_field_values (
     UNIQUE KEY uniq_applicant_field (applicant_id, field_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =============================================
--- بذر تنظیمات پیش‌فرض
--- =============================================
+-- ================================================================
+-- ۱۴. رشته‌های مجوز (اختصاصی هر سرویس)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS license_titles (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_type_id INT NULL,
+    category VARCHAR(80) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE,
+    UNIQUE INDEX uniq_service_title (service_type_id, title),
+    INDEX idx_active_sort (is_active, sort_order),
+    INDEX idx_active_service_sort (service_type_id, is_active, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۵. کانال‌های پرداخت
+-- ================================================================
+CREATE TABLE IF NOT EXISTS payment_channels (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(100) NOT NULL,
+    channel_type ENUM('کارت به کارت','حساب بانکی','پرداخت اینترنتی','سایر') NOT NULL DEFAULT 'کارت به کارت',
+    account_info TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۶. درخواست‌های دسترسی به تصویر مجوز
+--    (قبل از payments ساخته می‌شود تا FK از payments به این جدول برقرار شود)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS license_access_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL,
+    is_first_access TINYINT(1) NOT NULL DEFAULT 0,
+    access_token CHAR(64) NULL UNIQUE,
+    requires_payment TINYINT(1) NOT NULL DEFAULT 0,
+    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    payment_id INT NULL,
+    status ENUM('در انتظار','تأیید شده','رد شده','در انتظار پرداخت','منقضی') NOT NULL DEFAULT 'در انتظار',
+    expires_at DATETIME NULL,
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    reject_reason VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE SET NULL,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_lar_status (status),
+    INDEX idx_lar_applicant (applicant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۷. پرداخت‌های متقاضیان
+-- ================================================================
+CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL,
+    user_account_id INT NULL,
+    payment_channel_id INT NULL,
+    purpose ENUM('هزینهٔ ثبت‌نام','هزینهٔ دریافت مجدد تصویر مجوز') NOT NULL DEFAULT 'هزینهٔ ثبت‌نام',
+    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    original_amount BIGINT UNSIGNED NULL,
+    final_amount BIGINT UNSIGNED NULL,
+    discount_reason VARCHAR(500) NULL,
+    fee_group_id INT NULL,
+    is_rural_exempt TINYINT(1) NOT NULL DEFAULT 0,
+    fallback_used TINYINT(1) NOT NULL DEFAULT 0,
+    suspicion_flag VARCHAR(255) NULL,
+    reference_code VARCHAR(50) NULL,
+    paid_at DATE NULL,
+    receipt_document_id INT NULL,
+    linked_request_id INT NULL,
+    status ENUM('در انتظار رسید','در انتظار بررسی','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار رسید',
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    reject_reason VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY (payment_channel_id) REFERENCES payment_channels(id) ON DELETE SET NULL,
+    FOREIGN KEY (receipt_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+    FOREIGN KEY (linked_request_id) REFERENCES license_access_requests(id) ON DELETE SET NULL,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_pay_status (status),
+    INDEX idx_pay_applicant (applicant_id),
+    INDEX idx_pay_purpose (purpose),
+    INDEX idx_pay_user (user_account_id),
+    INDEX idx_pay_group (fee_group_id),
+    INDEX idx_pay_suspicion (suspicion_flag(50))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۸. تصویر مجوز هر پرونده
+-- ================================================================
+CREATE TABLE IF NOT EXISTS license_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL UNIQUE,
+    document_id INT NOT NULL,
+    download_count INT NOT NULL DEFAULT 0,
+    first_accessed_at DATETIME NULL,
+    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۱۹. الگوهای پیامک
+-- ================================================================
+CREATE TABLE IF NOT EXISTS sms_templates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    sample_text TEXT NULL,
+    target_status VARCHAR(50) NOT NULL,
+    requires_code TINYINT(1) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۰. پیامک‌های ثبت‌شده توسط متقاضیان
+-- ================================================================
+CREATE TABLE IF NOT EXISTS user_sms_entries (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL,
+    sms_template_id INT NOT NULL,
+    sms_code VARCHAR(50) NULL,
+    sms_text TEXT NULL,
+    received_at DATE NULL,
+    status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار',
+    applied_status TINYINT(1) NOT NULL DEFAULT 0,
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    reject_reason VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    FOREIGN KEY (sms_template_id) REFERENCES sms_templates(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_sms_status (status),
+    INDEX idx_sms_applicant (applicant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۱. درخواست‌های بازبینی پرونده
+-- ================================================================
+CREATE TABLE IF NOT EXISTS applicant_revisions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    applicant_id INT NOT NULL,
+    payload JSON NOT NULL,
+    note VARCHAR(500) NULL,
+    status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار',
+    reviewed_by INT NULL,
+    reviewed_at DATETIME NULL,
+    reject_reason VARCHAR(255) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_rev_status (status),
+    INDEX idx_rev_applicant (applicant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۲. لاگ تلاش‌های احراز هویت
+-- ================================================================
+CREATE TABLE IF NOT EXISTS identity_checks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    national_code CHAR(10) NOT NULL,
+    ip VARCHAR(45) NULL,
+    success TINYINT(1) NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_nc_time (national_code, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۳. نرخ‌نامهٔ چندگانه — گروه‌ها
+-- ================================================================
+CREATE TABLE IF NOT EXISTS fee_groups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(20) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    icon VARCHAR(30),
+    decile_min TINYINT NOT NULL,
+    decile_max TINYINT NOT NULL,
+    is_rural_eligible TINYINT(1) NOT NULL DEFAULT 0,
+    total_amount BIGINT UNSIGNED NOT NULL,
+    message_title VARCHAR(100),
+    message_body TEXT,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_active_sort (is_active, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۴. نرخ‌نامهٔ چندگانه — آیتم‌ها
+-- ================================================================
+CREATE TABLE IF NOT EXISTS fee_group_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fee_group_id INT NOT NULL,
+    item_key VARCHAR(40) NOT NULL,
+    item_label VARCHAR(150) NOT NULL,
+    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    notes VARCHAR(255),
+    sort_order INT NOT NULL DEFAULT 0,
+    FOREIGN KEY (fee_group_id) REFERENCES fee_groups(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_group_item (fee_group_id, item_key),
+    INDEX idx_group_sort (fee_group_id, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۵. تیک خدمات انجام‌شده برای هر پرداخت
+-- ================================================================
+CREATE TABLE IF NOT EXISTS payment_service_ticks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT NOT NULL,
+    item_key VARCHAR(40) NOT NULL,
+    item_label VARCHAR(150) NOT NULL,
+    original_amount BIGINT UNSIGNED NOT NULL,
+    is_done TINYINT(1) NOT NULL DEFAULT 1,
+    ticked_by INT NULL,
+    ticked_at DATETIME NULL,
+    untick_reason VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (ticked_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY uniq_payment_item (payment_id, item_key),
+    INDEX idx_payment (payment_id),
+    INDEX idx_done (is_done)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۶. تاریخچهٔ تغییرات مدیر روی پرداخت‌ها (audit log)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS payment_audit_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    action VARCHAR(50) NOT NULL,
+    field_changed VARCHAR(50) NULL,
+    old_value TEXT NULL,
+    new_value TEXT NULL,
+    note VARCHAR(500) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_audit_payment (payment_id),
+    INDEX idx_audit_user (user_id),
+    INDEX idx_audit_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۷. حساب‌های کاربری متقاضیان (مدل فروشگاهی)
+-- ================================================================
+CREATE TABLE IF NOT EXISTS user_accounts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT NOT NULL UNIQUE,
+    username VARCHAR(50) UNIQUE NULL,
+    mobile CHAR(11) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(150) NULL,
+    avatar_document_id INT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    last_login_at DATETIME NULL,
+    failed_login_count INT NOT NULL DEFAULT 0,
+    locked_until DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE,
+    FOREIGN KEY (avatar_document_id) REFERENCES documents(id) ON DELETE SET NULL,
+    INDEX idx_username (username),
+    INDEX idx_mobile (mobile),
+    INDEX idx_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ================================================================
+-- ۲۸. اعلان‌های کاربر
+-- ================================================================
+CREATE TABLE IF NOT EXISTS user_notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_account_id INT NOT NULL,
+    applicant_id INT NULL,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    body TEXT NULL,
+    is_read TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
+    INDEX idx_notif_user (user_account_id),
+    INDEX idx_notif_unread (user_account_id, is_read)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- فعال‌سازی مجدد بررسی FK
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ================================================================
+-- بذر داده‌ها
+-- ================================================================
+
+-- === بذر تنظیمات پیش‌فرض ===
 INSERT INTO settings (setting_key, setting_value) VALUES
 ('site_name', 'سامانهٔ مجوزهای صنایع دستی'),
 ('owner_name', 'امین دروگر بزدی'),
@@ -227,102 +618,272 @@ INSERT INTO settings (setting_key, setting_value) VALUES
 ('social_bale', 'Derogaramin'),
 ('success_message_template', 'باسلام\n{name} هستم .\nدر سامانه مدارک رو بارگذاری کردم و کد رهگیری {code} را اخذ نمودم .\nبا تشکر {name}'),
 ('about_title', 'دربارهٔ ما'),
-('about_content', 'سامانهٔ مجوزهای صنایع دستی، بستری یکپارچه برای ثبت، پیگیری و صدور مجوزهای صنایع دستی است که توسط «امین دروگر بزدی» طراحی و راه‌اندازی شده است.\n\nهدف ما ساده‌سازی فرآیند اداری دریافت مجوز برای هنرمندان و صنعتگران عزیز ایرانی است؛ به‌گونه‌ای که متقاضی بدون مراجعهٔ حضوری مکرر، تمام مراحل ثبت‌نام، بارگذاری مدارک و پیگیری وضعیت پرونده را به‌صورت الکترونیکی انجام دهد.\n\n### مسیر ارتباطی\nبرای هماهنگی، پیگیری سریع‌تر و اطلاع مدیر سامانه از ثبت درخواست خود، پس از اخذ کد رهگیری به آیدی Derogaramin در شبکه‌های اجتماعی ایتا، روبیکا و بله پیام دهید.\n\n### تعهدات ما\n- حفظ محرمانگی اطلاعات و مدارک متقاضیان\n- رسیدگی شفاف و مرحله‌به‌مرحله به پرونده‌ها\n- اطلاع‌رسانی دقیق وضعیت از طریق تایم‌لاین پرونده')
-ON DUPLICATE KEY UPDATE setting_key = setting_key;
+('about_content', 'سامانهٔ مجوزهای صنایع دستی، بستری یکپارچه برای ثبت، پیگیری و صدور مجوزهای صنایع دستی است که توسط «امین دروگر بزدی» طراحی و راه‌اندازی شده است.\n\nهدف ما ساده‌سازی فرآیند اداری دریافت مجوز برای هنرمندان و صنعتگران عزیز ایرانی است؛ به‌گونه‌ای که متقاضی بدون مراجعهٔ حضوری مکرر، تمام مراحل ثبت‌نام، بارگذاری مدارک و پیگیری وضعیت پرونده را به‌صورت الکترونیکی انجام دهد.\n\n### مسیر ارتباطی\nبرای هماهنگی، پیگیری سریع‌تر و اطلاع مدیر سامانه از ثبت درخواست خود، پس از اخذ کد رهگیری به آیدی Derogaramin در شبکه‌های اجتماعی ایتا، روبیکا و بله پیام دهید.\n\n### تعهدات ما\n- حفظ محرمانگی اطلاعات و مدارک متقاضیان\n- رسیدگی شفاف و مرحله‌به‌مرحله به پرونده‌ها\n- اطلاع‌رسانی دقیق وضعیت از طریق تایم‌لاین پرونده'),
+('owner_image', ''),
+('registration_fee_amount', '500000'),
+('license_reissue_fee_amount', '100000'),
+('fee_tariff_active', '1'),
+('fee_tariff_valid_until', '1405/12/29'),
+('fee_default_amount', '500000'),
+('fee_rural_auto_eligible', '1'),
+('fee_modal_enabled', '1'),
+('fee_modal_dismissable', '1'),
+('fee_fallback_group_code', 'C'),
+('fee_min_amount_percent', '10'),
+('fee_max_discount_without_reason', '2'),
+('fee_max_discount_with_reason', '50')
+ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value);
 
--- =============================================
--- بذر فیلدهای سیستمی فرم (فقط در صورت خالی بودن جدول)
--- =============================================
-INSERT INTO form_fields (step, field_key, label, field_type, is_required, is_system, is_active, sort_order)
-SELECT * FROM (
-    SELECT 1 AS step, 'first_name' AS field_key, 'نام' AS label, 'text' AS field_type, 1 AS is_required, 1 AS is_system, 1 AS is_active, 10 AS sort_order
-) AS seed
-WHERE NOT EXISTS (SELECT 1 FROM form_fields);
+-- === بذر سرویس‌ها ===
+INSERT INTO service_types (id, title, authority, description, sort_order) VALUES
+(1, 'مجوز صنایع دستی', 'وزارت میراث فرهنگی، گردشگری و صنایع دستی',
+ 'صدور مجوز رشته‌های صنایع دستی برای اشخاص حقیقی — فرآیند پایهٔ سامانه.', 10),
+(2, 'مجوز مشاغل خانگی (مستقل)', 'وزارت تعاون، کار و رفاه اجتماعی — سامانهٔ مشاغل خانگی',
+ 'کسب‌وکار خانگی توسط خود متقاضی در فضای مسکونی؛ همان مدارک پایه کفایت می‌کند.', 20),
+(3, 'مجوز مشاغل خانگی (پشتیبان)', 'وزارت تعاون، کار و رفاه اجتماعی — سامانهٔ مشاغل خانگی',
+ 'پشتیبانِ چند شاغل خانگی: نیازمند طرح توجیهی، فهرست افراد تحت پوشش و جزئیات درآمدی (حداقل ۵ سال سابقهٔ مرتبط).', 30),
+(4, 'مجوز گردشگری', 'وزارت میراث فرهنگی، گردشگری و صنایع دستی — درگاه ملی مجوزها / سامانهٔ جانا',
+ 'اقامتگاه بوم‌گردی، تأسیسات گردشگری و دفاتر خدمات مسافرتی.', 40),
+(5, 'مجوز هنری و فرهنگی', 'وزارت فرهنگ و ارشاد اسلامی — پنجرهٔ واحد وفا',
+ 'فعالیت‌های هنری، آموزشگاه‌های آزاد هنری و مؤسسات فرهنگی.', 50)
+ON DUPLICATE KEY UPDATE authority = VALUES(authority);
 
-INSERT INTO form_fields (step, field_key, label, field_type, is_required, is_system, sort_order) VALUES
-(1, 'last_name', 'نام خانوادگی', 'text', 1, 1, 20),
-(1, 'national_code', 'کد ملی', 'text', 1, 1, 30),
-(1, 'postal_code', 'کد پستی', 'text', 1, 1, 40),
-(1, 'mobile', 'شماره تلفن همراه', 'text', 1, 1, 50),
-(1, 'birth_date', 'تاریخ تولد', 'date_jalali', 1, 1, 60),
-(1, 'father_name', 'نام پدر', 'text', 1, 1, 70),
-(1, 'marital_status', 'وضعیت تأهل', 'radio', 1, 1, 80),
-(1, 'children_count', 'تعداد فرزندان', 'number', 0, 1, 90),
-(1, 'physical_condition', 'وضعیت جسمانی', 'radio', 1, 1, 100),
-(1, 'disability_details', 'توضیحات معلولیت', 'textarea', 0, 1, 110),
-(1, 'income_decile', 'دهک درآمدی', 'number', 0, 1, 120),
-(1, 'has_court_case', 'پرونده قضایی', 'radio', 1, 1, 130),
-(1, 'has_active_loan', 'وام فعال', 'radio', 1, 1, 140),
-(1, 'has_overdue_installments', 'اقساط معوقه', 'radio', 1, 1, 150),
-(2, 'license_title', 'عنوان مجوز درخواستی', 'select', 1, 1, 10),
-(2, 'experience_months', 'سابقهٔ فعالیت (ماه)', 'number', 1, 1, 20),
-(2, 'training_method', 'نحوهٔ آموزش و آشنایی با حرفه', 'radio', 1, 1, 30),
-(3, 'ownership_status', 'وضعیت مالکیت', 'radio', 1, 1, 10),
-(3, 'province', 'استان', 'text', 1, 1, 20),
-(3, 'county', 'شهرستان', 'text', 1, 1, 30),
-(3, 'city', 'شهر', 'text', 1, 1, 40),
-(3, 'district', 'بخش', 'text', 0, 1, 50),
-(3, 'rural_district', 'دهستان', 'text', 0, 1, 60),
-(3, 'village', 'روستا', 'text', 0, 1, 70),
-(3, 'electricity_bill_id', 'شناسهٔ قبض برق', 'text', 1, 1, 80),
-(3, 'address_street', 'خیابان', 'text', 1, 1, 90),
-(3, 'address_alley', 'کوچه', 'text', 1, 1, 100),
-(3, 'address_plaque', 'پلاک', 'text', 1, 1, 110),
-(4, 'national_card_front', 'تصویر کارت ملی (رو)', 'file', 1, 1, 10),
-(4, 'national_card_back', 'تصویر کارت ملی (پشت)', 'file', 0, 1, 20),
-(4, 'birth_cert', 'تصویر شناسنامه', 'file', 1, 1, 30),
-(4, 'ownership_doc', 'مدرک مالکیت/اجاره‌نامه/حکم سرپرستی', 'file', 1, 1, 40),
-(4, 'vocational_cert', 'گواهینامهٔ فنی‌وحرفه‌ای', 'file', 0, 1, 50),
-(4, 'education_degree', 'آخرین مدرک تحصیلی', 'file', 0, 1, 60),
-(4, 'product_photos', 'تصاویر متقاضی با محصولات حین تولید', 'file', 0, 1, 70),
-(4, 'optional_1', 'مدارک اختیاری ۱', 'file', 0, 1, 80),
-(4, 'optional_2', 'مدارک اختیاری ۲', 'file', 0, 1, 90),
-(4, 'optional_3', 'مدارک اختیاری ۳', 'file', 0, 1, 100)
-ON DUPLICATE KEY UPDATE field_key = field_key;
+-- === بذر مراحل ویزارد سیستمی ===
+INSERT INTO wizard_steps (id, view_key, title, icon, is_system, sort_order) VALUES
+(1, 'step1', 'اطلاعات هویتی', 'id-card', 1, 10),
+(2, 'step2', 'اطلاعات شغلی', 'vase', 1, 20),
+(3, 'step3', 'اطلاعات ملک', 'home', 1, 30),
+(4, 'step4', 'بارگذاری مدارک', 'upload', 1, 1000)
+ON DUPLICATE KEY UPDATE title = VALUES(title);
 
+-- === بذر مراحل اختصاصی سرویس ۳ (پشتیبان) ===
+INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
+SELECT 'اطلاعات پشتیبان', 'طرح توجیهی و اطلاعات افراد تحت پوشش (اخصاصی مجوز پشتیبان)', 'users', NULL, 3, 0, 1, 35
+FROM DUAL WHERE NOT EXISTS (
+    SELECT 1 FROM wizard_steps WHERE title = 'اطلاعات پشتیبان' AND service_type_id = 3
+);
 
-USE handicraft_license;
+-- === بذر مراحل اختصاصی سرویس ۲ (مشاغل خانگی مستقل) ===
+INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
+SELECT 'اطلاعات طرح و شغل', 'اطلاعات شغل، مهارت و طرح کسب‌وکار خانگی', 'briefcase', NULL, 2, 0, 1, 40
+FROM DUAL WHERE NOT EXISTS (
+    SELECT 1 FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2
+);
 
--- ۱. وضعیت‌های جدید (مسیر یکطرفهٔ رسیدگی گسترده‌تر شد)
-ALTER TABLE applicants
-MODIFY COLUMN current_status ENUM(
-    'پیش‌نویس',
-    'تکمیل اطلاعات',
-    'احراز نشانی',
-    'بررسی کارشناسی رشته',
-    'ثبت درخواست صدور',
-    'بارگذاری مدارک به سازمان',
-    'درخواست اصلاح مدارک',
-    'تأیید اولیه',
-    'تأیید نهایی',
-    'صدور مجوز',
-    'تحویل مجوز',
-    'مشاهده و چاپ',
-    'رد درخواست',
-    'لغو',
-    'تطبیق آدرس با ثبت احوال',
-    'دریافت تصویر مجوز',
-    'تأیید اولیه در سامانه مشاغل خانگی',
-    'تأیید نهایی دریافت کد رهگیری'
-) DEFAULT 'پیش‌نویس';
+INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
+SELECT 'اطلاعات مالی', 'سرمایه، وام، سود و هزینه تجهیزات', 'wallet', NULL, 2, 0, 1, 50
+FROM DUAL WHERE NOT EXISTS (
+    SELECT 1 FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2
+);
 
--- ۲. جدول رشته‌های مجوز (به‌جای فهرست سخت‌کدشده در ویو)
---    هر رشته به یک سرویس خاص وصل می‌شود (service_type_id) تا هر سرویس
---    فهرست اختصاصی خود را داشته باشد. ستون و FOREIGN KEY پس از ایجاد
---    جدول service_types (در ادامهٔ همین فایل) افزوده می‌شود.
-CREATE TABLE IF NOT EXISTS license_titles (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    service_type_id INT NULL,                 -- ۱=صنایع دستی، ۲=مشاغل خانگی مستقل، ۳=پشتیبان
-    category VARCHAR(80) NOT NULL,            -- گروه/خوشهٔ رشته (optgroup)
-    title VARCHAR(120) NOT NULL,              -- عنوان رشته (یکتا در دامنهٔ هر سرویس)
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_active_sort (is_active, sort_order),
-    INDEX idx_active_service_sort (service_type_id, is_active, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
+SELECT 'محل فعالیت شخصی', 'مشخصات فضای فعالیت و امکانات', 'home', NULL, 2, 0, 1, 60
+FROM DUAL WHERE NOT EXISTS (
+    SELECT 1 FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2
+);
 
--- بذر فهرست گستردهٔ رشته‌های صنایع دستی (سرویس ۱ — بر پایهٔ طبقه‌بندی فرهنگستان هنر و فهرست وزارت میراث فرهنگی)
+-- === بذر فیلدهای سیستمی فرم (مراحل ۱-۴) ===
+INSERT INTO form_fields (step, wizard_step_id, field_key, label, field_type, is_required, is_system, is_active, sort_order) VALUES
+(1, 1, 'first_name', 'نام', 'text', 1, 1, 1, 10),
+(1, 1, 'last_name', 'نام خانوادگی', 'text', 1, 1, 1, 20),
+(1, 1, 'national_code', 'کد ملی', 'text', 1, 1, 1, 30),
+(1, 1, 'postal_code', 'کد پستی', 'text', 1, 1, 1, 40),
+(1, 1, 'mobile', 'شماره تلفن همراه', 'text', 1, 1, 1, 50),
+(1, 1, 'birth_date', 'تاریخ تولد', 'date_jalali', 1, 1, 1, 60),
+(1, 1, 'father_name', 'نام پدر', 'text', 1, 1, 1, 70),
+(1, 1, 'marital_status', 'وضعیت تأهل', 'radio', 1, 1, 1, 80),
+(1, 1, 'children_count', 'تعداد فرزندان', 'number', 0, 1, 1, 90),
+(1, 1, 'physical_condition', 'وضعیت جسمانی', 'radio', 1, 1, 1, 100),
+(1, 1, 'disability_details', 'توضیحات معلولیت', 'textarea', 0, 1, 1, 110),
+(1, 1, 'income_decile', 'دهک درآمدی', 'number', 0, 1, 1, 120),
+(1, 1, 'has_court_case', 'پرونده قضایی', 'radio', 1, 1, 1, 130),
+(1, 1, 'has_active_loan', 'وام فعال', 'radio', 1, 1, 1, 140),
+(1, 1, 'has_overdue_installments', 'اقساط معوقه', 'radio', 1, 1, 1, 150),
+(2, 2, 'license_title', 'عنوان مجوز درخواستی', 'select', 1, 1, 1, 10),
+(2, 2, 'experience_months', 'سابقهٔ فعالیت (ماه)', 'number', 1, 1, 1, 20),
+(2, 2, 'training_method', 'نحوهٔ آموزش و آشنایی با حرفه', 'radio', 1, 1, 1, 30),
+(3, 3, 'ownership_status', 'وضعیت مالکیت', 'radio', 1, 1, 1, 10),
+(3, 3, 'province', 'استان', 'text', 1, 1, 1, 20),
+(3, 3, 'county', 'شهرستان', 'text', 1, 1, 1, 30),
+(3, 3, 'city', 'شهر', 'text', 1, 1, 1, 40),
+(3, 3, 'district', 'بخش', 'text', 0, 1, 1, 50),
+(3, 3, 'rural_district', 'دهستان', 'text', 0, 1, 1, 60),
+(3, 3, 'village', 'روستا', 'text', 0, 1, 1, 70),
+(3, 3, 'electricity_bill_id', 'شناسهٔ قبض برق', 'text', 1, 1, 1, 80),
+(3, 3, 'address_street', 'خیابان', 'text', 1, 1, 1, 90),
+(3, 3, 'address_alley', 'کوچه', 'text', 1, 1, 1, 100),
+(3, 3, 'address_plaque', 'پلاک', 'text', 1, 1, 1, 110),
+(4, 4, 'national_card_front', 'تصویر کارت ملی (رو)', 'file', 1, 1, 1, 10),
+(4, 4, 'national_card_back', 'تصویر کارت ملی (پشت)', 'file', 0, 1, 1, 20),
+(4, 4, 'birth_cert', 'تصویر شناسنامه', 'file', 1, 1, 1, 30),
+(4, 4, 'ownership_doc', 'مدرک مالکیت/اجاره‌نامه/حکم سرپرستی', 'file', 1, 1, 1, 40),
+(4, 4, 'vocational_cert', 'گواهینامهٔ فنی‌وحرفه‌ای', 'file', 0, 1, 1, 50),
+(4, 4, 'education_degree', 'آخرین مدرک تحصیلی', 'file', 0, 1, 1, 60),
+(4, 4, 'product_photos', 'تصاویر متقاضی با محصولات حین تولید', 'file', 0, 1, 1, 70),
+(4, 4, 'optional_1', 'مدارک اختیاری ۱', 'file', 0, 1, 1, 80),
+(4, 4, 'optional_2', 'مدارک اختیاری ۲', 'file', 0, 1, 1, 90),
+(4, 4, 'optional_3', 'مدارک اختیاری ۳', 'file', 0, 1, 1, 100)
+ON DUPLICATE KEY UPDATE label = VALUES(label);
+
+-- === بذر فیلدهای اختصاصی سرویس ۳ (پشتیبان) — dyn_justification_plan، dyn_covered_persons، dyn_income_details ===
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات پشتیبان' AND service_type_id = 3 LIMIT 1), 3,
+       'dyn_justification_plan', 'طرح توجیهی کسب‌وکار', 'textarea', 1, 0, 1, 10,
+       'شرح کامل طرح: محصول/خدمت، بازار هدف، برآورد هزینه و درآمد'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_justification_plan' AND service_type_id = 3);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات پشتیبان' AND service_type_id = 3 LIMIT 1), 3,
+       'dyn_covered_persons', 'فهرست و مشخصات افراد تحت پوشش', 'textarea', 1, 0, 1, 20,
+       'نام، کد ملی و رشتهٔ فعالیت هر شاغل خانگی تحت پوشش (هر نفر یک خط)'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_covered_persons' AND service_type_id = 3);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات پشتیبان' AND service_type_id = 3 LIMIT 1), 3,
+       'dyn_income_details', 'جزئیات درآمدی', 'textarea', 1, 0, 1, 30,
+       'منابع درآمد، سهم پشتیبان و شاغلان، و نحوهٔ تسویه'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_income_details' AND service_type_id = 3);
+
+-- === بذر فیلدهای اختصاصی سرویس ۲ (مشاغل خانگی مستقل) — مرحلهٔ ۵: اطلاعات طرح و شغل ===
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_skill_level', 'سطح مهارت', 'select', 'دارای مهارت کامل انجام کسب و کار مورد نظر\nنیاز به آموزش\nنیاز به مشاوره', 1, 0, 1, 10
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_skill_level' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_has_skill', 'داشتن مهارت لازم', 'radio', 'بله\nخیر', 1, 0, 1, 20
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_has_skill' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, placeholder)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_job_title', 'عنوان شغل', 'text', 1, 0, 1, 30, 'مثلاً قالیباف، فرَتَ باف، سفالگر'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_job_title' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_skill_acquisition', 'نحوه کسب مهارت', 'select',
+       'شیوه تجربی (استاد شاگردی - شغل پدری - روش خودآموز)\nشیوه آموزشی (آموزشگاه فنی و حرفه‌ای)\nشیوه دانشگاهی', 1, 0, 1, 40
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_skill_acquisition' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_need_support', 'نیاز به پشتیبانی', 'radio', 'بله\nخیر', 1, 0, 1, 50
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_need_support' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_cooperation', 'تمایل به همکاری', 'radio', 'بله\nخیر', 1, 0, 1, 60
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_cooperation' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, placeholder)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_plan_summary', 'خلاصه طرح', 'textarea', 1, 0, 1, 70, 'مثلاً تولید محصولات دستباف سنتی'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_plan_summary' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_experience_months', 'ماه‌های تجربه', 'number', 1, 0, 1, 80
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_experience_months' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_customers', 'مشتریان', 'checkbox', 'سفارشی\nمغازه یا کارگاه\nعرضه عمومی\nآنلاین (مجازی)', 0, 0, 1, 90, 'چندانتخابی'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_customers' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_marketing_methods', 'روش‌های بازاریابی', 'checkbox', 'معاملاتی\nچهره به چهره\nتلفنی\nرابطه‌ای', 0, 0, 1, 100
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_marketing_methods' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_target_markets', 'بازارهای هدف', 'checkbox', 'بازار داخل\nمنطقه‌ای\nصادرات', 0, 0, 1, 110
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_target_markets' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_risks', 'ریسک‌ها', 'textarea', 0, 0, 1, 120, 'ریسک‌های احتمالی طرح'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_risks' AND service_type_id = 2);
+
+-- === بذر فیلدهای اختصاصی سرویس ۲ — مرحلهٔ ۶: اطلاعات مالی ===
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_fixed_capital', 'سرمایه ثابت (میلیون ریال)', 'number', 1, 0, 1, 10, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_fixed_capital' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_working_capital', 'سرمایه در گردش (میلیون ریال)', 'number', 1, 0, 1, 20, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_working_capital' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_cash_share', 'سهم نقدی (میلیون ریال)', 'number', 1, 0, 1, 30, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_cash_share' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_noncash_share', 'سهم غیرنقدی (میلیون ریال)', 'number', 1, 0, 1, 40, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_noncash_share' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_loan_request', 'درخواست وام (میلیون ریال)', 'number', 1, 0, 1, 50, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_loan_request' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_financial_rate', 'نرخ مالی', 'number', 0, 0, 1, 60
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_financial_rate' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_break_even', 'نقطه سر به سر (میلیون ریال)', 'number', 1, 0, 1, 70, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_break_even' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_annual_profit', 'سود سالانه تخمینی (میلیون ریال)', 'number', 1, 0, 1, 80, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_annual_profit' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_annual_production', 'تولید سالانه تخمینی (میلیون ریال)', 'number', 1, 0, 1, 90, 'معادل X میلیون تومان'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_annual_production' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_equipment_costs', 'هزینه تجهیزات (شرح کامل)', 'textarea', 0, 0, 1, 100, 'هر خط: عنوان، تعداد، قیمت واحد'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_equipment_costs' AND service_type_id = 2);
+
+-- === بذر فیلدهای اختصاصی سرویس ۲ — مرحلهٔ ۷: محل فعالیت شخصی ===
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_infrastructure_area', 'مساحت زیرساخت (متر)', 'number', 1, 0, 1, 10
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_infrastructure_area' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_property_ownership', 'مالکیت', 'select', 'ملک\nاجاره‌ای\nرایگان', 1, 0, 1, 20
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_property_ownership' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_building_type', 'نوع ساختمان', 'select', 'ویلا\nآپارتمان\nسایر', 1, 0, 1, 30
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_building_type' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_activity_area', 'مساحت فعالیت (متر)', 'number', 1, 0, 1, 40
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_activity_area' AND service_type_id = 2);
+
+INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order, help_text)
+SELECT 0, (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1), 2,
+       'dyn_facilities', 'امکانات', 'checkbox', 'تلفن ثابت\nگاز لوله‌کشی\nبرق\nآب لوله‌کشی', 0, 0, 1, 50, 'چندانتخابی'
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_facilities' AND service_type_id = 2);
+
+-- === بذر رشته‌های صنایع دستی (سرویس ۱) ===
 INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 -- بافته‌های داری
 (1, 'بافته‌های داری', 'قالی تمام پشمی', 10), (1, 'بافته‌های داری', 'قالی پشم و ابریشم', 11),
@@ -333,7 +894,8 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (1, 'بافته‌های داری', 'زربفت', 20), (1, 'بافته‌های داری', 'دارایی بافی', 21),
 (1, 'بافته‌های داری', 'چادرشب بافی', 22), (1, 'بافته‌های داری', 'شمد بافی', 23),
 (1, 'بافته‌های داری', 'عبا بافی', 24), (1, 'بافته‌های داری', 'ابریشم بافی', 25),
-(1, 'بافته‌های داری', 'پلاس بافی', 26),
+(1, 'بافته‌های داری', 'پلاس بافی', 26), (1, 'بافته‌های داری', 'فرَتَ باف (تنُ باف)', 27),
+(1, 'بافته‌های داری', 'گلیم نقش برجسته', 28), (1, 'بافته‌های داری', 'بافت سنتی عشایری', 31),
 -- رودوزی‌های سنتی
 (1, 'رودوزی‌های سنتی', 'پته دوزی', 30), (1, 'رودوزی‌های سنتی', 'سرمه دوزی', 31),
 (1, 'رودوزی‌های سنتی', 'زر دوزی', 32), (1, 'رودوزی‌های سنتی', 'ابریشم دوزی', 33),
@@ -350,12 +912,16 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (1, 'صنایع فلزی', 'دواتگری', 62), (1, 'صنایع فلزی', 'ملیله سازی', 63),
 (1, 'صنایع فلزی', 'فیروزه کوبی', 64), (1, 'صنایع فلزی', 'طلا و نقره سازی', 65),
 (1, 'صنایع فلزی', 'مسگری', 66), (1, 'صنایع فلزی', 'چاقو و کارد سازی', 67),
+(1, 'صنایع فلزی', 'آهنگری سنتی', 68), (1, 'صنایع فلزی', 'قفل‌سازی سنتی', 69),
+(1, 'صنایع فلزی', 'ساخت ظروف مسی دست‌ساز', 70), (1, 'صنایع فلزی', 'زیورآلات فلزی دست‌ساز', 71),
 -- صنایع چوبی
 (1, 'صنایع چوبی', 'منبت کاری', 70), (1, 'صنایع چوبی', 'معرق کاری', 71),
 (1, 'صنایع چوبی', 'خراطی', 72), (1, 'صنایع چوبی', 'پیکره سازی چوبی', 73),
 (1, 'صنایع چوبی', 'گره چینی', 74), (1, 'صنایع چوبی', 'مقرنس', 75),
 (1, 'صنایع چوبی', 'نقاشی چوب (رنگ روغن)', 76), (1, 'صنایع چوبی', 'خیمه جات', 77),
 (1, 'صنایع چوبی', 'ساخت سازهای سنتی (تار، سه تار، کمانچه و...)', 78),
+(1, 'صنایع چوبی', 'صندلی و مبل چوبی دست‌ساز', 77), (1, 'صنایع چوبی', 'ساخت مبلمان روستایی', 79),
+(1, 'صنایع چوبی', 'ساخت اشیاء تزئینی چوبی', 80), (1, 'صنایع چوبی', 'قاشق و چنگال چوبی دست‌ساز', 81),
 -- شیشه و نگارگری
 (1, 'شیشه و آبگینه', 'شیشه گری', 85), (1, 'شیشه و آبگینه', 'نقاشی روی شیشه', 86),
 (1, 'شیشه و آبگینه', 'آبگینه تراشی', 87), (1, 'شیشه و آبگینه', 'آینه کاری', 88),
@@ -378,61 +944,13 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (1, 'بافته‌های الیاف طبیعی', 'حصیر بافی', 120), (1, 'بافته‌های الیاف طبیعی', 'خس بافی', 121),
 (1, 'بافته‌های الیاف طبیعی', 'بوته بافی', 122), (1, 'بافته‌های الیاف طبیعی', 'کپو بافی', 123),
 (1, 'بافته‌های الیاف طبیعی', 'گندم بافی', 124), (1, 'بافته‌های الیاف طبیعی', 'مرصع بافی', 125),
--- سایر
+-- سایر هنرهای دستی
 (1, 'سایر هنرهای دستی', 'مینیاتور سفالی', 130), (1, 'سایر هنرهای دستی', 'معرق کاشی', 131),
 (1, 'سایر هنرهای دستی', 'ورق کوبی', 132), (1, 'سایر هنرهای دستی', 'تراش شیشه', 133),
 (1, 'سایر هنرهای دستی', 'ساخت زیورآلات دست ساز', 134), (1, 'سایر هنرهای دستی', 'شمع سازی دست ساز', 135),
 (1, 'سایر هنرهای دستی', 'صابون دست ساز', 136), (1, 'سایر هنرهای دستی', 'عروسک سازی', 137),
 (1, 'سایر هنرهای دستی', 'سفالینه و مجسمه سازی', 138), (1, 'سایر هنرهای دستی', 'بافته‌های تلفیقی', 139),
 (1, 'سایر هنرهای دستی', 'سایر (با ذکر عنوان در توضیحات)', 140),
--- === بافته‌های دستی (افزودنی) ===
-(1, 'بافته‌های داری', 'فرَتَ باف (تنُ باف)', 27),
-(1, 'بافته‌های داری', 'گلیم نقش برجسته', 28),
-(1, 'بافته‌های داری', 'بافت سنتی عشایری', 31),
--- === صنایع غذایی سنتی ===
-(1, 'صنایع غذایی سنتی', 'فرآوری محصولات لبنی (پنیر، ماست، کره سنتی)', 200),
-(1, 'صنایع غذایی سنتی', 'پخت نان سنتی و محلی', 201),
-(1, 'صنایع غذایی سنتی', 'رب و رب میوه سنتی', 202),
-(1, 'صنایع غذایی سنتی', 'ترشی و شور سنتی', 203),
-(1, 'صنایع غذایی سنتی', 'انواع مربا و شیرینی سنتی', 204),
-(1, 'صنایع غذایی سنتی', 'آبگوشت و خورش سنتی (آماده)', 205),
-(1, 'صنایع غذایی سنتی', 'فرآوری گیاهان دارویی و عرقیجات', 206),
-(1, 'صنایع غذایی سنتی', 'خشک کردن میوه و سبزی', 207),
-(1, 'صنایع غذایی سنتی', 'سس و چاشنی سنتی', 208),
--- === صنایع نساجی و پوشاک ===
-(1, 'صنایع نساجی و پوشاک', 'خیاطی سنتی و محلی', 220),
-(1, 'صنایع نساجی و پوشاک', 'دوخت لباس محلی و قومی', 221),
-(1, 'صنایع نساجی و پوشاک', 'بافتنی دستی (پیراهن، کلاه، شال)', 222),
-(1, 'صنایع نساجی و پوشاک', 'دوخت چادر عربی و عشایری', 223),
-(1, 'صنایع نساجی و پوشاک', 'دوخت کیف و کوله دست‌ساز', 225),
-(1, 'صنایع نساجی و پوشاک', 'دوخت کفش و دمپایی سنتی', 226),
--- === صنایع چوبی (افزودنی) ===
-(1, 'صنایع چوبی', 'صندلی و مبل چوبی دست‌ساز', 77),
-(1, 'صنایع چوبی', 'ساخت مبلمان روستایی', 79),
-(1, 'صنایع چوبی', 'ساخت اشیاء تزئینی چوبی', 80),
-(1, 'صنایع چوبی', 'قاشق و چنگال چوبی دست‌ساز', 81),
--- === آرایش و بهداشت سنتی ===
-(1, 'آرایش و بهداشت سنتی', 'صابون گیاهی و سنتی', 240),
-(1, 'آرایش و بهداشت سنتی', 'محصولات آرایشی طبیعی (حنا، وسمه)', 241),
-(1, 'آرایش و بهداشت سنتی', 'عطر و گلاب سنتی', 242),
-(1, 'آرایش و بهداشت سنتی', 'محصولات مراقبت پوست طبیعی', 243),
--- === صنایع فلزی (افزودنی) ===
-(1, 'صنایع فلزی', 'آهنگری سنتی', 68),
-(1, 'صنایع فلزی', 'قفل‌سازی سنتی', 69),
-(1, 'صنایع فلزی', 'ساخت ظروف مسی دست‌ساز', 70),
-(1, 'صنایع فلزی', 'زیورآلات فلزی دست‌ساز', 71),
--- === گردشگری و اقامتگاه ===
-(1, 'گردشگری و اقامتگاه', 'اقامتگاه بوم‌گردی', 260),
-(1, 'گردشگری و اقامتگاه', 'چایخانه سنتی', 261),
-(1, 'گردشگری و اقامتگاه', 'غذاهای محلی و سنتی', 262),
-(1, 'گردشگری و اقامتگاه', 'صنایع دستی سوغاتی', 263),
-(1, 'گردشگری و اقامتگاه', 'راهنمای گردشگری محلی', 264),
--- === محصولات خانگی و دکوراسیون ===
-(1, 'محصولات خانگی و دکوراسیون', 'شمع تزئینی و معطر', 280),
-(1, 'محصولات خانگی و دکوراسیون', 'گل و گیاه مصنوعی دست‌ساز', 281),
-(1, 'محصولات خانگی و دکوراسیون', 'ساعت و اشیاء دکوری دست‌ساز', 282),
-(1, 'محصولات خانگی و دکوراسیون', 'بافت پرده و لوازم خانه', 283),
--- === سایر (افزودنی) ===
 (1, 'سایر هنرهای دستی', 'عروسک و ماکت محلی', 141),
 (1, 'سایر هنرهای دستی', 'ساخت بازی‌های سنتی', 142),
 (1, 'سایر هنرهای دستی', 'کتاب دست‌ساز و صحافی هنری', 143),
@@ -443,341 +961,7 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (1, 'سایر هنرهای دستی', 'آینه کاری و طلا کوبی', 148)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
--- ۳. اصلاح دامنهٔ روبیکا و افزودن کلید تصویر مدیر
-UPDATE settings SET setting_value = REPLACE(setting_value, 'rubika.cc', 'rubika.ir')
-WHERE setting_key IN ('about_content');
-INSERT INTO settings (setting_key, setting_value) VALUES
-('owner_image', '')
-ON DUPLICATE KEY UPDATE setting_key = setting_key;
-
-
-USE handicraft_license;
-
--- کانال‌های پرداخت (از پنل مدیریت قابل CRUD)
-CREATE TABLE IF NOT EXISTS payment_channels (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(100) NOT NULL,
-    channel_type ENUM('کارت به کارت','حساب بانکی','پرداخت اینترنتی','سایر') NOT NULL DEFAULT 'کارت به کارت',
-    account_info TEXT NULL,               -- شمارهٔ کارت/حساب/شبا/لینک درگاه + نام دارنده
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- پرداخت‌های متقاضیان
-CREATE TABLE IF NOT EXISTS payments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    applicant_id INT NOT NULL,
-    payment_channel_id INT NULL,
-    purpose ENUM('هزینهٔ ثبت‌نام','هزینهٔ دریافت مجدد تصویر مجوز') NOT NULL DEFAULT 'هزینهٔ ثبت‌نام',
-    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,      -- تومان
-    reference_code VARCHAR(50) NULL,                 -- کد پیگیری بانکی
-    paid_at DATE NULL,                               -- تاریخ واریز اعلامی (میلادی، از شمسی تبدیل می‌شود)
-    receipt_document_id INT NULL,                    -- تصویر رسید → documents
-    linked_request_id INT NULL,                      -- درخواست مرتبط (بازصدور تصویر مجوز — فاز ۶)
-    status ENUM('در انتظار رسید','در انتظار بررسی','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار رسید',
-    reviewed_by INT NULL,
-    reviewed_at DATETIME NULL,
-    reject_reason VARCHAR(255) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    FOREIGN KEY (payment_channel_id) REFERENCES payment_channels(id) ON DELETE SET NULL,
-    FOREIGN KEY (receipt_document_id) REFERENCES documents(id) ON DELETE SET NULL,
-    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_pay_status (status),
-    INDEX idx_pay_applicant (applicant_id),
-    INDEX idx_pay_purpose (purpose)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- پرچم درخواست پرداخت روی پرونده (مدیر فعال می‌کند)
-ALTER TABLE applicants
-    ADD COLUMN payment_required TINYINT(1) NOT NULL DEFAULT 0 AFTER priority,
-    ADD COLUMN payment_requested_at DATETIME NULL AFTER payment_required;
-
--- مبلغ پیش‌فرض هزینهٔ ثبت‌نام (تومان) — از پنل تنظیمات قابل تغییر
-INSERT INTO settings (setting_key, setting_value) VALUES
-('registration_fee_amount', '500000'),
-('license_reissue_fee_amount', '100000')
-ON DUPLICATE KEY UPDATE setting_key = setting_key;
-
--- دو کانال نمونه (مدیر از پنل ویرایش/حذف می‌کند)
-INSERT INTO payment_channels (title, channel_type, account_info, sort_order) VALUES
-('کارت بانک ملت — به نام امین دروگر بزدی', 'کارت به کارت', '6104-3333-0000-0000 (نمونه — از پنل تنظیمات ویرایش کنید)', 10),
-('حساب بانکی سامانه', 'حساب بانکی', 'شبا: IR00-0000-0000-0000-0000-0000-00 (نمونه)', 20)
-ON DUPLICATE KEY UPDATE title = title;
-
-
-USE handicraft_license;
-
--- تصویر مجوز هر پرونده (توسط مدیر پس از صدور بارگذاری می‌شود)
-CREATE TABLE IF NOT EXISTS license_files (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    applicant_id INT NOT NULL UNIQUE,
-    document_id INT NOT NULL,            -- تصویر مجوز در جدول documents
-    download_count INT NOT NULL DEFAULT 0,
-    first_accessed_at DATETIME NULL,
-    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- درخواست‌های دسترسی به تصویر مجوز (بار اول خودکار، دفعات بعد با تأیید مدیر و در صورت لزوم پرداخت)
-CREATE TABLE IF NOT EXISTS license_access_requests (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    applicant_id INT NOT NULL,
-    is_first_access TINYINT(1) NOT NULL DEFAULT 0,  -- دریافت اول (خودکار)
-    access_token CHAR(64) NULL UNIQUE,              -- توکن لینک زمان‌دار
-    requires_payment TINYINT(1) NOT NULL DEFAULT 0,
-    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    payment_id INT NULL,                            -- پرداخت مرتبط
-    status ENUM('در انتظار','تأیید شده','رد شده','در انتظار پرداخت','منقضی') NOT NULL DEFAULT 'در انتظار',
-    expires_at DATETIME NULL,
-    reviewed_by INT NULL,
-    reviewed_at DATETIME NULL,
-    reject_reason VARCHAR(255) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE SET NULL,
-    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_lar_status (status),
-    INDEX idx_lar_applicant (applicant_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- اتصال پرداخت‌های «دریافت مجدد تصویر مجوز» به درخواست مرتبط
-ALTER TABLE payments
-    ADD CONSTRAINT fk_payment_license_request
-    FOREIGN KEY (linked_request_id) REFERENCES license_access_requests(id) ON DELETE SET NULL;
-
-
-USE handicraft_license;
-
--- الگوهای پیامک (متن + وضعیت مقصد) — تماماً از پنل مدیریت قابل CRUD
-CREATE TABLE IF NOT EXISTS sms_templates (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(120) NOT NULL,           -- مثال: «پیامک پذیرش نهایی سازمان»
-    sample_text TEXT NULL,                 -- نمونهٔ متن برای راهنمای متقاضی
-    target_status VARCHAR(50) NOT NULL,    -- وضعیت مقصد پس از تأیید مدیر
-    requires_code TINYINT(1) NOT NULL DEFAULT 0,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- پیامک‌های ثبت‌شده توسط متقاضیان
-CREATE TABLE IF NOT EXISTS user_sms_entries (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    applicant_id INT NOT NULL,
-    sms_template_id INT NOT NULL,
-    sms_code VARCHAR(50) NULL,
-    sms_text TEXT NULL,
-    received_at DATE NULL,                  -- تاریخ دریافت پیامک (میلادی، از شمسی تبدیل)
-    status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار',
-    applied_status TINYINT(1) NOT NULL DEFAULT 0,  -- آیا وضعیت پرونده اعمال شد؟
-    reviewed_by INT NULL,
-    reviewed_at DATETIME NULL,
-    reject_reason VARCHAR(255) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    FOREIGN KEY (sms_template_id) REFERENCES sms_templates(id) ON DELETE CASCADE,
-    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_sms_status (status),
-    INDEX idx_sms_applicant (applicant_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- الگوهای پیش‌فرض متناسب با وضعیت‌های سامانه
-INSERT INTO sms_templates (title, sample_text, target_status, requires_code, sort_order) VALUES
-('پیامک احراز نشانی / تکمیل بررسی', 'پرونده شما در حال بررسی است...', 'احراز نشانی', 0, 10),
-('پیامک ثبت درخواست صدور مجوز', 'درخواست صدور مجوز شما ثبت شد...', 'ثبت درخواست صدور', 0, 20),
-('پیامک درخواست اصلاح مدارک', 'لطفاً مدارک ناقص را تکمیل نمایید...', 'درخواست اصلاح مدارک', 1, 30),
-('پیامک تأیید اولیه سازمان', 'مدارک شما تأیید اولیه شد...', 'تأیید اولیه', 1, 40),
-('پیامک تأیید نهایی', 'پرونده شما تأیید نهایی شد...', 'تأیید نهایی', 1, 50),
-('پیامک صدور مجوز', 'مجوز شما صادر شد؛ برای دریافت اقدام کنید...', 'صدور مجوز', 1, 60)
-ON DUPLICATE KEY UPDATE title = title;
-
-
-USE handicraft_license;
-
-CREATE TABLE IF NOT EXISTS applicant_revisions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    applicant_id INT NOT NULL,
-    payload JSON NOT NULL,                 -- کل دادهٔ پیشنهادی (مراحل ۱-۳ + فهرست مدارک جدید + یادداشت)
-    note VARCHAR(500) NULL,                -- توضیح متقاضی برای مدیر
-    status ENUM('در انتظار','تأیید شده','رد شده') NOT NULL DEFAULT 'در انتظار',
-    reviewed_by INT NULL,
-    reviewed_at DATETIME NULL,
-    reject_reason VARCHAR(255) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_rev_status (status),
-    INDEX idx_rev_applicant (applicant_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-USE handicraft_license;
-
--- ۱. جدول اشخاص (لنگر هویت = کد ملی)
-CREATE TABLE IF NOT EXISTS persons (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    national_code CHAR(10) NOT NULL UNIQUE,
-    first_name VARCHAR(50) NOT NULL,
-    last_name VARCHAR(50) NOT NULL,
-    father_name VARCHAR(50) NULL,
-    birth_date DATE NULL,
-    mobile CHAR(11) NOT NULL,
-    mobile_2 CHAR(11) NULL,                          -- موبایل دوم (برای متقاضیان دارای چند شماره)
-    mobile_3 CHAR(11) NULL,                          -- موبایل سوم
-    postal_code CHAR(10) NULL,
-    person_type ENUM('حقیقی','حقوقی') NOT NULL DEFAULT 'حقیقی',   -- فاز ۱۰
-    -- اطلاعات شخص حقوقی (فاز ۱۰)
-    company_name VARCHAR(150) NULL,
-    company_national_id CHAR(11) NULL,
-    reg_number VARCHAR(30) NULL,
-    reg_date DATE NULL,
-    company_type VARCHAR(60) NULL,
-    economic_code VARCHAR(20) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_person_mobile (mobile),
-    INDEX idx_person_mobile_2 (mobile_2),
-    INDEX idx_person_mobile_3 (mobile_3)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ۲. گسترش پرونده‌ها
-ALTER TABLE applicants
-    ADD COLUMN person_id INT NULL AFTER id,
-    ADD COLUMN parent_application_id INT NULL AFTER person_id,
-    ADD COLUMN license_state ENUM('جاری','صادر شده','باطل شده','منقضی') NOT NULL DEFAULT 'جاری' AFTER priority,
-    ADD COLUMN license_valid_until DATE NULL AFTER license_state,
-    ADD INDEX idx_person (person_id),
-    ADD INDEX idx_parent_app (parent_application_id),
-    ADD INDEX idx_license_state (license_state);
-
-ALTER TABLE applicants
-    ADD CONSTRAINT fk_app_person FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE SET NULL,
-    ADD CONSTRAINT fk_app_parent FOREIGN KEY (parent_application_id) REFERENCES applicants(id) ON DELETE SET NULL;
-
--- ۳. مهاجرت داده: برای هر کد ملی یک شخص بساز و پرونده‌ها را متصل کن
-INSERT INTO persons (national_code, first_name, last_name, father_name, birth_date, mobile, postal_code)
-SELECT a.national_code,
-       SUBSTRING_INDEX(GROUP_CONCAT(a.first_name ORDER BY a.id DESC), ',', 1),
-       SUBSTRING_INDEX(GROUP_CONCAT(a.last_name ORDER BY a.id DESC), ',', 1),
-       SUBSTRING_INDEX(GROUP_CONCAT(COALESCE(a.father_name,'') ORDER BY a.id DESC), ',', 1),
-       MAX(a.birth_date),
-       SUBSTRING_INDEX(GROUP_CONCAT(a.mobile ORDER BY a.id DESC), ',', 1),
-       SUBSTRING_INDEX(GROUP_CONCAT(a.postal_code ORDER BY a.id DESC), ',', 1)
-FROM applicants a
-GROUP BY a.national_code
-ON DUPLICATE KEY UPDATE national_code = national_code;
-
-UPDATE applicants a
-JOIN persons p ON p.national_code = a.national_code
-SET a.person_id = p.id
-WHERE a.person_id IS NULL;
-
--- پرونده‌های صادرشده → license_state
-UPDATE applicants SET license_state = 'صادر شده'
-WHERE current_status IN ('صدور مجوز','تحویل مجوز') AND license_state = 'جاری';
-
--- ۴. رفع یکتایی سراسری کد ملی/موبایل روی پرونده‌ها (یکتا در سطح persons باقی می‌ماند)
--- فقط قید UNIQUE حذف می‌شود؛ ایندکس‌های عادی idx_national_code/idx_mobile از قبل در schema وجود دارند
-ALTER TABLE applicants DROP INDEX national_code;
-ALTER TABLE applicants DROP INDEX mobile;
-
--- ۵. لاگ تلاش‌های احراز هویت (فاز ۸)
-CREATE TABLE IF NOT EXISTS identity_checks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    national_code CHAR(10) NOT NULL,
-    ip VARCHAR(45) NULL,
-    success TINYINT(1) NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_nc_time (national_code, created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
-USE handicraft_license;
-
-CREATE TABLE IF NOT EXISTS wizard_steps (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    view_key VARCHAR(30) NULL,             -- برای مراحل سیستمی: step1..step4؛ سفارشی‌ها NULL
-    title VARCHAR(100) NOT NULL,
-    description VARCHAR(255) NULL,
-    icon VARCHAR(30) NULL,                 -- نام آیکون از دیکشنری icon()
-    is_system TINYINT(1) NOT NULL DEFAULT 0,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 50,    -- مرحلهٔ مدارک sort=1000 (همیشه آخر)
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- اتصال فیلدها به مراحل ویزارد
-ALTER TABLE form_fields
-    ADD COLUMN wizard_step_id INT NULL AFTER step,
-    ADD CONSTRAINT fk_field_step FOREIGN KEY (wizard_step_id) REFERENCES wizard_steps(id) ON DELETE SET NULL;
-
--- بذر چهار مرحلهٔ سیستمی
-INSERT INTO wizard_steps (id, view_key, title, icon, is_system, sort_order) VALUES
-(1, 'step1', 'اطلاعات هویتی', 'id-card', 1, 10),
-(2, 'step2', 'اطلاعات شغلی', 'vase', 1, 20),
-(3, 'step3', 'اطلاعات ملک', 'home', 1, 30),
-(4, 'step4', 'بارگذاری مدارک', 'upload', 1, 1000)
-ON DUPLICATE KEY UPDATE title = VALUES(title);
-
--- نگاشت فیلدهای موجود به مراحل سیستمی
-UPDATE form_fields SET wizard_step_id = step WHERE wizard_step_id IS NULL AND step BETWEEN 1 AND 4;
-
-
-USE handicraft_license;
-
-CREATE TABLE IF NOT EXISTS service_types (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(120) NOT NULL UNIQUE,
-    authority VARCHAR(150) NULL,        -- مرجع صدور
-    description TEXT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- بذر سرویس‌ها (بر پایهٔ مراجع رسمی: وزارت میراث فرهنگی، وزارت کار، وزارت ارشاد)
-INSERT INTO service_types (id, title, authority, description, sort_order) VALUES
-(1, 'مجوز صنایع دستی', 'وزارت میراث فرهنگی، گردشگری و صنایع دستی',
- 'صدور مجوز رشته‌های صنایع دستی برای اشخاص حقیقی — فرآیند پایهٔ سامانه.', 10),
-(2, 'مجوز مشاغل خانگی (مستقل)', 'وزارت تعاون، کار و رفاه اجتماعی — سامانهٔ مشاغل خانگی',
- 'کسب‌وکار خانگی توسط خود متقاضی در فضای مسکونی؛ همان مدارک پایه کفایت می‌کند.', 20),
-(3, 'مجوز مشاغل خانگی (پشتیبان)', 'وزارت تعاون، کار و رفاه اجتماعی — سامانهٔ مشاغل خانگی',
- 'پشتیبانِ چند شاغل خانگی: نیازمند طرح توجیهی، فهرست افراد تحت پوشش و جزئیات درآمدی (حداقل ۵ سال سابقهٔ مرتبط).', 30),
-(4, 'مجوز گردشگری', 'وزارت میراث فرهنگی، گردشگری و صنایع دستی — درگاه ملی مجوزها / سامانهٔ جانا',
- 'اقامتگاه بوم‌گردی، تأسیسات گردشگری و دفاتر خدمات مسافرتی.', 40),
-(5, 'مجوز هنری و فرهنگی', 'وزارت فرهنگ و ارشاد اسلامی — پنجرهٔ واحد وفا',
- 'فعالیت‌های هنری، آموزشگاه‌های آزاد هنری و مؤسسات فرهنگی.', 50)
-ON DUPLICATE KEY UPDATE authority = VALUES(authority);
-
--- اتصال پرونده‌ها و فیلدها/مراحل به سرویس (NULL = مشترک بین همهٔ سرویس‌ها)
-ALTER TABLE applicants
-    ADD COLUMN service_type_id INT NULL AFTER person_id,
-    ADD CONSTRAINT fk_app_service FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE SET NULL;
-
-ALTER TABLE form_fields
-    ADD COLUMN service_type_id INT NULL AFTER wizard_step_id,
-    ADD CONSTRAINT fk_field_service FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE;
-
-ALTER TABLE wizard_steps
-    ADD COLUMN service_type_id INT NULL AFTER view_key,
-    ADD CONSTRAINT fk_step_service FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE;
-
--- =================================================================
--- اتصال رشته‌های مجوز به سرویس‌ها (اختصاصی‌سازی فهرست هر سرویس)
--- -----------------------------------------------------------------
--- هر سرویس اکنون فهرست دسته‌بندی‌ها و رشته‌های مختص به خود را دارد.
--- UNIQUE از روی title به‌جای آن روی (service_type_id, title) اعمال می‌شود
--- تا یک عنوان بتواند در چند سرویس تکرار شود ولی در هر سرویس یکتا بماند.
--- =================================================================
-ALTER TABLE license_titles
-    ADD CONSTRAINT fk_license_title_service
-        FOREIGN KEY (service_type_id) REFERENCES service_types(id) ON DELETE CASCADE,
-    ADD UNIQUE INDEX uniq_service_title (service_type_id, title);
-
--- بذر فهرست اختصاصی سرویس ۲ (مشاغل خانگی مستقل)
--- منبع: سامانهٔ مشاغل خانگی smkh.mcls.gov.ir — وزارت تعاون، کار و رفاه اجتماعی
+-- === بذر رشته‌های مشاغل خانگی مستقل (سرویس ۲) ===
 INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 -- === صنایع غذایی و آشامیدنی خانگی ===
 (2, 'صنایع غذایی و آشامیدنی خانگی', 'پخت نان سنتی و محلی', 10),
@@ -843,9 +1027,7 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (2, 'سایر کسب‌وکارهای خانگی', 'سایر (با ذکر عنوان در توضیحات)', 200)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
--- بذر فهرست اختصاصی سرویس ۳ (پشتیبان مشاغل خانگی)
--- پشتیبان کسب‌وکار چند شاغل خانگی است؛ طبقه‌بندی بر اساس نوع
--- فعالیت پشتیبانی، نه خود تولید.
+-- === بذر رشته‌های پشتیبان (سرویس ۳) ===
 INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 -- === پشتیبانی فرآورده‌های غذایی ===
 (3, 'پشتیبانی فرآورده‌های غذایی', 'پشتیبانی تولید و بسته‌بندی نان و شیرینی', 10),
@@ -854,7 +1036,7 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (3, 'پشتیبانی فرآورده‌های غذایی', 'پشتیبانی فرآوری گیاهان دارویی و عرقیجات', 13),
 (3, 'پشتیبانی فرآورده‌های غذایی', 'پشتیبانی تولید غذای آماده و سنتی', 14),
 -- === پشتیبانی صنایع دستی ===
-(3, 'پشتیبانی صنایع دستی', 'پشتیبانی تولید بافتهای سنتی (قالی، گلیم)', 30),
+(3, 'پشتیبانی صنایع دستی', 'پشتیبانی تولید بافتههای سنتی (قالی، گلیم)', 30),
 (3, 'پشتیبانی صنایع دستی', 'پشتیبانی تولید رودوزی‌های سنتی', 31),
 (3, 'پشتیبانی صنایع دستی', 'پشتیبانی تولید سفال و سرامیک', 32),
 (3, 'پشتیبانی صنایع دستی', 'پشتیبانی تولید صنایع چوبی و منبت', 33),
@@ -896,270 +1078,23 @@ INSERT INTO license_titles (service_type_id, category, title, sort_order) VALUES
 (3, 'سایر خدمات پشتیبانی', 'سایر (با ذکر عنوان در توضیحات)', 200)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
--- مرحلهٔ اختصاصی «اطلاعات پشتیبان» برای سرویس پشتیبان (با سه فیلد الزامی)
-INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
-VALUES ('اطلاعات پشتیبان', 'طرح توجیهی و اطلاعات افراد تحت پوشش (اختصاصی مجوز پشتیبان)', 'users', NULL, 3, 0, 1, 35);
+-- === بذر کانال‌های پرداخت نمونه ===
+INSERT INTO payment_channels (title, channel_type, account_info, sort_order) VALUES
+('کارت بانک ملت — به نام امین دروگر بزدی', 'کارت به کارت', '6104-3333-0000-0000 (نمونه — از پنل تنظیمات ویرایش کنید)', 10),
+('حساب بانکی سامانه', 'حساب بانکی', 'شبا: IR00-0000-0000-0000-0000-0000-00 (نمونه)', 20)
+ON DUPLICATE KEY UPDATE title = title;
 
-SET @wsid = LAST_INSERT_ID();
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, sort_order, help_text) VALUES
-(0, @wsid, 3, 'dyn_justification_plan', 'طرح توجیهی کسب‌وکار', 'textarea', 1, 0, 10,
- 'شرح کامل طرح: محصول/خدمت، بازار هدف، برآورد هزینه و درآمد'),
-(0, @wsid, 3, 'dyn_covered_persons', 'فهرست و مشخصات افراد تحت پوشش', 'textarea', 1, 0, 20,
- 'نام، کد ملی و رشتهٔ فعالیت هر شاغل خانگی تحت پوشش (هر نفر یک خط)'),
-(0, @wsid, 3, 'dyn_income_details', 'جزئیات درآمدی', 'textarea', 1, 0, 30,
- 'منابع درآمد، سهم پشتیبان و شاغلان، و نحوهٔ تسویه');
+-- === بذر الگوهای پیامک ===
+INSERT INTO sms_templates (title, sample_text, target_status, requires_code, sort_order) VALUES
+('پیامک احراز نشانی / تکمیل بررسی', 'پرونده شما در حال بررسی است...', 'احراز نشانی', 0, 10),
+('پیامک ثبت درخواست صدور مجوز', 'درخواست صدور مجوز شما ثبت شد...', 'ثبت درخواست صدور', 0, 20),
+('پیامک درخواست اصلاح مدارک', 'لطفاً مدارک ناقص را تکمیل نمایید...', 'درخواست اصلاح مدارک', 1, 30),
+('پیامک تأیید اولیه سازمان', 'مدارک شما تأیید اولیه شد...', 'تأیید اولیه', 1, 40),
+('پیامک تأیید نهایی', 'پرونده شما تأیید نهایی شد...', 'تأیید نهایی', 1, 50),
+('پیامک صدور مجوز', 'مجوز شما صادر شد؛ برای دریافت اقدام کنید...', 'صدور مجوز', 1, 60)
+ON DUPLICATE KEY UPDATE title = title;
 
--- =================================================================
--- مراحل اختصاصی مشاغل خانگی مستقل (service_type_id=2)
--- =================================================================
-
--- مرحلهٔ ۵: اطلاعات طرح و شغل
-INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
-SELECT 'اطلاعات طرح و شغل', 'اطلاعات شغل، مهارت و طرح کسب‌وکار خانگی', 'briefcase', NULL, 2, 0, 1, 40
-FROM DUAL WHERE NOT EXISTS (
-    SELECT 1 FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2
-);
-SET @hk_step5 = (SELECT id FROM wizard_steps WHERE title = 'اطلاعات طرح و شغل' AND service_type_id = 2 LIMIT 1);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_skill_level', 'سطح مهارت', 'select', 'دارای مهارت کامل انجام کسب و کار مورد نظر\nنیاز به آموزش\nنیاز به مشاوره', 1, 0, 1, 10
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_skill_level' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_has_skill', 'داشتن مهارت لازم', 'radio', 'بله\nخیر', 1, 0, 1, 20
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_has_skill' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, placeholder)
-SELECT 0, @hk_step5, 2, 'dyn_job_title', 'عنوان شغل', 'text', 1, 0, 1, 30, 'مثلاً قالیباف'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_job_title' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_skill_acquisition', 'نحوه کسب مهارت', 'select', 'شیوه تجربی (استاد شاگردی - شغل پدری - روش خودآموز)\nشیوه آموزشی (آموزشگاه فنی و حرفه‌ای)\nشیوه دانشگاهی', 1, 0, 1, 40
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_skill_acquisition' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_need_support', 'نیاز به پشتیبانی', 'radio', 'بله\nخیر', 1, 0, 1, 50
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_need_support' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_cooperation', 'تمایل به همکاری', 'radio', 'بله\nخیر', 1, 0, 1, 60
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_cooperation' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, placeholder)
-SELECT 0, @hk_step5, 2, 'dyn_plan_summary', 'خلاصه طرح', 'textarea', 1, 0, 1, 70, 'مثلاً تولید محصولات دستباف سنتی'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_plan_summary' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_experience_months', 'ماه‌های تجربه', 'number', 1, 0, 1, 80
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_experience_months' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step5, 2, 'dyn_customers', 'مشتریان', 'checkbox', 'سفارشی\nمغازه یا کارگاه\nعرضه عمومی\nآنلاین (مجازی)', 0, 0, 1, 90, 'چندانتخابی'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_customers' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_marketing_methods', 'روش‌های بازاریابی', 'checkbox', 'معاملاتی\nچهره به چهره\nتلفنی\nرابطه‌ای', 0, 0, 1, 100
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_marketing_methods' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step5, 2, 'dyn_target_markets', 'بازارهای هدف', 'checkbox', 'بازار داخل\nمنطقه‌ای\nصادرات', 0, 0, 1, 110
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_target_markets' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step5, 2, 'dyn_risks', 'ریسک‌ها', 'textarea', 0, 0, 1, 120, 'ریسک‌های احتمالی طرح'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_risks' AND service_type_id = 2);
-
--- مرحلهٔ ۶: اطلاعات مالی
-INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
-SELECT 'اطلاعات مالی', 'سرمایه، وام، سود و هزینه تجهیزات', 'wallet', NULL, 2, 0, 1, 50
-FROM DUAL WHERE NOT EXISTS (
-    SELECT 1 FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2
-);
-SET @hk_step6 = (SELECT id FROM wizard_steps WHERE title = 'اطلاعات مالی' AND service_type_id = 2 LIMIT 1);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_fixed_capital', 'سرمایه ثابت (میلیون ریال)', 'number', 1, 0, 1, 10, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_fixed_capital' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_working_capital', 'سرمایه در گردش (میلیون ریال)', 'number', 1, 0, 1, 20, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_working_capital' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_cash_share', 'سهم نقدی (میلیون ریال)', 'number', 1, 0, 1, 30, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_cash_share' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_noncash_share', 'سهم غیرنقدی (میلیون ریال)', 'number', 1, 0, 1, 40, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_noncash_share' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_loan_request', 'درخواست وام (میلیون ریال)', 'number', 1, 0, 1, 50, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_loan_request' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step6, 2, 'dyn_financial_rate', 'نرخ مالی', 'number', 0, 0, 1, 60
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_financial_rate' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_break_even', 'نقطه سر به سر (میلیون ریال)', 'number', 1, 0, 1, 70, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_break_even' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_annual_profit', 'سود سالانه تخمینی (میلیون ریال)', 'number', 1, 0, 1, 80, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_annual_profit' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_annual_production', 'تولید سالانه تخمینی (میلیون ریال)', 'number', 1, 0, 1, 90, 'معادل X میلیون تومان'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_annual_production' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step6, 2, 'dyn_equipment_costs', 'هزینه تجهیزات (شرح کامل)', 'textarea', 0, 0, 1, 100, 'هر خط: عنوان، تعداد، قیمت واحد'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_equipment_costs' AND service_type_id = 2);
-
--- مرحلهٔ ۷: محل فعالیت شخصی
-INSERT INTO wizard_steps (title, description, icon, view_key, service_type_id, is_system, is_active, sort_order)
-SELECT 'محل فعالیت شخصی', 'مشخصات فضای فعالیت و امکانات', 'home', NULL, 2, 0, 1, 60
-FROM DUAL WHERE NOT EXISTS (
-    SELECT 1 FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2
-);
-SET @hk_step7 = (SELECT id FROM wizard_steps WHERE title = 'محل فعالیت شخصی' AND service_type_id = 2 LIMIT 1);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step7, 2, 'dyn_infrastructure_area', 'مساحت زیرساخت (متر)', 'number', 1, 0, 1, 10
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_infrastructure_area' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step7, 2, 'dyn_property_ownership', 'مالکیت', 'select', 'ملک\nاجاره‌ای\nرایگان', 1, 0, 1, 20
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_property_ownership' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step7, 2, 'dyn_building_type', 'نوع ساختمان', 'select', 'ویلا\nآپارتمان\nسایر', 1, 0, 1, 30
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_building_type' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, is_required, is_system, is_active, sort_order)
-SELECT 0, @hk_step7, 2, 'dyn_activity_area', 'مساحت فعالیت (متر)', 'number', 1, 0, 1, 40
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_activity_area' AND service_type_id = 2);
-
-INSERT INTO form_fields (step, wizard_step_id, service_type_id, field_key, label, field_type, options, is_required, is_system, is_active, sort_order, help_text)
-SELECT 0, @hk_step7, 2, 'dyn_facilities', 'امکانات', 'checkbox', 'تلفن ثابت\nگاز لوله‌کشی\nبرق\nآب لوله‌کشی', 0, 0, 1, 50, 'چندانتخابی'
-FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM form_fields WHERE field_key = 'dyn_facilities' AND service_type_id = 2);
-
-
-USE handicraft_license;
-
-ALTER TABLE applicants
-    ADD COLUMN applicant_type ENUM('حقیقی','حقوقی') NOT NULL DEFAULT 'حقیقی' AFTER current_status,
-    ADD INDEX idx_applicant_type (applicant_type);
-
--- company_name, company_national_id, reg_number, reg_date, company_type, economic_code
-
--- =================================================================
--- نرخ‌نامهٔ چندگانه (درخواست کاربر)
--- -----------------------------------------------------------------
--- ۴ گروه قیمتی بر اساس دهک درآمدی + معافیت روستایی
--- =================================================================
-
-CREATE TABLE IF NOT EXISTS fee_groups (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    code VARCHAR(20) NOT NULL UNIQUE,
-    name VARCHAR(100) NOT NULL,
-    icon VARCHAR(30),
-    decile_min TINYINT NOT NULL,
-    decile_max TINYINT NOT NULL,
-    is_rural_eligible TINYINT(1) NOT NULL DEFAULT 0,
-    total_amount BIGINT UNSIGNED NOT NULL,
-    message_title VARCHAR(100),
-    message_body TEXT,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_active_sort (is_active, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS fee_group_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    fee_group_id INT NOT NULL,
-    item_key VARCHAR(40) NOT NULL,
-    item_label VARCHAR(150) NOT NULL,
-    amount BIGINT UNSIGNED NOT NULL DEFAULT 0,
-    notes VARCHAR(255),
-    sort_order INT NOT NULL DEFAULT 0,
-    FOREIGN KEY (fee_group_id) REFERENCES fee_groups(id) ON DELETE CASCADE,
-    UNIQUE KEY uniq_group_item (fee_group_id, item_key),
-    INDEX idx_group_sort (fee_group_id, sort_order)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- تیک خدمات انجام‌شده برای هر پرداخت (واسط مدیر)
-CREATE TABLE IF NOT EXISTS payment_service_ticks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    payment_id INT NOT NULL,
-    item_key VARCHAR(40) NOT NULL,
-    item_label VARCHAR(150) NOT NULL,
-    original_amount BIGINT UNSIGNED NOT NULL,
-    is_done TINYINT(1) NOT NULL DEFAULT 1,
-    ticked_by INT NULL,
-    ticked_at DATETIME NULL,
-    untick_reason VARCHAR(255) NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
-    FOREIGN KEY (ticked_by) REFERENCES users(id) ON DELETE SET NULL,
-    UNIQUE KEY uniq_payment_item (payment_id, item_key),
-    INDEX idx_payment (payment_id),
-    INDEX idx_done (is_done)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- تاریخچهٔ تغییرات مدیر روی پرداخت‌ها (audit log)
-CREATE TABLE IF NOT EXISTS payment_audit_log (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    payment_id INT NOT NULL,
-    user_id INT NOT NULL,
-    action VARCHAR(50) NOT NULL,
-    field_changed VARCHAR(50) NULL,
-    old_value TEXT NULL,
-    new_value TEXT NULL,
-    note VARCHAR(500) NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_audit_payment (payment_id),
-    INDEX idx_audit_user (user_id),
-    INDEX idx_audit_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ستون‌های جدید در payments برای نرخ‌نامه و تخفیف
-ALTER TABLE payments
-    ADD COLUMN original_amount BIGINT UNSIGNED NULL AFTER amount,
-    ADD COLUMN final_amount BIGINT UNSIGNED NULL AFTER original_amount,
-    ADD COLUMN discount_reason VARCHAR(500) NULL AFTER final_amount,
-    ADD COLUMN fee_group_id INT NULL AFTER discount_reason,
-    ADD COLUMN is_rural_exempt TINYINT(1) NOT NULL DEFAULT 0 AFTER fee_group_id,
-    ADD COLUMN fallback_used TINYINT(1) NOT NULL DEFAULT 0 AFTER is_rural_exempt,
-    ADD COLUMN suspicion_flags VARCHAR(255) NULL AFTER fallback_used,
-    ADD INDEX idx_pay_group (fee_group_id),
-    ADD INDEX idx_pay_suspicion (suspicion_flags(50));
-
--- مهاجرت: افزودن وضعیت 'در انتظار رسید' به ENUM پرداخت‌ها
--- این وضعیت برای زمانی است که مدیر درخواست پرداخت صادر کرده ولی هنوز رسیدی آپلود نشده.
-ALTER TABLE payments
-    MODIFY COLUMN status ENUM('در انتظار رسید','در انتظار بررسی','تأیید شده','رد شده')
-    NOT NULL DEFAULT 'در انتظار رسید';
-
--- مهاجرت: افزودن ستون sort_order به payment_service_ticks (در صورت نبود)
--- این مهاجرت idempotent است — اگر ستون از قبل موجود باشد، نادیده گرفته می‌شود.
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
-                   WHERE TABLE_SCHEMA = DATABASE()
-                     AND TABLE_NAME = 'payment_service_ticks'
-                     AND COLUMN_NAME = 'sort_order');
-SET @ddl = IF(@col_exists = 0,
-    'ALTER TABLE payment_service_ticks ADD COLUMN sort_order INT NOT NULL DEFAULT 0 AFTER untick_reason',
-    'SELECT 1');
-PREPARE stmt FROM @ddl;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- بذر ۴ گروه قیمتی + ۱۲ خدمت برای هر گروه
+-- === بذر ۴ گروه قیمتی ===
 INSERT INTO fee_groups (code, name, icon, decile_min, decile_max, is_rural_eligible, total_amount, message_title, message_body, sort_order) VALUES
 ('A', 'گروه الف: حمایتی', '🌱', 1, 2, 1, 1350000,
  'پیام ما به شما',
@@ -1179,8 +1114,7 @@ INSERT INTO fee_groups (code, name, icon, decile_min, decile_max, is_rural_eligi
  40)
 ON DUPLICATE KEY UPDATE name = VALUES(name);
 
--- بذر ۱۲ خدمت پایه برای هر گروه (مبالغ اولیه)
--- کلیدهای آیتم‌ها
+-- === بذر ۱۲ خدمت پایه برای هر گروه قیمتی ===
 INSERT INTO fee_group_items (fee_group_id, item_key, item_label, amount, sort_order) VALUES
 -- گروه الف
 ((SELECT id FROM fee_groups WHERE code='A'), 'service_registration', 'ثبت‌نام و احراز هویت در درگاه ملی مجوزها', 80000, 10),
@@ -1236,119 +1170,10 @@ INSERT INTO fee_group_items (fee_group_id, item_key, item_label, amount, sort_or
 ((SELECT id FROM fee_groups WHERE code='D'), 'service_multi_license', 'پشتیبانی چندمجوزی + احراز شش‌عاملی', 810000, 120)
 ON DUPLICATE KEY UPDATE item_label = VALUES(item_label), amount = VALUES(amount);
 
--- تنظیمات نرخ‌نامه
-INSERT INTO settings (setting_key, setting_value) VALUES
-('fee_tariff_active', '1'),
-('fee_tariff_valid_until', '1405/12/29'),
-('fee_default_amount', '500000'),
-('fee_rural_auto_eligible', '1'),
-('fee_modal_enabled', '1'),
-('fee_modal_dismissable', '1'),
-('fee_fallback_group_code', 'C'),
-('fee_min_amount_percent', '10'),
-('fee_max_discount_without_reason', '2'),
-('fee_max_discount_with_reason', '50')
-ON DUPLICATE KEY UPDATE setting_key = setting_key;
-
-
--- =================================================================
--- حساب‌های کاربری متقاضیان (مدل فروشگاهی)
--- -----------------------------------------------------------------
--- کاربران آزادانه ثبت‌نام می‌کنند، درخواست‌ها را «خریداری» می‌کنند
--- سابقهٔ خرید و پرداخت متمرکز روی حساب کاربر
--- =================================================================
-
-CREATE TABLE IF NOT EXISTS user_accounts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    person_id INT NOT NULL UNIQUE,
-    username VARCHAR(50) UNIQUE NULL,
-    mobile CHAR(11) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    email VARCHAR(150) NULL,
-    avatar_document_id INT NULL,
-    is_active TINYINT(1) NOT NULL DEFAULT 1,
-    last_login_at DATETIME NULL,
-    failed_login_count INT NOT NULL DEFAULT 0,
-    locked_until DATETIME NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (person_id) REFERENCES persons(id) ON DELETE CASCADE,
-    FOREIGN KEY (avatar_document_id) REFERENCES documents(id) ON DELETE SET NULL,
-    INDEX idx_username (username),
-    INDEX idx_mobile (mobile),
-    INDEX idx_active (is_active)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- مهاجرت idempotent: افزودن ستون user_account_id به applicants
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
-                   WHERE TABLE_SCHEMA = DATABASE()
-                     AND TABLE_NAME = 'applicants'
-                     AND COLUMN_NAME = 'user_account_id');
-SET @ddl = IF(@col_exists = 0,
-    'ALTER TABLE applicants ADD COLUMN user_account_id INT NULL AFTER person_id, ADD INDEX idx_applicant_user (user_account_id)',
-    'SELECT 1');
-PREPARE stmt FROM @ddl;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- مهاجرت idempotent: افزودن ستون user_account_id به payments
-SET @col_pay = (SELECT COUNT(*) FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'payments'
-                  AND COLUMN_NAME = 'user_account_id');
-SET @ddl_pay = IF(@col_pay = 0,
-    'ALTER TABLE payments ADD COLUMN user_account_id INT NULL AFTER applicant_id, ADD INDEX idx_pay_user (user_account_id)',
-    'SELECT 1');
-PREPARE stmt_pay FROM @ddl_pay;
-EXECUTE stmt_pay;
-DEALLOCATE PREPARE stmt_pay;
-
--- =================================================================
--- اعلان‌های کاربر (نظام اعلان دیده‌شده/دیده‌نشده)
--- =================================================================
-CREATE TABLE IF NOT EXISTS user_notifications (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_account_id INT NOT NULL,
-    applicant_id INT NULL,
-    type VARCHAR(50) NOT NULL,
-    title VARCHAR(200) NOT NULL,
-    body TEXT NULL,
-    is_read TINYINT(1) NOT NULL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_account_id) REFERENCES user_accounts(id) ON DELETE CASCADE,
-    FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE,
-    INDEX idx_notif_user (user_account_id),
-    INDEX idx_notif_unread (user_account_id, is_read)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =================================================================
--- ستون‌های موبایل دوم/سوم برای اشخاص (ایمپورت دسته‌جمعی)
--- -----------------------------------------------------------------
--- برای متقاضیانی که در فایل CSV با چند شماره موبایل ظاهر می‌شوند،
--- شماره‌های اضافی در mobile_2 و mobile_3 ذخیره می‌شوند.
--- این مهاجرت idempotent است و روی پایگاه‌های داده موجود قابل اجراست.
--- =================================================================
-
--- mobile_2
-SET @col_m2 = (SELECT COUNT(*) FROM information_schema.COLUMNS
-               WHERE TABLE_SCHEMA = DATABASE()
-                 AND TABLE_NAME = 'persons'
-                 AND COLUMN_NAME = 'mobile_2');
-SET @ddl_m2 = IF(@col_m2 = 0,
-    'ALTER TABLE persons ADD COLUMN mobile_2 CHAR(11) NULL AFTER mobile, ADD INDEX idx_person_mobile_2 (mobile_2)',
-    'SELECT 1');
-PREPARE stmt_m2 FROM @ddl_m2;
-EXECUTE stmt_m2;
-DEALLOCATE PREPARE stmt_m2;
-
--- mobile_3
-SET @col_m3 = (SELECT COUNT(*) FROM information_schema.COLUMNS
-               WHERE TABLE_SCHEMA = DATABASE()
-                 AND TABLE_NAME = 'persons'
-                 AND COLUMN_NAME = 'mobile_3');
-SET @ddl_m3 = IF(@col_m3 = 0,
-    'ALTER TABLE persons ADD COLUMN mobile_3 CHAR(11) NULL AFTER mobile_2, ADD INDEX idx_person_mobile_3 (mobile_3)',
-    'SELECT 1');
-PREPARE stmt_m3 FROM @ddl_m3;
-EXECUTE stmt_m3;
-DEALLOCATE PREPARE stmt_m3;
+-- گزارش نهایی
+SELECT 'Schema installation completed' AS result;
+SELECT COUNT(*) AS total_tables FROM information_schema.tables WHERE table_schema = DATABASE();
+SELECT COUNT(*) AS total_license_titles FROM license_titles;
+SELECT COUNT(*) AS total_service_types FROM service_types;
+SELECT COUNT(*) AS total_form_fields FROM form_fields;
+SELECT COUNT(*) AS total_wizard_steps FROM wizard_steps;
