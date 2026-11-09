@@ -17,9 +17,28 @@ $curOrder = $statusMeta[$curStatus]['order'] ?? 0;
 $isTerminal = in_array($curStatus, ['رد درخواست', 'لغو'], true);
 $fullName = trim($applicant['first_name'] . ' ' . $applicant['last_name']);
 
-// گام‌های نمایشی مسیر رسیدگی (بدون رویدادهای غیرخطی)
-$pipeline = ['تکمیل اطلاعات', 'احراز نشانی', 'بررسی کارشناسی رشته', 'ثبت درخواست صدور',
+// گام‌های نمایشی مسیر رسیدگی — پویا بر اساس نوع خدمت
+$_pipelineBase = ['تکمیل اطلاعات', 'احراز نشانی', 'بررسی کارشناسی رشته', 'ثبت درخواست صدور',
     'بارگذاری مدارک به سازمان', 'تأیید اولیه', 'تأیید نهایی', 'صدور مجوز', 'تحویل مجوز'];
+// اگر خدمت مشاغل خانگی مستقل است، مسیر اختصاصی را جایگزین کن
+$_serviceId = (int)($applicant['service_type_id'] ?? 0);
+if ($_serviceId === 2) {
+    $_pipelineBase = ['تکمیل اطلاعات', 'احراز نشانی', 'تطبیق آدرس با ثبت احوال', 'ثبت درخواست صدور',
+        'صدور مجوز', 'دریافت تصویر مجوز', 'تأیید اولیه در سامانه مشاغل خانگی',
+        'تأیید نهایی دریافت کد رهگیری'];
+}
+$pipeline = $_pipelineBase;
+
+// فیلتر وضعیت‌های قابل تغییر بر اساس نوع خدمت
+$_availStatuses = [];
+foreach ($statuses as $st) {
+    if (!isset($statusMeta[$st]) || !$statusMeta[$st]['manual']) continue;
+    // اگر services تعریف شده، فقط برای آن خدمت‌ها نمایش بده
+    if (isset($statusMeta[$st]['services'])) {
+        if (!in_array($_serviceId, $statusMeta[$st]['services'], true)) continue;
+    }
+    $_availStatuses[] = $st;
+}
 
 // نگاشت نوع مدرک → برچسب و آیکون
 $docLabels = [
@@ -292,8 +311,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                     <label class="form-label small">انتقال به وضعیت:</label>
                     <select class="form-select form-select-sm mb-2" name="new_status" <?= $isTerminal ? 'disabled' : '' ?>>
                         <option value="">انتخاب کنید...</option>
-                        <?php foreach ($statuses as $st): ?>
-                            <?php if (!$statusMeta[$st]['manual']) continue; ?>
+                        <?php foreach ($_availStatuses as $st): ?>
                             <option value="<?= $e($st) ?>" <?= $st === $curStatus ? 'disabled' : '' ?>><?= $e($st) ?></option>
                         <?php endforeach; ?>
                     </select>
