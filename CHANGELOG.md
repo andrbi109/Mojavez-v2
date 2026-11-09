@@ -8,6 +8,62 @@
 
 ---
 
+## [0.6.1] — ۲۰۲۶-۱۱-۰۹ — استقرار روی هاست اشتراکی (نت افراز)
+
+### 🎯 هدف
+آماده‌سازی پروژه برای استقرار روی هاست اشتراکی با DirectAdmin
+(مثل سرویس برنزی نت افراز با Nginx + Apache).
+
+### ✨ قابلیت‌های جدید
+
+#### ۱) راهنمای جامع استقرار
+فایل `deploy/shared-hosting/README.md` با راهنمای گام‌به‌گام فارسی:
+- مشخصات سرویس برنزی نت افراز و تطبیق با نیازهای پروژه
+- ساخت دیتابیس در DirectAdmin
+- فعال‌سازی PHP 8.x و SSL رایگان
+- تنظیم cron job برای لغو خودکار
+- چک‌لیست نهایی استقرار
+- رفع مشکلات رایج (خطای ۵۰۰، صفحهٔ سفید، آپلود ناموفق)
+- پشتیبان‌گیری و ارتقا
+
+#### ۲) بررسی‌کنندهٔ پیش‌نیازها (`check.php`)
+فایل `deploy/shared-hosting/check.php`:
+- بررسی نسخهٔ PHP
+- بررسی پسوندهای ضروری (PDO, mbstring, openssl, json, ...)
+- بررسی محدودیت‌های آپلود (upload_max_filesize, post_max_size, memory_limit)
+- بررسی mod_rewrite, mod_headers, mod_deflate, mod_expires
+- بررسی HTTPS/SSL
+- بررسی قابلیت نوشتن پوشهٔ uploads
+- تست اتصال به MySQL (با فرم تعاملی)
+
+#### ۳) نصب‌کنندهٔ وب (`install.php`)
+فایل `deploy/shared-hosting/install.php`:
+- فرم دو مرحله‌ای: اطلاعات دیتابیس → نصب schema
+- ساخت خودکار فایل `.env` با مقادیر واقعی
+- تولید خودکار `CRON_SECRET` (رمز ۶۴ کاراکتری)
+- اجرای `schema.sql` با تقسیم‌کنندهٔ هوشمند SQL
+- گزارش نهایی با تعداد دستورات موفق/skip/خطا
+
+#### ۴) `.htaccess` سازگار با هاست اشتراکی
+فایل `deploy/shared-hosting/.htaccess`:
+- بهینه‌شده برای معماری Nginx + Apache (DirectAdmin)
+- بدون `<LimitExcept>` (در برخی هاست‌ها نامعتبر است)
+- بدون `ServerTokens/ServerSignature` (فقط در server config معتبرند)
+- بدون `mod_php` (در Nginx+Apache معمولاً PHP-FPM است)
+- همهٔ قواعد با `<IfModule>` محافظت می‌شوند
+
+### 📦 فایل‌های جدید
+- `deploy/shared-hosting/README.md` — راهنمای استقرار
+- `deploy/shared-hosting/check.php` — بررسی‌کنندهٔ پیش‌نیازها
+- `deploy/shared-hosting/install.php` — نصب‌کنندهٔ وب
+- `deploy/shared-hosting/.htaccess` — `.htaccess` هاست اشتراکی
+
+### 📝 فایل‌های تغییر یافته
+- `VERSION` → `0.6.1`
+- `config/config.php` → `APP_VERSION` → `0.6.1`
+
+---
+
 ## [0.6.0] — ۲۰۲۶-۱۱-۰۹ — سخت‌سازی امنیتی و حریم خصوصی برای سامانهٔ خصوصی
 
 ### 🎯 هدف

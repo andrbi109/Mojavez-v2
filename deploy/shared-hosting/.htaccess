@@ -1,0 +1,129 @@
+# =================================================================
+# Mojavez — قواعد مسیریابی و امنیت برای هاست اشتراکی
+# -----------------------------------------------------------------
+# این نسخه برای هاست‌های اشتراکی (DirectAdmin / cPanel) با معماری
+# Nginx + Apache (مثل نت افراز، ایران استاندارد) بهینه شده است.
+#
+# تفاوت‌ها با نسخهٔ اصلی:
+#   • <LimitExcept> حذف شد (در برخی هاست‌ها نامعتبر است)
+#   • <FilesMatch> ساده‌سازی شد (بدون IfModule تودرتو)
+#   • ServerTokens/ServerSignature حذف شدند (فقط در server config)
+#   • قواعد mod_php حذف شدند (در Nginx+Apache معمولاً PHP-FPM است)
+#   • تنظیمات کش و فشرده‌سازی با IfModule محافظت می‌شوند
+# =================================================================
+
+# --- فعال‌سازی موتور بازنویسی ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # اگر فایل یا پوشهٔ واقعی نیست، به index.php هدایت کن
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>
+
+# --- امنیت: جلوگیری از لیست شدن پوشه‌ها ---
+Options -Indexes +FollowSymLinks
+
+# --- کاراکترست پیش‌فرض ---
+AddDefaultCharset UTF-8
+
+# --- امنیت: مسدودسازی موتورهای جستجو و خزنده‌های هوش مصنوعی ---
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP_USER_AGENT} Googlebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Bingbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Slurp [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} DuckDuckBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Baiduspider [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} YandexBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Sogou [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Exabot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} facebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} ia_archiver [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Applebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Twitterbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} LinkedInBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} TelegramBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Discordbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} GPTBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} ChatGPT-User [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} CCBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} anthropic-ai [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Claude-Web [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} cohere-ai [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Google-Extended [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} PerplexityBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Amazonbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Bytespider [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Diffbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Meta-ExternalAgent [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} OAI-SearchBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Applebot-Extended [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} SemrushBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} AhrefsBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} MJ12bot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} DotBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} BLEXBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} SeznamBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} PetalBot [NC]
+    RewriteRule ^ - [R=410,L]
+</IfModule>
+
+# --- امنیت: مسدودسازی دسترسی مستقیم به فایل‌های مخفی و حساس ---
+<FilesMatch "(^\.|\.(env|sql|md|sh|py|bak|log|lock|yaml|yml|ini|conf|swp|tmp|orig|dist)$)">
+    Require all denied
+</FilesMatch>
+
+# --- امنیت: هدرهای امنیتی جامع ---
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), interest-cohort=()"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Resource-Policy "same-site"
+    <IfModule mod_ssl.c>
+        Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    </IfModule>
+</IfModule>
+
+# --- فشرده‌سازی پاسخ‌ها ---
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json application/xml application/xml+rss
+    DeflateCompressionLevel 6
+</IfModule>
+
+# --- کش مرورگر برای فایل‌های استاتیک ---
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType text/javascript "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType application/json "access plus 0 seconds"
+    ExpiresByType application/xml "access plus 1 hour"
+    ExpiresByType text/xml "access plus 1 hour"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType text/plain "access plus 0 seconds"
+</IfModule>
+
+# --- ETag برای کش‌گذاری شرطی ---
+FileETag MTime Size
+
+# --- صفحات خطای سفارشی ---
+ErrorDocument 410 "دسترسی برای خزنده‌ها مسدود است — این سامانه خصوصی است."
+ErrorDocument 403 "دسترسی ممنوع"
+ErrorDocument 404 "صفحه یافت نشد"
