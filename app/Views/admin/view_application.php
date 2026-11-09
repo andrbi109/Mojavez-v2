@@ -39,6 +39,12 @@ foreach ($statuses as $st) {
     }
     $_availStatuses[] = $st;
 }
+// اطمینان از وجود رد درخواست و لغو (همیشه باید موجود باشند)
+foreach (['رد درخواست', 'لغو'] as $essential) {
+    if (!in_array($essential, $_availStatuses, true) && isset($statusMeta[$essential]) && $statusMeta[$essential]['manual']) {
+        $_availStatuses[] = $essential;
+    }
+}
 
 // نگاشت نوع مدرک → برچسب و آیکون
 $docLabels = [
@@ -315,6 +321,9 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             <option value="<?= $e($st) ?>" <?= $st === $curStatus ? 'disabled' : '' ?>><?= $e($st) ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <?php if (APP_DEBUG): ?>
+                    <small class="text-muted d-block mb-1">سرویس: <?= $_serviceId ?> — تعداد گزینه‌ها: <?= count($_availStatuses) ?></small>
+                    <?php endif; ?>
                     <button type="submit" class="btn btn-primary btn-sm w-100" <?= $isTerminal ? 'disabled' : '' ?>>
                         <?= icon('check', '', 15) ?> اعمال تغییر
                     </button>
