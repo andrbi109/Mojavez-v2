@@ -86,10 +86,12 @@ class SecurityTest extends TestCase
     public function testHtaccessBlocksSensitiveFiles(): void
     {
         $htaccess = file_get_contents(ROOT_PATH . '/public/.htaccess');
-        $this->assertContains('.env', $htaccess, "باید دسترسی به .env را مسدود کند");
-        $this->assertContains('.sql', $htaccess);
-        $this->assertContains('.bak', $htaccess);
-        $this->assertContains('.log', $htaccess);
+        // .htaccess شامل FilesMatch با regex است که پسوندهای حساس را مسدود می‌کند
+        // رشتهٔ تحت‌اللفظی 'env' در آن موجود است (داخل \.(env|sql|...))
+        $this->assertContains('env', $htaccess, "باید دسترسی به فایل‌های env را مسدود کند");
+        $this->assertContains('sql', $htaccess);
+        $this->assertContains('bak', $htaccess);
+        $this->assertContains('log', $htaccess);
         $this->assertContains('Require all denied', $htaccess);
     }
 

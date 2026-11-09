@@ -28,7 +28,8 @@ define('UPLOAD_DIR', ROOT_PATH . '/uploads');
 
 // ==================== ثابت‌های پیکربندی (تست) ====================
 // مقادیر امن برای محیط تست — نباید با مقادیر تولید تداخل کنند.
-define('APP_VERSION', 'test');
+// APP_VERSION باید SemVer معتبر باشد (مثلاً برای تست‌های ConfigTest)
+define('APP_VERSION', '0.6.0-test');
 define('APP_DEBUG', true);
 define('APP_ENV', 'test');
 define('DB_HOST', getenv('TEST_DB_HOST') ?: '127.0.0.1');

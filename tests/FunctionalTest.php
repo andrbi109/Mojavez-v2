@@ -262,17 +262,27 @@ class FunctionalTest extends TestCase
 
     public function testNationalCodeValidatorAcceptsValidCode(): void
     {
-        // کد ملی معتبر تستی: 1111111111
-        $v = new Validator(['nc' => '1111111111']);
+        // کد ملی معتبر با ارقام متفاوت (کدهای تمام‌یکسان نامعتبر محسوب می‌شوند)
+        // 6890213246 — رقم کنترل درست، ارقام متفاوت
+        $v = new Validator(['nc' => '6890213246']);
         $v->nationalCode('nc', 'کد ملی');
         $this->assertFalse($v->hasErrors(), "کد ملی معتبر نباید خطا تولید کند");
     }
 
     public function testNationalCodeValidatorRejectsInvalidCode(): void
     {
+        // کد ملی نامعتبر — رقم کنترل اشتباه
         $v = new Validator(['nc' => '1234567890']);
         $v->nationalCode('nc', 'کد ملی');
         $this->assertTrue($v->hasErrors(), "کد ملی نامعتبر باید خطا تولید کند");
+    }
+
+    public function testNationalCodeValidatorRejectsAllSameDigits(): void
+    {
+        // کد ملی تمام‌یکسان (مثل 1111111111) باید نامعتبر باشد
+        $v = new Validator(['nc' => '1111111111']);
+        $v->nationalCode('nc', 'کد ملی');
+        $this->assertTrue($v->hasErrors(), "کد ملی تمام‌یکسان باید نامعتبر باشد");
     }
 
     public function testMobileValidatorAcceptsValidMobile(): void

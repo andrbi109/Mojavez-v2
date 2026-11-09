@@ -84,15 +84,27 @@ abstract class TestCase
         if (empty($v)) throw new AssertionFailed($msg ?: 'انتظار non-empty بود');
     }
 
-    public function assertContains(string $needle, string $haystack, string $msg = ''): void
+    public function assertContains(string $needle, string|array $haystack, string $msg = ''): void
     {
+        if (is_array($haystack)) {
+            if (!in_array($needle, $haystack, true)) {
+                throw new AssertionFailed($msg . " — '{$needle}' در آرایه نیست");
+            }
+            return;
+        }
         if (!str_contains($haystack, $needle)) {
             throw new AssertionFailed($msg . " — رشتهٔ '{$needle}' در متن یافت نشد");
         }
     }
 
-    public function assertNotContains(string $needle, string $haystack, string $msg = ''): void
+    public function assertNotContains(string $needle, string|array $haystack, string $msg = ''): void
     {
+        if (is_array($haystack)) {
+            if (in_array($needle, $haystack, true)) {
+                throw new AssertionFailed($msg . " — '{$needle}' نباید در آرایه باشد");
+            }
+            return;
+        }
         if (str_contains($haystack, $needle)) {
             throw new AssertionFailed($msg . " — رشتهٔ '{$needle}' نباید در متن باشد");
         }

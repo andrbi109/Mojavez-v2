@@ -90,7 +90,10 @@ class LicenseTitleTest extends TestCase
         $params = $method->getParameters();
         $this->assertCount(1, $params);
         $this->assertTrue($params[0]->allowsNull(), "پارامتر باید nullable باشد");
-        $this->assertEquals('int', (string)$params[0]->getType(), "نوع باید int باشد");
+        // نوع ممکن است 'int' یا '?int' باشد — هر دو قابل قبول
+        $type = (string)$params[0]->getType();
+        $this->assertTrue($type === 'int' || $type === '?int',
+            "نوع باید int یا ?int باشد — واقعی: {$type}");
     }
 
     public function testGetAllAcceptsNullableInt(): void
