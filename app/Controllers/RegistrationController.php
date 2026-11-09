@@ -241,7 +241,7 @@ class RegistrationController extends Controller
                     'stepData' => Session::getStep('step2', []),
                     'dynFields' => $this->customFieldsForStepId($stepId),
                     'sysActive' => $this->fieldModel->systemActiveMap(),
-                    'licenseGroups' => (new LicenseTitle())->groupedActive(),
+                    'licenseGroups' => (new LicenseTitle())->groupedActiveByService($this->selectedServiceId()),
                     'currentStep' => $position,
                 ]);
                 break;

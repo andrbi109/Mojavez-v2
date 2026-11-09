@@ -4,6 +4,9 @@
  * -------------------------------------------------------
  * افزودن / ویرایش / حذف / غیرفعال‌سازی رشته‌ها و دسته‌های آن‌ها.
  * رشته‌های در حال استفاده در پرونده‌ها حذف نمی‌شوند (فقط غیرفعال).
+ *
+ * هر رشته به یک سرویس خاص وصل می‌شود (service_type_id) تا هر سرویس
+ * فهرست اختصاصی خود را داشته باشد.
  */
 class LicenseTitleController extends Controller
 {
@@ -16,6 +19,7 @@ class LicenseTitleController extends Controller
 
     /**
      * فهرست رشته‌ها + فرم افزودن/ویرایش درون‌خطی
+     * پارامتر GET service=<id> برای فیلتر بر اساس سرویس
      */
     public function index(): void
     {
@@ -24,17 +28,28 @@ class LicenseTitleController extends Controller
         $editId = (int)($_GET['edit'] ?? 0);
         $editing = $editId > 0 ? $this->model->findById($editId) : null;
 
-        // گروه‌بندی برای نمایش
-        $all = $this->model->getAll();
+        // فیلتر سرویس: از GET ?service=N، وگرنه از رکورد ویرایش، وگرنه همهٔ سرویس‌ها
+        $filterServiceId = (int)($_GET['service'] ?? 0);
+        if ($filterServiceId <= 0 && $editing) {
+            $filterServiceId = (int)($editing['service_type_id'] ?? 0);
+        }
+        $activeFilter = $filterServiceId > 0 ? $filterServiceId : null;
+
+        $all = $this->model->getAll($activeFilter);
+
+        // گروه‌بندی برای نمایش — ابتدا بر اساس سرویس، سپس بر اساس دسته
         $grouped = [];
         foreach ($all as $row) {
-            $grouped[$row['category']][] = $row;
+            $serviceKey = $row['service_title'] ?? 'بدون سرویس';
+            $grouped[$serviceKey][$row['category']][] = $row;
         }
 
         $this->render('admin/license_titles', [
             'title' => 'مدیریت رشته‌های مجوز',
             'grouped' => $grouped,
-            'categories' => $this->model->getCategories(),
+            'categories' => $this->model->getCategories($activeFilter),
+            'services' => (new ServiceType())->getAll(),
+            'filterServiceId' => $filterServiceId,
             'editing' => $editing,
             'message' => Session::get('license_message'),
             'errors' => Session::get('errors', []),
@@ -62,16 +77,26 @@ class LicenseTitleController extends Controller
         $validator->required('category', 'دسته/گروه رشته')
             ->maxLength('category', 80, 'دسته')
             ->required('title', 'عنوان رشته')
-            ->maxLength('title', 120, 'عنوان رشته')
-            ->unique('title', 'license_titles', 'title', 'این رشته', $id > 0 ? $id : null);
+            ->maxLength('title', 120, 'عنوان رشته');
+
+        // بررسی یکتایی عنوان در دامنهٔ سرویس انتخاب‌شده (به‌جای یکتایی سراسری)
+        $serviceTypeId = !empty($data['service_type_id']) ? (int)$data['service_type_id'] : null;
+        if (!$this->model->isTitleUniqueInService(
+            trim((string)$data['title']),
+            $serviceTypeId,
+            $id > 0 ? $id : null
+        )) {
+            $validator->addError('title', 'این رشته برای سرویس انتخاب‌شده قبلاً ثبت شده است.');
+        }
 
         if ($validator->hasErrors()) {
             Session::set('errors', $validator->getErrors());
             Session::set('formData', $data);
-            $this->redirect('/admin/license-titles');
+            $this->redirect('/admin/license-titles' . ($serviceTypeId ? '?service=' . $serviceTypeId : ''));
         }
 
         $payload = [
+            'service_type_id' => $serviceTypeId,
             'category' => trim((string)$data['category']),
             'title' => trim((string)$data['title']),
             'is_active' => !empty($data['is_active']),
@@ -83,9 +108,9 @@ class LicenseTitleController extends Controller
             Session::set('license_message', 'رشتهٔ «' . $payload['title'] . '» ویرایش شد.');
         } else {
             $this->model->create($payload);
-            Session::set('license_message', 'رشتهٔ «' . $payload['title'] . '» به گروه «' . $payload['category'] . '» افزوده شد.');
+            Session::set('license_message', 'رشتهٔ «' . $payload['title'] . '» به سرویس انتخاب‌شده افزوده شد.');
         }
-        $this->redirect('/admin/license-titles');
+        $this->redirect('/admin/license-titles' . ($serviceTypeId ? '?service=' . $serviceTypeId : ''));
     }
 
     /**
@@ -105,7 +130,8 @@ class LicenseTitleController extends Controller
         Session::set('license_message', $deleted
             ? 'رشتهٔ «' . $row['title'] . '» حذف شد.'
             : 'رشتهٔ «' . $row['title'] . '» در پرونده‌ها استفاده شده است؛ به‌جای حذف، غیرفعال شد.');
-        $this->redirect('/admin/license-titles');
+        $redirect = '/admin/license-titles' . (!empty($row['service_type_id']) ? '?service=' . (int)$row['service_type_id'] : '');
+        $this->redirect($redirect);
     }
 
     /**
@@ -121,6 +147,7 @@ class LicenseTitleController extends Controller
         $row = $this->model->findById($id);
         if ($row) {
             $this->model->update($id, [
+                'service_type_id' => $row['service_type_id'] ?? null,
                 'category' => $row['category'],
                 'title' => $row['title'],
                 'is_active' => !(int)$row['is_active'],
@@ -130,6 +157,26 @@ class LicenseTitleController extends Controller
                 ? 'رشتهٔ «' . $row['title'] . '» از فرم ثبت‌نام حذف (غیرفعال) شد.'
                 : 'رشتهٔ «' . $row['title'] . '» فعال شد.');
         }
-        $this->redirect('/admin/license-titles');
+        $redirect = '/admin/license-titles' . (!empty($row['service_type_id']) ? '?service=' . (int)$row['service_type_id'] : '');
+        $this->redirect($redirect);
+    }
+
+    /**
+     * API JSON — بازگرداندن رشته‌های فعال یک سرویس برای فرم‌های پویا
+     * GET /admin/license-titles/by-service/{id}
+     *
+     * این متد برای زمانی است که کاربر در فرم ثبت‌نام یا ویرایش، نوع
+     * خدمت را تغییر می‌دهد و باید فهرست عناوین به‌روز شود.
+     */
+    public function byService(int|string $serviceId): void
+    {
+        $this->requireRole(['admin']);
+        $serviceId = (int)$serviceId;
+        $grouped = $this->model->groupedActiveByService($serviceId > 0 ? $serviceId : null);
+        $this->json([
+            'success' => true,
+            'service_id' => $serviceId,
+            'groups' => $grouped,
+        ]);
     }
 }

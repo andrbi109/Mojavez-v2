@@ -64,7 +64,10 @@ class RevisionController extends Controller
             'propertyDetail' => $this->propertyDetailModel->findByApplicantId($aid),
             'dynFields' => $this->dynFieldsForSteps([1, 2, 3]),
             'dynCurrent' => $dynCurrent,
-            'licenseGroups' => (new LicenseTitle())->groupedActive(),
+            // فهرست رشته‌ها بر اساس سرویس متقاضی فیلتر می‌شود
+            'licenseGroups' => (new LicenseTitle())->groupedActiveByService(
+                !empty($applicant['service_type_id']) ? (int)$applicant['service_type_id'] : null
+            ),
             'errors' => Session::get('revision_errors', []),
             'old' => Session::get('revision_form', []),
         ]);

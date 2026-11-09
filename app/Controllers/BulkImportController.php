@@ -19,7 +19,11 @@ class BulkImportController extends Controller
     {
         $this->requireRole(['admin']);
         $services = (new ServiceType())->getActive();
-        $licenseGroups = (new LicenseTitle())->groupedActive();
+        // در ابتدای ایمپورت هنوز سرویسی انتخاب نشده است؛ فهرست خالی است
+        // و پس از انتخاب سرویس توسط کاربر، توسط JS پر می‌شود.
+        $licenseGroups = (new LicenseTitle())->groupedActiveByService(
+            !empty($services) ? (int)$services[0]['id'] : null
+        );
 
         $this->render('admin/bulk_import', [
             'title' => 'ایمپورت دسته‌جمعی',
@@ -248,7 +252,10 @@ class BulkImportController extends Controller
         }
 
         $services = (new ServiceType())->getActive();
-        $licenseGroups = (new LicenseTitle())->groupedActive();
+        // در پیش‌نمایش، رشته‌ها بر اساس سرویس انتخاب‌شده فیلتر می‌شوند
+        $licenseGroups = (new LicenseTitle())->groupedActiveByService(
+            $serviceTypeId > 0 ? $serviceTypeId : null
+        );
 
         $this->render('admin/bulk_preview', [
             'title' => 'پیش‌نمایش ایمپورت',

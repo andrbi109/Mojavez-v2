@@ -141,6 +141,15 @@
         <fieldset class="border rounded p-3 mb-4">
             <legend class="float-none w-auto px-2 h5">اطلاعات شغلی</legend>
             <div class="mb-3">
+                <label class="form-label">نوع خدمت <span class="text-danger">*</span></label>
+                <select class="form-select <?= isset($errors['service_type_id']) ? 'is-invalid' : '' ?>" name="service_type_id" id="service_type_id_reg" onchange="reloadLicenseTitlesByService(this.value)" required>
+                    <option value="">انتخاب کنید...</option>
+                    <?php foreach (($services ?? []) as $sv): ?>
+                        <option value="<?= (int)$sv['id'] ?>" <?= (int)($formData['service_type_id'] ?? 0) === (int)$sv['id'] ? 'selected' : '' ?>><?= htmlspecialchars($sv['title']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="mb-3">
                 <label class="form-label">عنوان مجوز <span class="text-danger">*</span></label>
                 <select class="form-select <?= isset($errors['license_title']) ? 'is-invalid' : '' ?>" name="license_title" id="license_title_reg" onchange="toggleCustomLicenseReg()" required>
                     <option value="">انتخاب کنید...</option>
@@ -343,6 +352,42 @@
     function toggleCustomLicenseReg() {
         const select = document.getElementById('license_title_reg');
         document.getElementById('custom_license_wrapper_reg').style.display = select.value .startsWith('سایر') ? 'block' : 'none';
+    }
+
+    // بارگذاری پویای عناوین مجوز بر اساس سرویس انتخاب‌شده
+    const csrfTokenReg = '<?= Session::csrfToken() ?>';
+    const initialLicenseReg = <?= json_encode($formData['license_title'] ?? '', JSON_UNESCAPED_UNICODE) ?>;
+    function reloadLicenseTitlesByService(serviceId) {
+        const select = document.getElementById('license_title_reg');
+        if (!select) return;
+        if (!serviceId || serviceId === '0') {
+            // فقط گزینهٔ «انتخاب کنید» و «سایر» باقی بماند
+            select.innerHTML = '<option value="">انتخاب کنید...</option><option value="سایر">سایر (عنوان دلخواه)</option>';
+            toggleCustomLicenseReg();
+            return;
+        }
+        fetch('<?= $base = rtrim(BASE_URL, '/') . '/'; ?>admin/license-titles/by-service/' + serviceId, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfTokenReg }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const groups = data.groups || {};
+                let html = '<option value="">انتخاب کنید...</option>';
+                for (const cat in groups) {
+                    html += '<optgroup label="' + cat + '">';
+                    groups[cat].forEach(t => {
+                        if (t.startsWith('سایر')) return;
+                        const sel = (t === initialLicenseReg) ? ' selected' : '';
+                        html += '<option value="' + t + '"' + sel + '>' + t + '</option>';
+                    });
+                    html += '</optgroup>';
+                }
+                html += '<option value="سایر"' + (initialLicenseReg.startsWith('سایر') ? ' selected' : '') + '>سایر (عنوان دلخواه)</option>';
+                select.innerHTML = html;
+                toggleCustomLicenseReg();
+            })
+            .catch(() => { /* در صورت خطا، فهرست فعلی دست‌نخورده باقی می‌ماند */ });
     }
 
     // پویا بودن روزها

@@ -401,7 +401,15 @@ class AdminController extends Controller
             'title' => 'ثبت نام متقاضی جدید (بایگانی)',
             'errors' => Session::get('errors', []),
             'formData' => Session::get('formData', []),
-            'licenseGroups' => (new LicenseTitle())->groupedActive(),
+            // برای فرم ثبت‌نام، فهرست رشته‌ها به سرویس انتخاب‌شده بستگی دارد
+            // و به‌صورت پویا توسط JS بارگذاری می‌شود. در ابتدا، سرویس
+            // پیش‌فرض (اولین سرویس فعال) نمایش داده می‌شود.
+            'services' => (new ServiceType())->getActive(),
+            'licenseGroups' => (new LicenseTitle())->groupedActiveByService(
+                (int)(Session::get('formData', [])['service_type_id'] ?? 0) > 0
+                    ? (int)Session::get('formData', [])['service_type_id']
+                    : null
+            ),
             'currentPage' => 'register'
         ], 'admin_layout');
         Session::remove('errors');
@@ -563,7 +571,8 @@ class AdminController extends Controller
             'jobDetail' => $jobDetail,
             'propertyDetail' => $propertyDetail,
             'documents' => $documents,
-            'licenseGroups' => (new LicenseTitle())->groupedActive(),
+            // فهرست رشته‌ها بر اساس سرویس متقاضی فیلتر می‌شود
+            'licenseGroups' => (new LicenseTitle())->groupedActiveByService((int)$applicant['service_type_id']),
             'services' => (new ServiceType())->getActive(),
             'wizardSteps' => $wizardSteps,
             'dynFieldsByStep' => $dynFieldsByStep,

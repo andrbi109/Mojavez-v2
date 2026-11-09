@@ -233,6 +233,7 @@ $router->get('/admin/license-titles', ['LicenseTitleController', 'index']);
 $router->post('/admin/license-titles/save', ['LicenseTitleController', 'save']);
 $router->post('/admin/license-titles/delete', ['LicenseTitleController', 'delete']);
 $router->post('/admin/license-titles/toggle/{id}', ['LicenseTitleController', 'toggle']);
+$router->get('/admin/license-titles/by-service/{id}', ['LicenseTitleController', 'byService']);
 
 // Documents
 $router->post('/document/view', ['DocumentController', 'view']);

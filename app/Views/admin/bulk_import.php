@@ -11,7 +11,7 @@
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">نوع خدمت <span class="text-danger">*</span></label>
-                        <select class="form-select" name="service_type_id" required>
+                        <select class="form-select" name="service_type_id" id="service_type_id_bulk" onchange="reloadLicenseTitlesByServiceBulk(this.value)" required>
                             <option value="">انتخاب کنید...</option>
                             <?php foreach(($services??[]) as $sv):?>
                                 <option value="<?= (int)$sv['id'] ?>"><?= $e($sv['title']) ?></option>
@@ -20,7 +20,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">رشته مجوز <span class="text-danger">*</span></label>
-                        <select class="form-select" name="license_title" required>
+                        <select class="form-select" name="license_title" id="license_title_bulk" required>
                             <option value="">انتخاب کنید...</option>
                             <?php foreach(($licenseGroups??[]) as $cat => $titles):?>
                                 <optgroup label="<?= $e($cat) ?>">
@@ -68,3 +68,41 @@
         </div>
     </div>
 </div>
+
+<script>
+    // بارگذاری پویای عناوین مجوز بر اساس سرویس انتخاب‌شده
+    const csrfTokenBulk = '<?= Session::csrfToken() ?>';
+    function reloadLicenseTitlesByServiceBulk(serviceId) {
+        const select = document.getElementById('license_title_bulk');
+        if (!select) return;
+        if (!serviceId || serviceId === '0') {
+            select.innerHTML = '<option value="">انتخاب کنید...</option>';
+            return;
+        }
+        fetch('<?= $base ?>admin/license-titles/by-service/' + serviceId, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfTokenBulk }
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) return;
+                const groups = data.groups || {};
+                let html = '<option value="">انتخاب کنید...</option>';
+                for (const cat in groups) {
+                    html += '<optgroup label="' + cat + '">';
+                    groups[cat].forEach(t => {
+                        if (t.startsWith('سایر')) return;
+                        html += '<option value="' + t + '">' + t + '</option>';
+                    });
+                    html += '</optgroup>';
+                }
+                select.innerHTML = html;
+            })
+            .catch(() => { /* در صورت خطا، فهرست فعلی دست‌نخورده باقی می‌ماند */ });
+    }
+
+    // اگر سرویسی از ابتدا انتخاب‌شده باشد (در بازگشت از خطا)، فهرست را به‌روز کن
+    (function(){
+        const s = document.getElementById('service_type_id_bulk');
+        if (s && s.value) reloadLicenseTitlesByServiceBulk(s.value);
+    })();
+</script>
