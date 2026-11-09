@@ -239,7 +239,18 @@ class UserPanelController extends Controller
     {
         $user = $this->getUser();
         $applications = $this->userModel->getApplications((int)$user['id']);
-        $licenses = array_filter($applications, fn($a) => in_array($a['current_status'] ?? '', ['صدور مجوز','تحویل مجوز'], true));
+
+        // شامل همهٔ وضعیت‌های «صدور شده» برای هر نوع خدمت
+        // - صنایع دستی: صدور مجوز، تحویل مجوز
+        // - مشاغل خانگی مستقل: دریافت تصویر مجوز، تأیید اولیه در سامانه، تأیید نهایی
+        $licenseStatuses = [
+            'صدور مجوز',
+            'تحویل مجوز',
+            'دریافت تصویر مجوز',
+            'تأیید اولیه در سامانه مشاغل خانگی',
+            'تأیید نهایی دریافت کد رهگیری',
+        ];
+        $licenses = array_filter($applications, fn($a) => in_array($a['current_status'] ?? '', $licenseStatuses, true));
 
         $data = [
             'title' => 'مجوزهای من',
