@@ -5,6 +5,13 @@ require_once dirname(__DIR__) . '/config/config.php';
 error_reporting(E_ALL);
 ini_set('display_errors', APP_DEBUG ? '1' : '0');
 ini_set('log_errors', '1');
+// محل ذخیرهٔ لاگ خطاها (اگر defined نباشد، PHP از پیش‌فرض سرور استفاده می‌کند)
+if (defined('ERROR_LOG_PATH') && ERROR_LOG_PATH) {
+    @ini_set('error_log', ERROR_LOG_PATH);
+}
+
+// ناپدید کردن جزئیات سرور در پاسخ (در صورت قابل تنظیم بودن)
+@ini_set('expose_php', '0');
 
 require_once dirname(__DIR__) . '/config/helper.php';
 require_once dirname(__DIR__) . '/config/jdf.php';
@@ -13,14 +20,55 @@ AutoLoader::register();
 
 // ==================== مدیریت سراسری خطاها ====================
 // هیچ خطای کنترل‌نشده‌ای نباید مسیر فایل‌های سرور را به کاربر نشان دهد
-set_exception_handler(function (\Throwable $e) {
-    error_log('Uncaught exception: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+$isAjax = (
+    (!empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+        && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
+    || (!empty($_SERVER['HTTP_ACCEPT'])
+        && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
+);
+
+set_exception_handler(function (\Throwable $e) use ($isAjax) {
+    // ثبت خطا با زمینهٔ درخواست (متد، مسیر، IP بدون نشاندادن مقادیر حساس)
+    $method = $_SERVER['REQUEST_METHOD'] ?? '?';
+    $uri = $_SERVER['REQUEST_URI'] ?? '?';
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '-';
+    error_log(sprintf(
+        'Uncaught %s: %s @ %s:%d | %s %s | IP=%s',
+        get_class($e),
+        $e->getMessage(),
+        basename($e->getFile()),
+        $e->getLine(),
+        $method,
+        $uri,
+        $ip
+    ));
+
     if (!headers_sent()) {
         http_response_code(500);
+        // در خطای ۵۰۰ هم X-Robots-Tag چاپ شود (سامانه خصوصی)
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        if ($isAjax) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => false,
+                'error' => 'خطای داخلی سرور',
+                'code' => 'internal_error',
+            ] + (defined('APP_DEBUG') && APP_DEBUG ? [
+                'debug' => [
+                    'message' => $e->getMessage(),
+                    'file' => basename($e->getFile()),
+                    'line' => $e->getLine(),
+                ],
+            ] : []), JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         header('Content-Type: text/html; charset=utf-8');
     }
+
     echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
-        . '<meta name="viewport" content="width=device-width, initial-scale=1"><title>خطای سرور</title>'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<meta name="robots" content="noindex,nofollow,noarchive">'
+        . '<title>خطای سرور</title>'
         . '<style>body{font-family:Tahoma,sans-serif;display:flex;align-items:center;justify-content:center;'
         . 'min-height:100vh;margin:0;background:#F0F2F5}.box{background:#fff;padding:2rem 3rem;border-radius:12px;'
         . 'box-shadow:0 2px 12px rgba(0,0,0,.08);text-align:center;max-width:560px}'
@@ -34,22 +82,76 @@ set_exception_handler(function (\Throwable $e) {
     echo '<a href="/">بازگشت به صفحهٔ اصلی</a></div></body></html>';
     exit;
 });
+
 set_error_handler(function (int $severity, string $message, string $file, int $line) {
     // ثبت هشدارها/اعلان‌ها در لاگ؛ اجرا ادامه می‌یابد (فقط استثناهای واقعی ۵۰۰ می‌شوند)
-    error_log("PHP {$severity}: {$message} @ {$file}:{$line}");
+    error_log("PHP {$severity}: {$message} @ " . basename($file) . ":{$line}");
     return false; // واگذاری نمایش به display_errors (مطابق APP_DEBUG)
 });
 
 // ==================== هدرهای امنیتی سراسری ====================
-// این هدرها در تمام پاسخ‌های سامانه اعمال می‌شوند:
+// این هدرها در تمام پاسخ‌های سامانه اعمال می‌شوند (همراه با قواعد .htaccess)
 header('X-Content-Type-Options: nosniff');            // جلوگیری از sniffing نوع محتوا
 header('X-Frame-Options: SAMEORIGIN');                 // مقابله با Clickjacking
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header('Permissions-Policy: geolocation=(), microphone=(), camera=()'); // غیرفعال‌سازی APIهای حساس مرورگر
+header('Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()'); // غیرفعال‌سازی APIهای حساس مرورگر
+// X-Robots-Tag — این سامانه خصوصی است و نباید ایندکس/ذخیره شود
+header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex');
+// Cross-Origin Protection (Spectre-class mitigations)
+header('Cross-Origin-Opener-Policy: same-origin');
+header('Cross-Origin-Resource-Policy: same-site');
+// Cache-Control پیش‌فرض برای صفحات پویا — جلوگیری از کش شدن داده‌های حساس
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 Session::start();
 
+// ==================== محدودیت آی‌پی (denylist عمومی) ====================
+// بررسی زودهنگام: اگر آی‌پی در denylist است، قبل از هر پردازش بلاک شود.
+if (defined('IP_BLOCKLIST') && IP_BLOCKLIST !== '') {
+    $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+    // پشتیبانی از پروکسی معتبر (اگر X-Forwarded-For از یک پروکسی شناخته‌شده می‌آید)
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwardedIp = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+        if (filter_var($forwardedIp, FILTER_VALIDATE_IP)) {
+            $clientIp = $forwardedIp;
+        }
+    }
+    $blocklist = array_filter(array_map('trim', explode(',', IP_BLOCKLIST)));
+    if ($clientIp && in_array($clientIp, $blocklist, true)) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        echo 'دسترسی از این آی‌پی مسدود شده است.';
+        exit;
+    }
+}
+
 $router = new Router(BASE_URL);
+
+// ==================== /health — بررسی سلامت برای مانیتورینگ ====================
+// بدون احراز هویت — فقط بررسی سریع اتصال به DB. در پاسخ، اطلاعات حساس قرار ندارد.
+$router->get('/health', function () {
+    header('Content-Type: application/json; charset=utf-8');
+    header('X-Robots-Tag: noindex, nofollow, noarchive');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    $ok = true;
+    $checks = [];
+    try {
+        $db = Database::getInstance()->getConnection();
+        $db->query('SELECT 1')->fetch();
+        $checks['db'] = 'ok';
+    } catch (\Throwable $e) {
+        $ok = false;
+        $checks['db'] = 'fail';
+    }
+    $checks['version'] = defined('APP_VERSION') ? APP_VERSION : 'unknown';
+    $checks['time'] = date('c');
+    http_response_code($ok ? 200 : 503);
+    echo json_encode(['status' => $ok ? 'healthy' : 'degraded', 'checks' => $checks], JSON_UNESCAPED_UNICODE);
+    exit;
+});
 
 // صفحهٔ اصلی
 $router->get('/', ['HomeController', 'index']);

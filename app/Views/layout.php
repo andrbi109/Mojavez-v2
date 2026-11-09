@@ -12,6 +12,9 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- این سامانه خصوصی است و نباید ایندکس شود -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache">
+    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <meta name="description" content="<?= htmlspecialchars($siteName) ?> — ثبت درخواست، پیگیری و صدور مجوز صنایع دستی | مدیریت: <?= htmlspecialchars(owner_name()) ?>">
     <title><?= htmlspecialchars($title ?? $siteName) ?></title>
     <!-- تم زودهنگام روز/شب (ضد پرش رنگ) -->

@@ -12,6 +12,8 @@ $base = rtrim(BASE_URL, '/') . '/';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- پروندهٔ چاپی خصوصی — ایندکس/ذخیره‌سازی ممنوع -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <title><?= htmlspecialchars($title ?? 'پرونده چاپی') ?></title>
     <script>document.documentElement.setAttribute('data-bs-theme', 'light');</script>
     <link rel="stylesheet" href="<?= $base ?>assets/font.css">

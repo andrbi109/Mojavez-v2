@@ -14,6 +14,9 @@ $navItem = fn(string $key) => $active === $key ? 'active' : '';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- پنل کاربری خصوصی — ایندکس/ذخیره‌سازی ممنوع -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache">
+    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <meta name="csrf-token" content="<?= Session::csrfToken() ?>">
     <title><?= htmlspecialchars($title ?? 'پنل کاربری') ?></title>
     <script src="<?= $base ?>assets/js/theme-init.js"></script>

@@ -112,6 +112,29 @@ if (!function_exists('owner_name')) {
 }
 
 /**
+ * ساخت URL برای یک asset (فایل استاتیک) همراه با پارامتر نسخه برای کش‌گذاری.
+ * ---------------------------------------------------------------------
+ * در صورتی که فایل واقعی موجود باشد، mtime آن به‌عنوان پارامتر ?v=... افزوده می‌شود.
+ * این کار تضمین می‌کند که با هر بار انتشار نسخهٔ جدید، مرورگر فایل تازه را بارگذاری کند،
+ * و در عین حال امکان کش‌گذاری طولانی‌مدت (immutable) فراهم می‌ماند.
+ *
+ * مثال: asset_url('assets/css/style.css') → '/assets/css/style.css?v=1731000000'
+ */
+if (!function_exists('asset_url')) {
+    function asset_url(string $relativePath): string
+    {
+        $base = rtrim(BASE_URL, '/') . '/';
+        $cleanPath = ltrim($relativePath, '/');
+        $absPath = ROOT_PATH . '/public/' . $cleanPath;
+        $version = defined('APP_VERSION') ? APP_VERSION : '1';
+        if (is_file($absPath)) {
+            $version = (string)filemtime($absPath);
+        }
+        return $base . $cleanPath . '?v=' . $version;
+    }
+}
+
+/**
  * قالب پیام اطلاع‌رسانی متقاضی با جایگذاری نام و کد رهگیری
  */
 if (!function_exists('build_notify_message')) {

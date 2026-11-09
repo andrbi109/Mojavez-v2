@@ -12,15 +12,41 @@ class Session
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            // سخت‌سازی نشست — پیش از فراخوانی session_start اعمال می‌شود.
+            ini_set('session.use_strict_mode', '1');      // رد شناسه‌های نامعتبر (جلوگیری از Session Fixation)
+            ini_set('session.use_only_cookies', '1');     // فقط کوکی (نه URL — جلوگیری از Session Leak در URL)
+            ini_set('session.sid_bits_per_character', '6'); // کاراکترهای بیشتری در شناسه (سخت‌تر برای حدس)
+            ini_set('session.sid_length', '48');          // شناسهٔ بلندتر = غیرقابل حدس‌تر
+            ini_set('session.cookie_httponly', '1');
+            ini_set('session.cookie_samesite', 'Lax');
+
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
             session_set_cookie_params([
                 'lifetime' => SESSION_LIFETIME,
                 'path' => '/',
-                'httponly' => true,          // عدم دسترسی جاوااسکریپت به کوکی (مقابله با XSS)
-                'samesite' => 'Lax',         // مقابله با CSRF در درخواست‌های میان‌سایتی
-                'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'), // فقط روی HTTPS در سرور واقعی
+                'domain' => '',                          // فقط هاست فعلی
+                'httponly' => true,                       // عدم دسترسی جاوااسکریپت به کوکی (مقابله با XSS)
+                'samesite' => 'Lax',                      // مقابله با CSRF در درخواست‌های میان‌سایتی
+                'secure' => $isHttps,                     // فقط روی HTTPS در سرور واقعی
             ]);
             session_name('MOJAVEZSESSID');
             session_start();
+
+            // بازتولید شناسهٔ نشست به‌صورت دوره‌ای برای محدود کردن پنجرهٔ سوءاستفاده
+            // هر ۳۰ دقیقه — توازن بین امنیت و تجربهٔ کاربری
+            $now = time();
+            $lastRegen = $_SESSION['_session_created_at'] ?? 0;
+            if ($lastRegen === 0) {
+                $_SESSION['_session_created_at'] = $now;
+            } elseif ($now - $lastRegen > 1800) {
+                // بازتولید بدون از بین بردن داده‌ها (preserve data)
+                $oldData = $_SESSION;
+                session_regenerate_id(true);
+                $_SESSION = $oldData;
+                $_SESSION['_session_created_at'] = $now;
+            }
         }
     }
 

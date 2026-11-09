@@ -8,6 +8,144 @@
 
 ---
 
+## [0.6.0] — ۲۰۲۶-۱۱-۰۹ — سخت‌سازی امنیتی و حریم خصوصی برای سامانهٔ خصوصی
+
+### 🎯 هدف
+این سامانه خصوصی است — نیازی به شناسایی توسط موتورهای جستجو و خزنده‌های هوش مصنوعی ندارد.
+این نسخه بر سه محور تمرکز دارد:
+1. **امنیت** — گام اول
+2. **بهینه‌سازی** — گام دوم
+3. **سرعت و پایداری** — گام سوم
+
+### 🔒 امنیت (گام اول)
+
+#### ۱) مسدودسازی موتورهای جستجو و خزنده‌های هوش مصنوعی
+این سامانه اکنون از سه لایه در برابر موتورهای جستجو و خزنده‌ها محافظت می‌شود:
+
+- **`public/robots.txt`** — بلیک‌لیست جامع ربات‌ها (Googlebot, Bingbot, GPTBot, ChatGPT-User, CCBot, anthropic-ai, Claude-Web, cohere-ai, Google-Extended, PerplexityBot, Amazonbot, Bytespider, Diffbot, Meta-ExternalAgent, OAI-SearchBot, Applebot-Extended، و ربات‌های SEO مثل SemrushBot, AhrefsBot, MJ12bot, DotBot)
+- **`.htaccess` و `index.php`** — هدر `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex` روی همهٔ پاسخ‌ها
+- **مداخلهٔ سطح Apache/Nginx** — مسدودسازی User-Agent با کد ۴۱۰ (Gone) — قبل از رسیدن به PHP
+
+#### ۲) متاتگ‌های noindex در همهٔ قالب‌ها
+- `app/Views/layout.php` (قالب عمومی)
+- `app/Views/admin_layout.php` (پنل مدیریت)
+- `app/Views/user_layout.php` (پنل کاربری)
+- `app/Views/layout_print.php` (صفحات چاپی)
+
+هر چهار قالب اکنون `<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">` دارند.
+
+#### ۳) سخت‌سازی نشست (Session Hardening)
+- `session.use_strict_mode = On` — رد شناسه‌های نامعتبر (مقابله با Session Fixation)
+- `session.use_only_cookies = On` — فقط کوکی (نه URL — جلوگیری از Session Leak در URL)
+- `session.sid_bits_per_character = 6` و `session.sid_length = 48` — شناسه‌های غیرقابل حدس‌تر
+- `session.cookie_httponly = On` و `session.cookie_samesite = Lax`
+- تشخیص صحیح HTTPS با پشتیبانی از پروکسی معتبر (`X-Forwarded-Proto`)
+- بازتولید خودکار شناسهٔ نشست هر ۳۰ دقیقه برای محدود کردن پنجرهٔ سوءاستفاده
+
+#### ۴) هدرهای امنیتی جامع روی همهٔ پاسخ‌ها
+- `Content-Security-Policy` کامل (default-src 'self'؛ object-src 'none'؛ base-uri 'self'؛ frame-ancestors 'self')
+- `Cross-Origin-Opener-Policy: same-origin` — محافظت Spectre-class
+- `Cross-Origin-Resource-Policy: same-site`
+- `Permissions-Policy` — غیرفعال‌سازی `geolocation`, `microphone`, `camera`, `payment`, `usb`, `interest-cohort`
+- `Cache-Control: no-store` پیش‌فرض برای صفحات پویا (جلوگیری از کش داده‌های حساس)
+- `Strict-Transport-Security` (HSTS) روی HTTPS با `includeSubDomains; preload`
+
+#### ۵) محدودیت آی‌پی (اختیاری)
+- `IP_BLOCKLIST` در `.env` — لیست آی‌پی‌های مسدودشده (denylist عمومی)
+- `ADMIN_IP_ALLOWLIST` در `.env` — فقط آی‌پی‌های فهرست‌شده به پنل مدیریت دسترسی دارند
+- پشتیبانی از پروکسی معتبر با `X-Forwarded-For` (با اعتبارسنجی IP)
+
+#### ۶) مسدودسازی فایل‌های مخفی و حساس
+- `.` dotfiles (مثل `.env`, `.git`, `.htaccess`)
+- پسوندهای حساس: `.env`, `.sql`, `.md`, `.sh`, `.py`, `.bak`, `.log`, `.lock`, `.json`, `.yaml`, `.ini`, `.conf`
+- غیرفعال‌سازی اجرای PHP در فایل‌های آپلود (لایهٔ دوم)
+- محدود کردن روش‌های HTTP: فقط `GET, POST, HEAD, OPTIONS` مجاز است
+
+#### ۷) ناپدید کردن امضای سرور
+- `ServerTokens Prod` و `ServerSignature Off` (Apache)
+- `server_tokens off` (Nginx)
+- `expose_php = Off` (PHP)
+- نام فایل در پیام خطا — `basename()` فقط نام فایل را برمی‌گرداند (نه مسیر کامل)
+
+### 🚀 بهینه‌سازی (گام دوم)
+
+#### ۱) توصیه‌های PHP برای محیط تولید
+فایل جدید `deploy/php/mojavez.production.ini`:
+- **OPcache** فعال با ۱۲۸ مگابایت حافظه، `validate_timestamps=0` برای حداکثر سرعت
+- **realpath_cache** — ۴ مگابایت برای شتاب‌دهی autoloader
+- **zlib.output_compression** — فشرده‌سازی خودکار gzip سطح ۶
+- **output_buffering** — ۴ کیلوبایت برای کاهش TTFB
+- `memory_limit = 256M`, `max_execution_time = 60s`
+
+#### ۲) کش‌گذاری هوشمند فایل‌های استاتیک
+- کش طولانی‌مدت (`expires 1y` با `Cache-Control: public, immutable`) برای فایل‌های `.js`, `.css`, `.png`, `.jpg`, `.woff2`
+- تابع جدید `asset_url()` در `helper.php` — افزودن پارامتر `?v={mtime}` برای کش‌باستینگ
+- با هر بار تغییر فایل، مرورگر به‌صورت خودکار نسخهٔ جدید را بارگذاری می‌کند
+
+### ⚡ سرعت و پایداری (گام سوم)
+
+#### ۱) `/health` endpoint برای مانیتورینگ
+- بدون احراز هویت — فقط بررسی سریع اتصال به DB
+- `GET /health` → `{ "status": "healthy", "checks": { "db": "ok", "version": "0.6.0", "time": "..." } }`
+- کد HTTP: ۲۰۰ (سالم) یا ۵۰۳ (degraded)
+- بدون نشاندادن اطلاعات حساس — آماده برای استفاده در Uptime Robot، Zabbix، Kubernetes probes
+
+#### ۲) مدیریت خطای قوی‌تر
+- `set_exception_handler` اکنون برای درخواست‌های AJAX به جای HTML، JSON برمی‌گرداند
+- لاگ خطا اکنون شامل زمینهٔ درخواست است (متد، مسیر، IP) برای دیباگ بهتر
+- در محیط تولید (`APP_DEBUG=false`)، استک تریس نمایش داده نمی‌شود
+- هدرهای امنیتی (`X-Robots-Tag`, `Cache-Control`) حتی در پاسخ خطا اعمال می‌شوند
+
+#### ۳) اطمینان از `display_errors = Off` در تولید
+- `ini_set('display_errors', APP_DEBUG ? '1' : '0')` — اگر `APP_DEBUG=false` باشد، خطاها هرگز به کاربر نمایش داده نمی‌شوند
+
+### 📦 فایل‌های جدید
+- `public/robots.txt` — بلیک‌لیست جامع ربات‌ها
+- `deploy/php/mojavez.production.ini` — توصیه‌های PHP برای تولید
+
+### 📝 فایل‌های تغییر یافته
+- `public/.htaccess` — بازنویسی کامل با قواعد مسدودسازی، هدرها و خطاهای سفارشی
+- `public/index.php` — هدرهای سراسری، `/health`، مدیریت خطای AJAX، IP blocklist
+- `core/Session.php` — سخت‌سازی نشست با `use_strict_mode`, `sid_bits_per_character`, بازتولید دوره‌ای
+- `app/Controllers/Controller.php` — `requireLogin()` اکنون ADMIN_IP_ALLOWLIST را بررسی می‌کند
+- `config/config.php` — تعریف `APP_ENV`, `ERROR_LOG_PATH`, `ADMIN_IP_ALLOWLIST`, `IP_BLOCKLIST`
+- `config/helper.php` — تابع جدید `asset_url()` برای کش‌باستینگ
+- `app/Views/layout.php`, `admin_layout.php`, `user_layout.php`, `layout_print.php` — متاتگ‌های noindex
+- `deploy/nginx/mojavez.conf` — بازنویسی کامل با مسدودسازی ربات، هدرها و صفحهٔ ۴۱۰
+- `deploy/apache/mojavez.conf` — بازنویسی کامل با مسدودسازی ربات، هدرها و صفحهٔ ۴۱۰
+- `.env.example` — متغیرهای جدید: `APP_ENV`, `ERROR_LOG_PATH`, `ADMIN_IP_ALLOWLIST`, `IP_BLOCKLIST`
+- `VERSION` → `0.6.0`
+- `config/config.php` → `APP_VERSION` → `0.6.0`
+
+### ⚙️ نصب بر روی سرور تولید
+
+۱) تنظیم `.env`:
+```ini
+APP_DEBUG=false
+APP_ENV=production
+ADMIN_IP_ALLOWLIST=192.168.1.10,192.168.1.20  # آی‌پی مدیران
+ERROR_LOG_PATH=/var/log/php/mojavez-error.log
+```
+
+۲) اعمال توصیه‌های PHP:
+```bash
+sudo cp deploy/php/mojavez.production.ini /etc/php/8.2/fpm/conf.d/99-mojavez.ini
+sudo systemctl reload php8.2-fpm
+```
+
+۳) راه‌اندازی پایش (اختیاری):
+```
+GET https://mojavez.example/health
+```
+
+۴) تست مسدودسازی ربات‌ها:
+```bash
+curl -I -A "Googlebot/2.1" https://mojavez.example/
+# باید برگرداند: HTTP/1.1 410 Gone
+```
+
+---
+
 ## [0.5.6] — ۲۰۲۶-۱۱-۰۹ — اختصاصی‌سازی رشته‌های مجوز به هر سرویس
 
 ### ✨ قابلیت‌های جدید

@@ -135,9 +135,38 @@ class Controller
 
     /**
      * بررسی ورود مدیر — در صورت عدم ورود به صفحهٔ لاگین هدایت می‌کند
+     *
+     * نکتهٔ امنیتی: اگر ADMIN_IP_ALLOWLIST در .env تنظیم شده باشد، فقط آی‌پی‌های
+     * فهرست‌شده به پنل مدیریت دسترسی دارند — مگر اینکه صفحهٔ لاگین خودش باشد.
      */
     protected function requireLogin(): void
     {
+        // بررسی allowlist آی‌پی برای پنل مدیریت
+        if (defined('ADMIN_IP_ALLOWLIST') && ADMIN_IP_ALLOWLIST !== '') {
+            $clientIp = $_SERVER['REMOTE_ADDR'] ?? '';
+            if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                $forwardedIp = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+                if (filter_var($forwardedIp, FILTER_VALIDATE_IP)) {
+                    $clientIp = $forwardedIp;
+                }
+            }
+            $allowed = array_filter(array_map('trim', explode(',', ADMIN_IP_ALLOWLIST)));
+            $uri = $_SERVER['REQUEST_URI'] ?? '';
+            $isLoginPage = str_contains($uri, '/admin/login');
+            if ($clientIp && !in_array($clientIp, $allowed, true) && !$isLoginPage) {
+                http_response_code(403);
+                header('Content-Type: text/html; charset=utf-8');
+                header('X-Robots-Tag: noindex, nofollow, noarchive');
+                echo '<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8">'
+                    . '<meta name="robots" content="noindex,nofollow"><title>دسترسی محدود</title>'
+                    . '<style>body{font-family:Tahoma,sans-serif;text-align:center;padding:3rem;'
+                    . 'background:#f8f9fa;color:#495057}</style></head><body>'
+                    . '<h2>دسترسی به پنل مدیریت از این شبکه محدود شده است.</h2>'
+                    . '<p>در صورت نیاز، با مدیر سامانه تماس بگیرید.</p>'
+                    . '</body></html>';
+                exit;
+            }
+        }
         if (!Session::get('admin_logged_in')) {
             $this->redirect('/admin/login');
         }

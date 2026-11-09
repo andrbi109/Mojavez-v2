@@ -41,6 +41,9 @@ $ownerImg = setting('owner_image', '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- پنل مدیریت خصوصی — ایندکس/ذخیره‌سازی ممنوع -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex, nocache">
+    <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
     <meta name="csrf-token" content="<?= Session::csrfToken() ?>">
     <title><?= htmlspecialchars($title ?? 'پنل مدیریت') ?></title>
     <script src="<?= $base ?>assets/js/theme-init.js"></script>
