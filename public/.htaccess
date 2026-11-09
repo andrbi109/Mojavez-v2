@@ -5,6 +5,8 @@
 #   • موتورهای جستجو و خزنده‌ها (Google/Bing/AI bots) مسدود می‌شوند.
 #   • دسترسی مستقیم به فایل‌های حساس ممنوع است.
 #   • هدرهای امنیتی و کش‌گذاری بهینه اعمال می‌شود.
+#
+# سازگار با: Apache 2.4+ (XAMPP/WAMP/Laragon) و PHP 8.x
 # =================================================================
 
 # --- فعال‌سازی موتور بازنویسی ---
@@ -17,95 +19,105 @@
     RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
 </IfModule>
 
-# --- امنیت: جلوگیری از لیست شدن پوشه‌ها و اجرای CGI ---
-Options -Indexes -ExecCGI +FollowSymLinks
+# --- امنیت: جلوگیری از لیست شدن پوشه‌ها ---
+Options -Indexes +FollowSymLinks
 
 # --- کاراکترست پیش‌فرض ---
 AddDefaultCharset UTF-8
 
-# --- امنیت: مخفی‌کردن امضای Apache و نسخهٔ سرور ---
-ServerTokens Prod
-ServerSignature Off
-
 # --- امنیت: مسدودسازی موتورهای جستجو و خزنده‌های هوش مصنوعی ---
 # این سامانه خصوصی است و نباید ایندکس شود.
+# فقط بات‌های شناخته‌شده مسدود می‌شوند (نه مرورگرهای عادی) — کد ۴۱۰ (Gone).
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # شناسایی بات‌های شناخته‌شده (با User-Agent)
-    RewriteCond %{HTTP_USER_AGENT} (Googlebot|Bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|Sogou|Exabot|facebot|ia_archiver|Applebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Discordbot|SkypeUriPreview) [NC,OR]
-    RewriteCond %{HTTP_USER_AGENT} (GPTBot|ChatGPT-User|CCBot|anthropic-ai|Claude-Web|cohere-ai|Google-Extended|PerplexityBot|Amazonbot|Bytespider|Diffbot|FacebookBot|Meta-ExternalAgent|OAI-SearchBot) [NC,OR]
-    RewriteCond %{HTTP_USER_AGENT} (SemrushBot|AhrefsBot|MJ12bot|DotBot|BLEXBot|SeznamBot|PetalBot|DotBot) [NC,OR]
-    RewriteCond %{HTTP_USER_AGENT} (MaJestic12|MJ12bot|BUbiNG|SiteAuditBot|SEO diverted|spider|crawler|scraping|wget|curl|python-requests|libwww-perl) [NC]
+    # لایهٔ ۱: موتورهای جستجوی کلاسیک
+    RewriteCond %{HTTP_USER_AGENT} Googlebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Bingbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Slurp [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} DuckDuckBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Baiduspider [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} YandexBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Sogou [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Exabot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} facebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} ia_archiver [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Applebot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Twitterbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} LinkedInBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} TelegramBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Discordbot [NC,OR]
+    # لایهٔ ۲: خزنده‌های هوش مصنوعی و مدل‌های زبانی
+    RewriteCond %{HTTP_USER_AGENT} GPTBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} ChatGPT-User [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} CCBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} anthropic-ai [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Claude-Web [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} cohere-ai [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Google-Extended [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} PerplexityBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Amazonbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Bytespider [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Diffbot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Meta-ExternalAgent [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} OAI-SearchBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} Applebot-Extended [NC,OR]
+    # لایهٔ ۳: خزنده‌های SEO و تحلیل بک‌لینک
+    RewriteCond %{HTTP_USER_AGENT} SemrushBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} AhrefsBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} MJ12bot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} DotBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} BLEXBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} SeznamBot [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} PetalBot [NC,OR]
+    # شرط نهایی — بدون OR
+    RewriteCond %{HTTP_USER_AGENT} PetalBot [NC]
     RewriteRule ^ - [R=410,L]
 </IfModule>
 
 # --- امنیت: مسدودسازی دسترسی مستقیم به فایل‌های مخفی و حساس ---
-<FilesMatch "(^\.|\.(env|sql|md|sh|py|bak|log|lock|json|yaml|yml|ini|conf|swp|tmp|orig|dist)$)">
-    <IfModule mod_authz_core.c>
-        Require all denied
-    </IfModule>
-    <IfModule !mod_authz_core.c>
-        Order deny,allow
-        Deny from all
-    </IfModule>
+<FilesMatch "(^\.|\.(env|sql|md|sh|py|bak|log|lock|yaml|yml|ini|conf|swp|tmp|orig|dist)$)">
+    Require all denied
 </FilesMatch>
-
-# --- امنیت: جلوگیری از اجرای PHP در پوشه‌های آپلود (در صورت سرو شدن) ---
-<IfModule mod_php.c>
-    php_flag engine off
-</IfModule>
 
 # --- امنیت: هدرهای امنیتی جامع ---
 <IfModule mod_headers.c>
-    # X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex
-    # این سامانه خصوصی است و نباید ایندکس شود.
+    # X-Robots-Tag — این سامانه خصوصی است و نباید ایندکس شود
     Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
 
     # جلوگیری از sniffing نوع محتوا
     Header always set X-Content-Type-Options "nosniff"
 
-    # مقابله با Clickjacking — فقط این سایت می‌تواند صفحه را embed کند
+    # مقابله با Clickjacking
     Header always set X-Frame-Options "SAMEORIGIN"
 
-    # سیاست Referrer — فقط origin در صورت خروج از سایت
+    # سیاست Referrer
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
 
     # غیرفعال‌سازی APIهای حساس مرورگر
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
 
-    # Content-Security-Policy — اجازه فقط به منابع هم‌خانواده (same-origin)
-    # Bootstrap از CDN استفاده می‌شود اگر USE_CDN=true، در غیر این صورت محلی است.
-    # این سیاست به‌صورت پیش‌فرض محافظه‌کارانه تنظیم شده است؛ در صورت نیاز به inline script، nonce اضافه کنید.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+    # Content-Security-Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
 
-    # Cross-Origin Opener Policy و Embedder Policy — محافظت در برابر حملات Spectre-class
+    # Cross-Origin Protection
     Header always set Cross-Origin-Opener-Policy "same-origin"
-    Header always set Cross-Origin-Embedder-Policy "unsafe-none"
     Header always set Cross-Origin-Resource-Policy "same-site"
 
-    # HSTS فقط روی HTTPS فعال شود (max-age=1 سال، شامل زیردامنه‌ها، آماده برای preload)
+    # HSTS فقط روی HTTPS فعال شود
     <IfModule mod_ssl.c>
         Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     </IfModule>
-
-    # Cache-Control برای صفحات HTML — no-store برای صفحات پویا
-    # برای صفحات خطا (4xx/5xx) همواره no-store
-    Header always set Cache-Control "no-store, no-cache, must-revalidate" env=ERROR_RESPONSE
 </IfModule>
 
-# --- فشرده‌سازی پاسخ‌ها ---
+# --- فشرده‌سازی پاسخ‌ها (Gzip) ---
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/html text/plain text/css text/javascript application/javascript application/json application/xml application/xml+rss
-    # سطح فشرده‌سازی (۹ = بیشترین)
     DeflateCompressionLevel 6
-    # فایل‌های کوچک‌تر از ۱۵۰ بایت فشرده نشوند (سربار بیش از سود)
-    DeflateInflateLimitRequestBody 150
 </IfModule>
 
 # --- کش مرورگر برای فایل‌های استاتیک ---
 <IfModule mod_expires.c>
     ExpiresActive On
-    # فایل‌های استاتیک با نسخه (مثل app.js?v=2.0.1) کش طولانی می‌شوند
     ExpiresByType image/png "access plus 1 month"
     ExpiresByType image/jpeg "access plus 1 month"
     ExpiresByType image/jpg "access plus 1 month"
@@ -127,31 +139,10 @@ ServerSignature Off
     ExpiresByType text/plain "access plus 0 seconds"
 </IfModule>
 
-# --- ETag برای کش‌گذاری شرطی (پایداری و سرعت) ---
+# --- ETag برای کش‌گذاری شرطی ---
 FileETag MTime Size
 
-# --- مسدودسازی برخی روش‌های HTTP خطرناک (فقط GET/POST/HEAD/OPTIONS مجاز) ---
-<LimitExcept GET POST HEAD OPTIONS>
-    <IfModule mod_authz_core.c>
-        Require all denied
-    </IfModule>
-    <IfModule !mod_authz_core.c>
-        Order deny,allow
-        Deny from all
-    </IfModule>
-</LimitExcept>
-
-# --- امنیت: جلوگیری از اجرای فایل‌های PHP در فایل‌های آپلود (لایهٔ دوم) ---
-<FilesMatch "\.(php|phtml|php3|php4|php5|php7|php8|phar)$">
-    <IfModule mod_php.c>
-        # اگر این فایل مستقیماً درخواست شود و index.php نباشد، اجرا نشود
-        SetHandler none
-    </IfModule>
-</FilesMatch>
-
-# --- خطای سفارشی برای کد 410 (بات‌های مسدودشده) ---
-ErrorDocument 410 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>دسترسی مسدود</title><style>body{font-family:Tahoma,sans-serif;text-align:center;padding:3rem;background:#f8f9fa}h1{color:#6c757d}</style></head><body><h1>۴۱۰ — دسترسی برای خزنده‌ها مسدود است</h1><p>این سامانه خصوصی است.</p></body></html>"
-
 # --- صفحات خطای سفارشی ---
-ErrorDocument 403 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>دسترسی ممنوع</title></head><body><h1>۴۰۳ — دسترسی ممنوع</h1></body></html>"
-ErrorDocument 404 "<!DOCTYPE html><html lang='fa' dir='rtl'><head><meta charset='UTF-8'><title>یافت نشد</title></head><body><h1>۴۰۴ — صفحه یافت نشد</h1></body></html>"
+ErrorDocument 410 "دسترسی برای خزنده‌ها مسدود است — این سامانه خصوصی است."
+ErrorDocument 403 "دسترسی ممنوع"
+ErrorDocument 404 "صفحه یافت نشد"

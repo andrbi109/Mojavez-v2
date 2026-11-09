@@ -13,29 +13,32 @@ class Session
     {
         if (session_status() === PHP_SESSION_NONE) {
             // سخت‌سازی نشست — پیش از فراخوانی session_start اعمال می‌شود.
-            ini_set('session.use_strict_mode', '1');      // رد شناسه‌های نامعتبر (جلوگیری از Session Fixation)
-            ini_set('session.use_only_cookies', '1');     // فقط کوکی (نه URL — جلوگیری از Session Leak در URL)
-            ini_set('session.sid_bits_per_character', '6'); // کاراکترهای بیشتری در شناسه (سخت‌تر برای حدس)
-            ini_set('session.sid_length', '48');          // شناسهٔ بلندتر = غیرقابل حدس‌تر
-            ini_set('session.cookie_httponly', '1');
-            ini_set('session.cookie_samesite', 'Lax');
+            @ini_set('session.use_strict_mode', '1');      // رد شناسه‌های نامعتبر (جلوگیری از Session Fixation)
+            @ini_set('session.use_only_cookies', '1');     // فقط کوکی (نه URL)
+            @ini_set('session.sid_bits_per_character', '5'); // ۵ برای سازگاری بهتر با همهٔ نسخه‌ها
+            @ini_set('session.sid_length', '40');          // شناسهٔ بلندتر = غیرقابل حدس‌تر
+            @ini_set('session.cookie_httponly', '1');
+            @ini_set('session.cookie_samesite', 'Lax');
 
             $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
                 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 
-            session_set_cookie_params([
+            // پارامترهای کوکی نشست — به‌صورت آرایه برای سازگاری با PHP 7.3+
+            $cookieParams = [
                 'lifetime' => SESSION_LIFETIME,
                 'path' => '/',
-                'domain' => '',                          // فقط هاست فعلی
                 'httponly' => true,                       // عدم دسترسی جاوااسکریپت به کوکی (مقابله با XSS)
                 'samesite' => 'Lax',                      // مقابله با CSRF در درخواست‌های میان‌سایتی
                 'secure' => $isHttps,                     // فقط روی HTTPS در سرور واقعی
-            ]);
+            ];
+            session_set_cookie_params($cookieParams);
             session_name('MOJAVEZSESSID');
-            session_start();
 
-            // بازتولید شناسهٔ نشست به‌صورت دوره‌ای برای محدود کردن پنجرهٔ سوءاستفاده
-            // هر ۳۰ دقیقه — توازن بین امنیت و تجربهٔ کاربری
+            // suppress هشدار احتمالی session_start در صورت وجود کوکی قدیمی نامعتبر
+            @session_start();
+
+            // بازتولید شناسهٔ نشست به‌صورت دوره‌ای — هر ۳۰ دقیقه
+            // برای محدود کردن پنجرهٔ سوءاستفاده در صورت نشت شناسه.
             $now = time();
             $lastRegen = $_SESSION['_session_created_at'] ?? 0;
             if ($lastRegen === 0) {
@@ -43,7 +46,7 @@ class Session
             } elseif ($now - $lastRegen > 1800) {
                 // بازتولید بدون از بین بردن داده‌ها (preserve data)
                 $oldData = $_SESSION;
-                session_regenerate_id(true);
+                @session_regenerate_id(true);
                 $_SESSION = $oldData;
                 $_SESSION['_session_created_at'] = $now;
             }
