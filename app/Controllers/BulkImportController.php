@@ -452,6 +452,10 @@ class BulkImportController extends Controller
             // رمز عبور
             $password = $passwordStrategy === 'fixed' ? $fixedPassword : $nc;
 
+            // شروع تراکنش دسته‌ای (اگر از قبل فعال نیست)
+            // createApplicant در صورت وجود تراکنش فعال، تراکنش جدید شروع نمی‌کند
+            $beginBatch();
+
             // استفاده از سرویس متمرکز ثبت‌نام (یکپارچه با ویزارد و ثبت‌نام دستی)
             $result = $registrationService->createApplicant(
                 [
@@ -482,6 +486,14 @@ class BulkImportController extends Controller
             );
 
             if (!$result['success']) {
+                // چون createApplicant تراکنش خودش را rollback نکرده (چون مالک ماست)،
+                // کل تراکنش دسته‌ای را rollback می‌کنیم تا تغییرات ناقص ثبت نشود.
+                // سپس تراکنش جدید برای ردیف‌های بعدی شروع می‌شود.
+                if ($inTransaction) {
+                    try { $db->rollBack(); } catch (\Throwable $e) {}
+                    $inTransaction = false;
+                    $processedInThisTransaction = 0;
+                }
                 $results[] = [
                     'idx' => $idx, 'name' => $fn . ' ' . $ln,
                     'national_code' => $nc, 'mobile' => $mb,

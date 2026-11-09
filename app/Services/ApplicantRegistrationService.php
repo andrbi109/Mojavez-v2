@@ -315,7 +315,12 @@ class ApplicantRegistrationService
         $actorName = Session::get('admin_display_name') ?? Session::get('admin_username', $source);
 
         $db = Database::getInstance()->getConnection();
-        $db->beginTransaction();
+        // اگر تراکنشی از قبل فعال است (مثلاً ایمپورت دسته‌جمعی)، تراکنش جدید شروع نکن.
+        // در غیر این صورت، تراکنش خودمان را شروع می‌کنیم تا atomic بودن ثبت‌نام حفظ شود.
+        $ownsTransaction = !$db->inTransaction();
+        if ($ownsTransaction) {
+            $db->beginTransaction();
+        }
         try {
             // ۱. Person (با findOrCreate — پشتیبانی کامل از حقوقی)
             $personData = [
@@ -442,7 +447,11 @@ class ApplicantRegistrationService
                 }
             }
 
-            $db->commit();
+            // اگر تراکنش خودمان را شروع کرده‌ایم، آن را commit کن؛
+            // در غیر این صورت، commit به فراخواننده سپرده می‌شود (مثلاً BulkImportController)
+            if ($ownsTransaction) {
+                $db->commit();
+            }
 
             return [
                 'success'       => true,
@@ -453,7 +462,11 @@ class ApplicantRegistrationService
                 'errors'        => [],
             ];
         } catch (\Throwable $e) {
-            $db->rollBack();
+            // فقط اگر تراکنش خودمان را شروع کرده‌ایم، rollback کن؛
+            // در غیر این صورت، rollback به فراخواننده سپرده می‌شود.
+            if ($ownsTransaction) {
+                $db->rollBack();
+            }
             return [
                 'success'       => false,
                 'applicant_id'  => null,
