@@ -1,0 +1,37 @@
+# =================================================================
+# Mojavez — ریدایرکت ریشهٔ دامنه به پوشهٔ public/
+# -----------------------------------------------------------------
+# این فایل را در پوشهٔ public_html/ (والدِ public/) قرار دهید
+# تا کاربرانی که به example.com/ می‌روند، به‌صورت خودکار به
+# example.com/public/ هدایت شوند.
+#
+# این فایل فقط زمانی لازم است که:
+#   - پروژه با پوشهٔ public/ استقرار یافته باشد
+#   - و DocumentRoot قابل تغییر نباشد
+#   - و BASE_URL=/public/ تنظیم شده باشد
+#
+# نکته: این فایل جایگزین public/.htaccess نیست — هر دو لازم هستند.
+# این فایل فقط ریدایرکت ریشه را انجام می‌دهد.
+# =================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # اگر درخواست برای ریشه یا هر مسیری است که فایل/پوشهٔ واقعی نیست،
+    # آن را به public/ هدایت کن.
+    # ولی اگر درخواست از قبل با /public/ شروع می‌شود، کاری نکن.
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ /public/$1 [L,R=301]
+</IfModule>
+
+# امنیت: مسدودسازی فایل‌های حساس
+<FilesMatch "(^\.|\.(env|sql|md|sh|py|bak|log|lock|yaml|yml|ini|conf)$)">
+    Require all denied
+</FilesMatch>
+
+# هدر X-Robots-Tag — سامانه خصوصی
+<IfModule mod_headers.c>
+    Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+</IfModule>

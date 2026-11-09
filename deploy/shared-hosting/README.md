@@ -68,55 +68,104 @@
 
 ### گام ۱: آپلود فایل‌ها
 
-۱) فایل‌های پروژه را (به‌جز `.git/`، `tests/`، `dev-server.sh`) با FTP یا فایل‌منیجر DirectAdmin آپلود کنید:
+**دو روش استقرار وجود دارد — یکی را انتخاب کنید:**
+
+#### روش A: استقرار با پوشهٔ `public/` (توصیه می‌شود — امن‌تر)
+
+در این روش، کل پروژه (شامل `public/`) را در `public_html/` آپلود می‌کنید.
+سپس `BASE_URL=/public/` تنظیم می‌کنید تا همهٔ مسیرها به‌درستی کار کنند.
 
 ```
 public_html/
-├── public/        ← محتوای این پوشه را در public_html/ بریزید
-│   ├── .htaccess
+├── public/                ← DocumentRoot واقعی اینجا است
+│   ├── .htaccess          ← از deploy/shared-hosting/.htaccess
 │   ├── index.php
-│   ├── check.php (موقت — بعداً حذف)
-│   ├── install.php (موقت — بعداً حذف)
 │   ├── assets/
 │   └── ...
+├── .htaccess              ← از deploy/shared-hosting/root-htaccess.htaccess (ری‌دایرکت ریشه)
 ├── app/
 ├── core/
 ├── config/
 ├── database/
-├── deploy/
 ├── uploads/
-└── .env (ساخته می‌شود)
+├── .env
+└── deploy/
+    └── shared-hosting/
+        ├── check.php (موقت)
+        ├── install.php (موقت)
+        └── .htaccess (برای public/)
 ```
 
-**ساختار نهایی هاست:**
-```
-/home/youruser/
-├── public_html/          ← DocumentRoot (محتوای public/ اینجا)
-│   ├── .htaccess
-│   ├── index.php
-│   ├── check.php
-│   ├── install.php
-│   └── assets/
-├── domains/
-│   └── your-domain.com/
-│       └── public_html/  (یا این مسیر)
-└── (سایر فایل‌های پروژه)
-    ├── app/
-    ├── core/
-    ├── config/
-    ├── database/
-    ├── uploads/
-    └── .env
+**تنظیم BASE_URL:**
+
+در فایل `.env`:
+```ini
+BASE_URL=/public/
 ```
 
-**نکتهٔ مهم:** اگر فایل‌های app/core/config در دسترس عمومی نیستند (یعنی DocumentRoot فقط `public/` است)، امنیت بهتر است. اگر کل پروژه در `public_html/` است، `.htaccess` باید دسترسی به این پوشه‌ها را مسدود کند (به‌صورت پیش‌فرض این کار را می‌کند).
+این کار باعث می‌شود همهٔ مسیرها (`/public/assets/...`، `/public/services`، ...)
+به‌درستی تولید شوند و فایل‌های استاتیک (`assets/`) در دسترس باشند.
 
-۲) **فایل `deploy/shared-hosting/.htaccess`** را به‌جای `public/.htaccess` کپی کنید (این نسخه برای هاست اشتراکی بهینه‌تر است):
+**فایل `.htaccess` در دو سطح:**
+
+۱) **`public_html/.htaccess`** — فایل `deploy/shared-hosting/root-htaccess.htaccess`
+   را به `public_html/.htaccess` کپی کنید. این فایل ریشهٔ دامنه را به `/public/`
+   ری‌دایرکت می‌کند (تا کاربرانی که به `example.com/` می‌روند، به‌صورت خودکار
+   به `example.com/public/` هدایت شوند).
 
 ```bash
-# روی هاست، در فایل‌منیجر:
-cp deploy/shared-hosting/.htaccess public_html/.htaccess
+cp deploy/shared-hosting/root-htaccess.htaccess public_html/.htaccess
 ```
+
+۲) **`public_html/public/.htaccess`** — فایل `deploy/shared-hosting/.htaccess`
+   را در `public_html/public/.htaccess` کپی کنید. این فایل اصلی مسیریابی و
+   امنیت است.
+
+```bash
+cp deploy/shared-hosting/.htaccess public_html/public/.htaccess
+```
+
+#### روش B: استقرار بدون پوشهٔ `public/` (ساده‌تر ولی نیازمند احتیاط)
+
+در این روش، محتوای `public/` را مستقیماً در `public_html/` می‌ریزید.
+
+```
+public_html/              ← DocumentRoot (محتوای public/ اینجا)
+├── .htaccess
+├── index.php
+├── check.php (موقت)
+├── install.php (موقت)
+├── assets/
+└── ...
+
+/home/youruser/           ← سایر فایل‌های پروژه (خارج از public_html/)
+├── app/
+├── core/
+├── config/
+├── database/
+├── uploads/
+├── .env
+└── deploy/
+```
+
+**تنظیم BASE_URL:**
+
+در فایل `.env`:
+```ini
+BASE_URL=/
+```
+
+⚠️ **نکته:** در این روش، باید فایل‌های `app/`، `core/`، `config/`، `database/` را
+خارج از `public_html/` قرار دهید. در غیر این صورت، امنیت به `.htaccess` وابسته است.
+
+### نکتهٔ مهم در مورد DocumentRoot
+
+- **اگر کنترل پنل هاست اجازه می‌دهد** DocumentRoot را روی `public/` تنظیم کنید
+  (مثلاً در DirectAdmin → Domain Setup → Document Root)، این بهترین روش است.
+  سپس `BASE_URL=/` کافی است.
+
+- **اگر نمی‌توانید DocumentRoot را تغییر دهید** و کل پروژه در `public_html/` است،
+  از روش A با `BASE_URL=/public/` استفاده کنید.
 
 ### گام ۲: بررسی پیش‌نیازها
 
@@ -330,6 +379,27 @@ tar -czf uploads_backup_$(date +%Y%m%d).tar.gz uploads/
 ---
 
 ## رفع مشکل
+
+### مشکل: خطای 404 برای فایل‌های استاتیک (`/assets/css/style.css`)
+
+**علت:** اگر پروژه را با پوشهٔ `public/` در `public_html/` استقرار داده‌اید،
+فایل‌های استاتیک در `/public/assets/...` موجودند ولی `BASE_URL=/` است و
+مرورگر `/assets/...` را درخواست می‌کند که 404 می‌دهد.
+
+**راه‌حل:** در فایل `.env`:
+
+```ini
+BASE_URL=/public/
+```
+
+سپس Apache را restart کنید یا صبر کنید تا `.env` دوباره خوانده شود.
+این کار باعث می‌شود همهٔ مسیرها (`/public/assets/...`، `/public/services`، ...)
+به‌درستی تولید شوند.
+
+**برای تأیید:**
+- صفحهٔ اصلی را باز کنید و `View Source` را بزنید
+- باید ببینید: `<link href="/public/assets/css/style.css">`
+- اگر هنوز `/assets/...` است، کش مرورگر را پاک کنید یا `Ctrl+Shift+R` بزنید
 
 ### مشکل: خطای ۵۰۰
 
