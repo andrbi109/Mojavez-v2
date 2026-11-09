@@ -39,15 +39,25 @@ class Setting
 
     /**
      * ذخیرهٔ یک تنظیم (درج یا به‌روزرسانی)
+     *
+     * نکتهٔ فنی: MariaDB با EMULATE_PREPARES=false ممکن است با پارامترهای
+     * نام‌گذاری‌شدهٔ تکراری مشکل داشته باشد. برای اطمینان، از دو پارامتر مجزا
+     * استفاده می‌کنیم و در صورت خطا، لاگ می‌کنیم.
      */
     public function set(string $key, string $value): void
     {
-        $stmt = $this->db->prepare(
-            "INSERT INTO settings (setting_key, setting_value) VALUES (:k, :v)
-             ON DUPLICATE KEY UPDATE setting_value = :v2"
-        );
-        $stmt->execute(['k' => $key, 'v' => $value, 'v2' => $value]);
-        self::$cache = null; // بی‌اعتبارسازی کش
+        try {
+            $stmt = $this->db->prepare(
+                "INSERT INTO settings (setting_key, setting_value) VALUES (:k, :v)
+                 ON DUPLICATE KEY UPDATE setting_value = :v2"
+            );
+            $stmt->execute(['k' => $key, 'v' => $value, 'v2' => $value]);
+            self::$cache = null; // بی‌اعتبارسازی کش
+        } catch (\PDOException $e) {
+            // لاگ خطا برای دیباگ
+            error_log("Setting::set({$key}) failed: " . $e->getMessage());
+            throw $e; // بازپرتاب برای مدیریت در کنترلر
+        }
     }
 
     /**

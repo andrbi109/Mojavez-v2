@@ -91,9 +91,16 @@ class SettingController extends Controller
                 $toSave[$key] = trim((string)$data[$key]);
             }
         }
-        $this->settingModel->setMany($toSave);
 
-        Session::set('settings_message', 'تنظیمات با موفقیت ذخیره شد. ✔');
+        try {
+            $this->settingModel->setMany($toSave);
+            Session::set('settings_message', 'تنظیمات با موفقیت ذخیره شد. ✔');
+        } catch (\Throwable $e) {
+            // لاگ خطا و نمایش پیام به کاربر
+            error_log('Settings save failed: ' . $e->getMessage());
+            Session::set('errors', ['system' => 'خطا در ذخیرهٔ تنظیمات: ' . $e->getMessage()]);
+            Session::set('formData', $data);
+        }
         $this->redirect('/admin/settings');
     }
 
