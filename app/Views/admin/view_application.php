@@ -29,22 +29,13 @@ if ($_serviceId === 2) {
 }
 $pipeline = $_pipelineBase;
 
-// فیلتر وضعیت‌های قابل تغییر بر اساس نوع خدمت
-$_availStatuses = [];
-foreach ($statuses as $st) {
-    if (!isset($statusMeta[$st]) || !$statusMeta[$st]['manual']) continue;
-    // اگر services تعریف شده، فقط برای آن خدمت‌ها نمایش بده
-    if (isset($statusMeta[$st]['services'])) {
-        if (!in_array($_serviceId, $statusMeta[$st]['services'], true)) continue;
-    }
-    $_availStatuses[] = $st;
-}
-// اطمینان از وجود رد درخواست و لغو (همیشه باید موجود باشند)
-foreach (['رد درخواست', 'لغو'] as $essential) {
-    if (!in_array($essential, $_availStatuses, true) && isset($statusMeta[$essential]) && $statusMeta[$essential]['manual']) {
-        $_availStatuses[] = $essential;
-    }
-}
+// وضعیت‌های قابل انتخاب در منوی کشویی:
+// فقط مراحل مسیر رسیدگی همان خدمت + رد درخواست + لغو + پیش‌نویس
+$_availStatuses = array_merge(['پیش‌نویس'], $_pipelineBase, ['رد درخواست', 'لغو']);
+// حذف موارد تکراری و فقط manual=true
+$_availStatuses = array_values(array_filter(array_unique($_availStatuses), function($st) use ($statusMeta) {
+    return isset($statusMeta[$st]) && $statusMeta[$st]['manual'];
+}));
 
 // نگاشت نوع مدرک → برچسب و آیکون
 $docLabels = [
