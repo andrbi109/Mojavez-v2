@@ -15,6 +15,7 @@
  */
 
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/TestCase.php';  // ← ضروری: کلاس پایه قبل از تست‌ها
 
 // فعال‌سازی نمایش خطاها در محیط تست
 error_reporting(E_ALL);
@@ -109,6 +110,10 @@ foreach ($testClasses as $className) {
         foreach ($testMethods as $method) {
             echo "  • {$method} ... ";
             try {
+                // فراخوانی setUp اگر وجود داشت (مقداردهی اولیه)
+                if (method_exists($test, 'setUp')) {
+                    $test->setUp();
+                }
                 $test->$method();
                 echo "{$colors['green']}✓ PASS{$colors['reset']}\n";
                 $totalPass++;

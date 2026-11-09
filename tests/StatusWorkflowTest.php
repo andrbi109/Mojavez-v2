@@ -14,7 +14,7 @@ class StatusWorkflowTest extends TestCase
     private array $workflow;
     private string $schemaSql;
 
-    protected function setUp(): void
+    public function setUp(): void
     {
         $this->statusConfig = require CONFIG_PATH . '/statuses.php';
         $this->workflow = require CONFIG_PATH . '/workflow.php';

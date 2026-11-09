@@ -14,7 +14,7 @@ class LicenseTitleTest extends TestCase
 {
     private LicenseTitle $model;
 
-    protected function setUp(): void
+    public function setUp(): void
     {
         $this->model = new LicenseTitle();
     }

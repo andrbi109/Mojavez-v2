@@ -13,7 +13,11 @@
  *       }
  *   }
  */
-require_once __DIR__ . '/bootstrap.php';
+
+// اطمینان از بارگذاری bootstrap — اگر از طریق run.php فراخوانی نشده باشد
+if (!defined('ROOT_PATH')) {
+    require_once __DIR__ . '/bootstrap.php';
+}
 
 class AssertionFailed extends \Exception {}
 

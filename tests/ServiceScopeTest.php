@@ -13,7 +13,7 @@ class ServiceScopeTest extends TestCase
 {
     private string $schemaSql;
 
-    protected function setUp(): void
+    public function setUp(): void
     {
         $this->schemaSql = file_get_contents(ROOT_PATH . '/database/schema.sql');
     }

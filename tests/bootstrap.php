@@ -110,16 +110,112 @@ function test_db(): PDO
     ]);
 
     // بارگذاری schema در صورت خالی بودن دیتابیس
-    $cnt = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote(DB_NAME))->fetchColumn();
-    if ($cnt === 0) {
-        test_load_mysql_schema($pdo);
+    try {
+        $cnt = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = " . $pdo->quote(DB_NAME))->fetchColumn();
+        if ($cnt === 0) {
+            test_load_mysql_schema($pdo);
+        }
+    } catch (\Throwable $e) {
+        // اگر نتوانست تعداد جداول را بشمارد، schema را بارگذاری نکن
+        fwrite(STDERR, "ℹ️  بررسی جداول ناموفق — تست‌های DB ممکن است skip شوند.\n");
     }
     return $pdo;
 }
 
 /**
+ * تقسیم‌کنندهٔ هوشمند SQL — رشته‌ها، کامنت‌ها و عبارات چندخطی را درست مدیریت می‌کند.
+ *
+ * @return array<int, string> لیست دستورات SQL
+ */
+function test_split_sql(string $sql): array
+{
+    $statements = [];
+    $current = '';
+    $len = strlen($sql);
+    $i = 0;
+    $state = 'normal'; // normal, single_str, double_str, backtick, line_comment, block_comment
+
+    while ($i < $len) {
+        $c = $sql[$i];
+        $next = ($i + 1 < $len) ? $sql[$i + 1] : '';
+
+        switch ($state) {
+            case 'normal':
+                if ($c === "'") { $state = 'single_str'; $current .= $c; }
+                elseif ($c === '"') { $state = 'double_str'; $current .= $c; }
+                elseif ($c === '`') { $state = 'backtick'; $current .= $c; }
+                elseif ($c === '-' && $next === '-') { $state = 'line_comment'; $current .= $c; }
+                elseif ($c === '#') { $state = 'line_comment'; $current .= $c; }
+                elseif ($c === '/' && $next === '*') { $state = 'block_comment'; $current .= $c; $i++; $current .= '/'; }
+                elseif ($c === ';') {
+                    $stmt = trim($current);
+                    if ($stmt !== '') $statements[] = $stmt;
+                    $current = '';
+                } else {
+                    $current .= $c;
+                }
+                break;
+
+            case 'single_str':
+                $current .= $c;
+                if ($c === '\\' && $i + 1 < $len) { $current .= $sql[$i + 1]; $i++; }
+                elseif ($c === "'") $state = 'normal';
+                break;
+
+            case 'double_str':
+                $current .= $c;
+                if ($c === '\\' && $i + 1 < $len) { $current .= $sql[$i + 1]; $i++; }
+                elseif ($c === '"') $state = 'normal';
+                break;
+
+            case 'backtick':
+                $current .= $c;
+                if ($c === '`') $state = 'normal';
+                break;
+
+            case 'line_comment':
+                $current .= $c;
+                if ($c === "\n") $state = 'normal';
+                break;
+
+            case 'block_comment':
+                $current .= $c;
+                if ($c === '*' && $next === '/') { $current .= '/'; $i++; $state = 'normal'; }
+                break;
+        }
+        $i++;
+    }
+
+    $stmt = trim($current);
+    if ($stmt !== '') $statements[] = $stmt;
+
+    return $statements;
+}
+
+/**
+ * آیا دستور SQL باید skip شود؟
+ * برخی دستورات در محیط تست مشکل‌سازند یا نیاز به مدیریت خاص دارند.
+ */
+function test_should_skip_statement(string $stmt): bool
+{
+    $upper = strtoupper(trim($stmt));
+
+    // دستورات session که در PDO قابل اجرا نیستند
+    if (str_starts_with($upper, 'USE ')) return true;
+    if (str_starts_with($upper, 'CREATE DATABASE')) return true;
+    if (str_starts_with($upper, 'SET @')) return true;        // متغیرهای session
+    if (str_starts_with($upper, 'PREPARE ')) return true;
+    if (str_starts_with($upper, 'EXECUTE ')) return true;
+    if (str_starts_with($upper, 'DEALLOCATE ')) return true;
+    if (str_starts_with($upper, 'SELECT 1 FROM DUAL')) return true;
+    if (str_starts_with($upper, 'SELECT @')) return true;     // SELECT @var = ...
+
+    return false;
+}
+
+/**
  * بارگذاری schema.sql برای MySQL.
- * فقط ساخت CREATE TABLE و INSERT اجرا می‌شود؛ ALTER TABLE ممکن است skip شود.
+ * از تقسیم‌کنندهٔ هوشمند استفاده می‌کند و دستورات مشکل‌ساز را skip می‌کند.
  */
 function test_load_mysql_schema(PDO $pdo): void
 {
@@ -129,22 +225,52 @@ function test_load_mysql_schema(PDO $pdo): void
         return;
     }
 
-    // حذف USE/CREATE DATABASE — ما از قبل به دیتابیس وصلیم
-    $sql = preg_replace('/^USE\s+`?\w+`?\s*;?\s*$/m', '', $sql);
-    $sql = preg_replace('/^CREATE DATABASE[^;]+;?\s*$/m', '', $sql);
+    // غیرفعال‌سازی بررسی FK موقتاً برای جلوگیری از خطای ترتیب
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
 
-    // تقسیم به دستورات منفرد
-    $statements = array_filter(array_map('trim', explode(';', $sql)));
+    $statements = test_split_sql($sql);
+    $ok = 0;
+    $skip = 0;
+    $fail = 0;
+
     foreach ($statements as $stmt) {
-        $stmt = rtrim($stmt, ';');
-        if ($stmt === '' || str_starts_with($stmt, '--')) continue;
+        $stmt = trim($stmt);
+        if ($stmt === '') continue;
+
+        // حذف کامنت‌ها از ابتدای دستور
+        $stmt = preg_replace('/^(\s*--[^\n]*\n\s*)+/', '', $stmt);
+        $stmt = trim($stmt);
+        if ($stmt === '') { $skip++; continue; }
+
+        // skip دستورات مشکل‌ساز
+        if (test_should_skip_statement($stmt)) { $skip++; continue; }
+
         try {
             $pdo->exec($stmt);
+            $ok++;
         } catch (PDOException $e) {
-            // در صورت وجود table/column از قبل، عبور کن
-            if (str_contains($e->getMessage(), 'already exists')) continue;
-            fwrite(STDERR, "  schema skip: " . substr($stmt, 0, 80) . "... " . $e->getMessage() . "\n");
+            $msg = $e->getMessage();
+            // خطاهای قابل چشم‌پوشی
+            if (str_contains($msg, 'already exists')) { $skip++; continue; }
+            if (str_contains($msg, 'Duplicate entry')) { $skip++; continue; }
+            if (str_contains($msg, 'Duplicate column')) { $skip++; continue; }
+            if (str_contains($msg, 'Duplicate key')) { $skip++; continue; }
+            if (str_contains($msg, 'Can\'t DROP')) { $skip++; continue; }
+            $fail++;
+            // فقط ۵ خطای اول را نمایش بده (برای کاهش نویز)
+            if ($fail <= 5) {
+                fwrite(STDERR, "  schema skip: " . substr(preg_replace('/\s+/', ' ', $stmt), 0, 70)
+                    . "... " . $msg . "\n");
+            }
         }
+    }
+
+    // فعال‌سازی مجدد بررسی FK
+    $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+
+    fwrite(STDERR, "ℹ️  Schema: {$ok} دستور OK، {$skip} skip، {$fail} خطا\n");
+    if ($fail > 5) {
+        fwrite(STDERR, "    ({$fail} خطای دیگر نمایش داده نشد — تست‌های DB ممکن است skip شوند)\n");
     }
 }
 

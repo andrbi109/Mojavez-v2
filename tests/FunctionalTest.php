@@ -13,7 +13,7 @@ class FunctionalTest extends TestCase
 {
     private string $indexPhp;
 
-    protected function setUp(): void
+    public function setUp(): void
     {
         $this->indexPhp = file_get_contents(ROOT_PATH . '/public/index.php');
     }
