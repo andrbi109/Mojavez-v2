@@ -18,6 +18,10 @@ class DocumentController extends Controller
         'application/pdf' => 'pdf',
     ];
 
+    /** حداکثر ابعاد بندانگشتی */
+    private const THUMB_MAX_WIDTH = 200;
+    private const THUMB_MAX_HEIGHT = 200;
+
     public function __construct()
     {
         $this->documentModel = new Document();
@@ -29,9 +33,8 @@ class DocumentController extends Controller
     public function view(): void
     {
         $this->requireLogin();
-        $this->verifyCsrf(); // درخواست‌های AJAX نیز توکن CSRF می‌فرستند
+        $this->verifyCsrf();
 
-        // اصلاح باگ اولویت عملگرها: ابتدا ?? و سپس cast
         $documentId = (int)($_POST['document_id'] ?? 0);
         $applicantId = (int)($_POST['applicant_id'] ?? 0);
 
@@ -45,12 +48,9 @@ class DocumentController extends Controller
 
     /**
      * نمایش آواتار کاربر با درخواست GET (بدون CSRF)
-     * فقط کاربر واردشده می‌تواند آواتار خودش را ببیند.
-     * URL: /document/avatar?id=DOCUMENT_ID
      */
     public function avatar(): void
     {
-        // رفع C-1: هم مدیر و هم کاربر می‌توانند آواتار را ببینند
         $this->requireAnyLogin();
 
         $documentId = (int)($_GET['id'] ?? 0);
@@ -63,7 +63,6 @@ class DocumentController extends Controller
             $this->deny(404, 'فایل یافت نشد.');
         }
 
-        // فقط doc_type='avatar' مجاز است
         if ($document['doc_type'] !== 'avatar') {
             $this->deny(403, 'دسترسی غیرمجاز.');
         }
@@ -72,9 +71,8 @@ class DocumentController extends Controller
     }
 
     /**
-     * نمایش فایل با درخواست GET (برای استفاده در iframe/embed)
-     * URL: /document/inline/{id}
-     * برای PDF: به صفحهٔ PDF viewer هدایت می‌شود (رندر با PDF.js)
+     * نمایش فایل با درخواست GET (برای iframe/img)
+     * برای PDF: به صفحهٔ PDF viewer هدایت می‌شود
      * برای تصاویر: مستقیماً inline سرو می‌شود
      */
     public function inline(int|string $id): void
@@ -86,24 +84,20 @@ class DocumentController extends Controller
             $this->deny(404, 'فایل یافت نشد.');
         }
 
-        // تشخیص نوع فایل
         $ext = strtolower(safe_file_extension((string)$document['file_name']));
 
         if ($ext === 'pdf') {
-            // برای PDF: هدایت به PDF viewer که با PDF.js رندر می‌کند
-            // (کاملاً inline — بدون امکان دانلود)
             $base = rtrim(BASE_URL, '/') . '/';
             header('Location: ' . $base . 'document/pdf-viewer?id=' . (int)$id);
             exit;
         }
 
-        // برای تصاویر و سایر فایل‌ها: مستقیم inline سرو کن
         $this->stream($document, 'inline');
     }
 
     /**
-     * نمایش PDF با PDF.js (رندر در مرورگر — بدون دانلود)
-     * URL: /document/pdf-viewer?id=21
+     * نمایش PDF با PDF.js — دادهٔ PDF مستقیماً در HTML embed می‌شود
+     * (بدون نیاز به fetch جداگانه — حل مشکل CSP/CORP)
      */
     public function pdfViewer(): void
     {
@@ -119,134 +113,7 @@ class DocumentController extends Controller
             $this->deny(404, 'فایل یافت نشد.');
         }
 
-        // این متد فقط PDF viewer را نمایش می‌دهد
-        // خود فایل PDF از طریق /document/inline/{id} دریافت می‌شود
-        // (که در inline() هدایت به اینجا می‌شود)
-
-        // نمایش صفحهٔ PDF viewer
-        $base = rtrim(BASE_URL, '/') . '/';
-        $docId = (int)$docId;
-
-        // پاک‌سازی هدرهای مختل‌کننده
-        if (!headers_sent()) {
-            header_remove('X-Frame-Options');
-            header_remove('Content-Security-Policy');
-            header_remove('Cross-Origin-Resource-Policy');
-            header_remove('Cross-Origin-Opener-Policy');
-            header_remove('Cache-Control');
-            header_remove('Pragma');
-        }
-
-        header('Content-Type: text/html; charset=utf-8');
-        header('X-Frame-Options: SAMEORIGIN');
-        header('Cache-Control: private, max-age=3600');
-
-        // خروجی HTML صفحهٔ PDF viewer
-        echo $this->renderPdfViewerHtml($base, $docId, (string)$document['original_name']);
-        exit;
-    }
-
-    /**
-     * سرو کردن فایل خام PDF برای PDF.js (بدون redirect)
-     * URL: /document/raw/{id}
-     * این متد فقط برای fetch از داخل PDF.js استفاده می‌شود.
-     */
-    public function raw(int|string $id): void
-    {
-        $this->requireLogin();
-
-        $document = is_numeric($id) ? $this->documentModel->findById((int)$id) : null;
-        if (!$document) {
-            $this->deny(404, 'فایل یافت نشد.');
-        }
-
-        // سرو کردن مستقیم فایل (بدون redirect)
-        $this->streamRaw($document);
-    }
-
-    /**
-     * بندانگشتی مدرک (در فهرست پرونده) — فعلاً همان فایل اصلی با هدرهای محدودکنندهٔ کش
-     */
-    public function thumb(int|string $id): void
-    {
-        $this->requireLogin();
-
-        // ورودی غیرعددی به‌سادگی به صفر تبدیل و ۴۰۴ می‌شود (بدون TypeError)
-        $document = is_numeric($id) ? $this->documentModel->findById((int)$id) : null;
-        if (!$document) {
-            $this->deny(404);
-        }
-
-        $this->stream($document, 'inline');
-    }
-
-    /* ==================== توابع داخلی ==================== */
-
-    /**
-     * ارسال امن فایل به مرورگر با بررسی نوع واقعی محتوا
-     */
-    private function stream(array $document, string $disposition): void
-    {
-        // محافظت در برابر Path Traversal — مسیر باید داخل uploads بماند
-        $clean = str_replace(['..', "\0"], '', (string)$document['file_path']);
-        $filePath = realpath(UPLOAD_DIR . $clean);
-        $base = realpath(UPLOAD_DIR);
-
-        if ($filePath === false || $base === false || !str_starts_with($filePath, $base) || !is_file($filePath)) {
-            $this->deny(404, 'فایل موجود نیست.');
-        }
-
-        // تعیین MIME واقعی — فقط انواع سفید سرو می‌شوند
-        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($filePath);
-        if (!array_key_exists($mime, self::SAFE_MIMES)) {
-            $this->deny(415, 'نوع فایل قابل نمایش نیست.');
-        }
-
-        // پاک‌سازی هدرهای سراسری که نمایش inline را مختل می‌کنند
-        if (!headers_sent()) {
-            header_remove('X-Frame-Options');
-            header_remove('Content-Security-Policy');
-            header_remove('Cache-Control');
-            header_remove('Pragma');
-        }
-
-        header('Content-Type: ' . $mime);
-
-        if ($disposition === 'inline') {
-            // برای نمایش inline (iframe/img):
-            // — filename حذف می‌شود تا مرورگر دانلود نکند
-            // — X-Frame-Options: SAMEORIGIN برای اجازهٔ نمایش در iframe
-            header('Content-Disposition: inline');
-            header('X-Frame-Options: SAMEORIGIN');
-            header('Cache-Control: private, max-age=3600');
-        } else {
-            // برای دانلود: filename مشخص می‌شود
-            $safeName = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', (string)$document['original_name']);
-            header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
-            header('Cache-Control: no-store, no-cache, must-revalidate');
-            header('Pragma: no-cache');
-        }
-
-        header('Content-Length: ' . filesize($filePath));
-        header('X-Content-Type-Options: nosniff');
-        readfile($filePath);
-        exit;
-    }
-
-    private function deny(int $code, string $message = 'دسترسی غیرمجاز'): void
-    {
-        http_response_code($code);
-        header('Content-Type: text/plain; charset=utf-8');
-        echo $message;
-        exit;
-    }
-
-    /**
-     * سرو کردن فایل خام (برای fetch از JavaScript) — بدون Content-Disposition
-     * خروجی: JSON با base64-encoded PDF برای استفاده در PDF.js
-     */
-    private function streamRaw(array $document): void
-    {
+        // خواندن فایل PDF
         $clean = str_replace(['..', "\0"], '', (string)$document['file_path']);
         $filePath = realpath(UPLOAD_DIR . $clean);
         $base = realpath(UPLOAD_DIR);
@@ -256,47 +123,27 @@ class DocumentController extends Controller
         }
 
         $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($filePath);
-        if (!array_key_exists($mime, self::SAFE_MIMES)) {
-            $this->deny(415, 'نوع فایل قابل نمایش نیست.');
+        if ($mime !== 'application/pdf') {
+            $this->deny(415, 'این فایل PDF نیست.');
         }
 
-        // خواندن محتوای فایل
         $fileContent = file_get_contents($filePath);
         if ($fileContent === false) {
             $this->deny(500, 'خطا در خواندن فایل.');
         }
 
-        // پاک‌سازی هدرهای مختل‌کننده
-        if (!headers_sent()) {
-            header_remove('X-Frame-Options');
-            header_remove('Content-Security-Policy');
-            header_remove('Cross-Origin-Resource-Policy');
-            header_remove('Cross-Origin-Opener-Policy');
-            header_remove('Cache-Control');
-            header_remove('Pragma');
-            header_remove('Content-Disposition');
-            header_remove('Expires');
-        }
+        // تبدیل به base64 برای embed در HTML
+        $base64Data = base64_encode($fileContent);
 
-        // خروجی base64 خام (بدون data: prefix و بدون JSON)
-        // PDF.js در JavaScript این را به Uint8Array تبدیل می‌کند
-        header('Content-Type: text/plain; charset=utf-8');
+        $base = rtrim(BASE_URL, '/') . '/';
+        $safeName = htmlspecialchars((string)$document['original_name'], ENT_QUOTES, 'UTF-8');
+
+        // خروجی HTML با PDF data embedded
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Frame-Options: SAMEORIGIN');
         header('Cache-Control: private, max-age=3600');
-        header('X-Content-Type-Options: nosniff');
 
-        echo base64_encode($fileContent);
-        exit;
-    }
-
-    /**
-     * تولید HTML صفحهٔ PDF viewer با PDF.js
-     */
-    private function renderPdfViewerHtml(string $base, int $docId, string $originalName): string
-    {
-        $safeName = htmlspecialchars($originalName, ENT_QUOTES, 'UTF-8');
-        $rawUrl = $base . 'document/raw/' . $docId;
-
-        return <<<HTML
+        echo <<<HTML
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -337,10 +184,6 @@ body { background: #525659; font-family: Vazir, Tahoma, Arial, sans-serif; overf
 <script src="{$base}assets/js/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = '{$base}assets/js/pdf.worker.min.js';
-// تنظیمات برای پشتیبانی از فونت‌های فارسی/عربی
-pdfjsLib.cMapUrl = '{$base}assets/js/cmaps/';
-pdfjsLib.cMapPacked = true;
-pdfjsLib.standardFontDataUrl = '{$base}assets/js/standard_fonts/';
 
 let pdfDoc = null;
 let currentPage = 1;
@@ -348,7 +191,19 @@ let scale = 1.5;
 let rendering = false;
 let pendingPage = null;
 
-const rawUrl = '{$rawUrl}';
+// دادهٔ PDF به‌صورت base64 — مستقیماً در HTML embed شده
+// (بدون نیاز به fetch — حل مشکل CSP/CORP)
+const pdfBase64 = "{$base64Data}";
+const pdfBytes = (function() {
+    const binaryStr = atob(pdfBase64);
+    const len = binaryStr.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+    }
+    return bytes;
+})();
+
 const container = document.getElementById('pdfContainer');
 const loading = document.getElementById('loading');
 const errorDiv = document.getElementById('error');
@@ -390,48 +245,196 @@ function nextPage() { if (currentPage >= pdfDoc.numPages) return; currentPage++;
 function zoomIn() { scale += 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 function zoomOut() { if (scale <= 0.5) return; scale -= 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 
-// مرحله ۱: فایل PDF را به‌صورت base64 دریافت کن
-// این روش از CORS/CORP مشکلی ندارد چون fetch از همان دامنه است
-fetch(rawUrl)
-    .then(function(response) {
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.text();
-    })
-    .then(function(base64Str) {
-        // مرحله ۲: base64 را به Uint8Array تبدیل کن
-        const binaryStr = atob(base64Str.trim());
-        const len = binaryStr.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
-        }
-        // مرحله ۳: PDF.js را با Uint8Array بارگذاری کن
-        // useSystemFonts: true — اجازهٔ استفاده از فونت‌های سیستمی برای رندر بهتر
-        // disableFontFace: false — اجازهٔ استفاده از @font-face در canvas
-        return pdfjsLib.getDocument({
-            data: bytes,
-            cMapUrl: '{$base}assets/js/cmaps/',
-            cMapPacked: true,
-            standardFontDataUrl: '{$base}assets/js/standard_fonts/',
-            useSystemFonts: true,
-            disableFontFace: false,
-            isEvalSupported: false
-        }).promise;
-    })
-    .then(function(pdf) {
-        pdfDoc = pdf;
-        loading.style.display = 'none';
-        renderPage(currentPage);
-    })
-    .catch(function(err) {
-        loading.style.display = 'none';
-        errorDiv.style.display = 'block';
-        errorDiv.textContent = 'خطا در بارگذاری PDF: ' + (err.message || 'نامشخص');
-        console.error('PDF.js error:', err);
-    });
+// بارگذاری PDF از دادهٔ embed شده
+pdfjsLib.getDocument({
+    data: pdfBytes,
+    cMapUrl: '{$base}assets/js/cmaps/',
+    cMapPacked: true,
+    standardFontDataUrl: '{$base}assets/js/standard_fonts/',
+    useSystemFonts: true,
+    disableFontFace: false,
+    isEvalSupported: false
+}).promise.then(function(pdf) {
+    pdfDoc = pdf;
+    loading.style.display = 'none';
+    renderPage(currentPage);
+}).catch(function(err) {
+    loading.style.display = 'none';
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = 'خطا در بارگذاری PDF: ' + (err.message || 'نامشخص');
+    console.error('PDF.js error:', err);
+});
 </script>
 </body>
 </html>
 HTML;
+        exit;
+    }
+
+    /**
+     * بندانگشتی مدرک — با تغییر اندازه واقعی برای بهینه‌سازی
+     */
+    public function thumb(int|string $id): void
+    {
+        $this->requireLogin();
+
+        $document = is_numeric($id) ? $this->documentModel->findById((int)$id) : null;
+        if (!$document) {
+            $this->deny(404);
+        }
+
+        $clean = str_replace(['..', "\0"], '', (string)$document['file_path']);
+        $filePath = realpath(UPLOAD_DIR . $clean);
+        $base = realpath(UPLOAD_DIR);
+
+        if ($filePath === false || $base === false || !str_starts_with($filePath, $base) || !is_file($filePath)) {
+            $this->deny(404, 'فایل موجود نیست.');
+        }
+
+        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($filePath);
+        if (!array_key_exists($mime, self::SAFE_MIMES)) {
+            $this->deny(415, 'نوع فایل قابل نمایش نیست.');
+        }
+
+        // برای PDF: نمایش آیکون PDF (بدون رندر)
+        if ($mime === 'application/pdf') {
+            $this->servePdfIcon();
+            return;
+        }
+
+        // برای تصاویر: تولید بندانگشتی با GD (اگر موجود است)
+        if (extension_loaded('gd') && in_array($mime, ['image/jpeg', 'image/png'])) {
+            $this->serveThumbnail($filePath, $mime);
+            return;
+        }
+
+        // Fallback: سرو فایل اصلی
+        $this->stream($document, 'inline');
+    }
+
+    /* ==================== توابع داخلی ==================== */
+
+    /**
+     * ارسال امن فایل به مرورگر
+     */
+    private function stream(array $document, string $disposition): void
+    {
+        $clean = str_replace(['..', "\0"], '', (string)$document['file_path']);
+        $filePath = realpath(UPLOAD_DIR . $clean);
+        $base = realpath(UPLOAD_DIR);
+
+        if ($filePath === false || $base === false || !str_starts_with($filePath, $base) || !is_file($filePath)) {
+            $this->deny(404, 'فایل موجود نیست.');
+        }
+
+        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($filePath);
+        if (!array_key_exists($mime, self::SAFE_MIMES)) {
+            $this->deny(415, 'نوع فایل قابل نمایش نیست.');
+        }
+
+        header('Content-Type: ' . $mime);
+
+        if ($disposition === 'inline') {
+            header('Content-Disposition: inline');
+            header('X-Frame-Options: SAMEORIGIN');
+            header('Cache-Control: private, max-age=3600');
+        } else {
+            $safeName = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', (string)$document['original_name']);
+            header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+        }
+
+        header('Content-Length: ' . filesize($filePath));
+        header('X-Content-Type-Options: nosniff');
+        readfile($filePath);
+        exit;
+    }
+
+    /**
+     * تولید و سرو بندانگشتی با GD
+     */
+    private function serveThumbnail(string $filePath, string $mime): void
+    {
+        // بارگذاری تصویر
+        $image = match ($mime) {
+            'image/jpeg' => @imagecreatefromjpeg($filePath),
+            'image/png' => @imagecreatefrompng($filePath),
+            default => false,
+        };
+
+        if ($image === false) {
+            // اگر GD ناموفق بود، فایل اصلی را سرو کن
+            readfile($filePath);
+            exit;
+        }
+
+        $origWidth = imagesx($image);
+        $origHeight = imagesy($image);
+
+        // محاسبه ابعاد جدید
+        $ratio = min(self::THUMB_MAX_WIDTH / $origWidth, self::THUMB_MAX_HEIGHT / $origHeight);
+        if ($ratio >= 1) {
+            // تصویر کوچک‌تر از حداکثر است —无需 تغییر اندازه
+            imagedestroy($image);
+            header('Content-Type: ' . $mime);
+            header('Cache-Control: private, max-age=86400');
+            header('X-Content-Type-Options: nosniff');
+            readfile($filePath);
+            exit;
+        }
+
+        $newWidth = (int)round($origWidth * $ratio);
+        $newHeight = (int)round($origHeight * $ratio);
+
+        $thumb = imagecreatetruecolor($newWidth, $newHeight);
+
+        // حفظ شفافیت PNG
+        if ($mime === 'image/png') {
+            imagealphablending($thumb, false);
+            imagesavealpha($thumb, true);
+            $transparent = imagecolorallocatealpha($thumb, 255, 255, 255, 127);
+            imagefilledrectangle($thumb, 0, 0, $newWidth, $newHeight, $transparent);
+        }
+
+        imagecopyresampled($thumb, $image, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+        imagedestroy($image);
+
+        // خروجی
+        header('Content-Type: ' . $mime);
+        header('Cache-Control: private, max-age=86400');
+        header('X-Content-Type-Options: nosniff');
+
+        match ($mime) {
+            'image/jpeg' => imagejpeg($thumb, null, 80),
+            'image/png' => imagepng($thumb, null, 6),
+        };
+
+        imagedestroy($thumb);
+        exit;
+    }
+
+    /**
+     * نمایش آیکون PDF برای بندانگشتی
+     */
+    private function servePdfIcon(): void
+    {
+        // SVG آیکون PDF
+        header('Content-Type: image/svg+xml');
+        header('Cache-Control: private, max-age=86400');
+        echo '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="150" viewBox="0 0 120 150">'
+           . '<rect width="120" height="150" fill="#f8f9fa" stroke="#dee2e6" rx="8"/>'
+           . '<text x="60" y="70" text-anchor="middle" font-size="14" fill="#dc3545" font-family="Arial">PDF</text>'
+           . '<text x="60" y="95" text-anchor="middle" font-size="10" fill="#6c757d" font-family="Arial">سند</text>'
+           . '</svg>';
+        exit;
+    }
+
+    private function deny(int $code, string $message = 'دسترسی غیرمجاز'): void
+    {
+        http_response_code($code);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo $message;
+        exit;
     }
 }
