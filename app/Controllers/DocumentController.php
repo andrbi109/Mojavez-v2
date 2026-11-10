@@ -243,7 +243,7 @@ class DocumentController extends Controller
 
     /**
      * سرو کردن فایل خام (برای fetch از JavaScript) — بدون Content-Disposition
-     * فقط Content-Type و CORS مناسب برای fetch.
+     * خروجی: JSON با base64-encoded PDF برای استفاده در PDF.js
      */
     private function streamRaw(array $document): void
     {
@@ -260,14 +260,13 @@ class DocumentController extends Controller
             $this->deny(415, 'نوع فایل قابل نمایش نیست.');
         }
 
-        // خواندن محتوای فایل و تبدیل به base64 data URL
-        // این روش از fetch مستقیم استفاده نمی‌کند — Apache headers مشکلی ایجاد نمی‌کنند
+        // خواندن محتوای فایل
         $fileContent = file_get_contents($filePath);
         if ($fileContent === false) {
             $this->deny(500, 'خطا در خواندن فایل.');
         }
 
-        // خروجی به‌صورت JSON با data URL
+        // پاک‌سازی هدرهای مختل‌کننده
         if (!headers_sent()) {
             header_remove('X-Frame-Options');
             header_remove('Content-Security-Policy');
@@ -279,18 +278,13 @@ class DocumentController extends Controller
             header_remove('Expires');
         }
 
-        $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($fileContent);
-
-        header('Content-Type: application/json; charset=utf-8');
+        // خروجی base64 خام (بدون data: prefix و بدون JSON)
+        // PDF.js در JavaScript این را به Uint8Array تبدیل می‌کند
+        header('Content-Type: text/plain; charset=utf-8');
         header('Cache-Control: private, max-age=3600');
         header('X-Content-Type-Options: nosniff');
 
-        echo json_encode([
-            'success' => true,
-            'data' => $dataUrl,
-            'mime' => $mime,
-            'size' => filesize($filePath),
-        ]);
+        echo base64_encode($fileContent);
         exit;
     }
 
@@ -391,17 +385,23 @@ function nextPage() { if (currentPage >= pdfDoc.numPages) return; currentPage++;
 function zoomIn() { scale += 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 function zoomOut() { if (scale <= 0.5) return; scale -= 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 
-// مرحله ۱: فایل PDF را به‌صورت JSON دریافت کن (شامل base64 data URL)
+// مرحله ۱: فایل PDF را به‌صورت base64 دریافت کن
 // این روش از CORS/CORP مشکلی ندارد چون fetch از همان دامنه است
 fetch(rawUrl)
     .then(function(response) {
         if (!response.ok) throw new Error('HTTP ' + response.status);
-        return response.json();
+        return response.text();
     })
-    .then(function(data) {
-        if (!data.success) throw new Error(data.error || 'خطا در دریافت فایل');
-        // مرحله ۲: PDF.js را با data URL بارگذاری کن
-        return pdfjsLib.getDocument(data.data).promise;
+    .then(function(base64Str) {
+        // مرحله ۲: base64 را به Uint8Array تبدیل کن
+        const binaryStr = atob(base64Str.trim());
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+        }
+        // مرحله ۳: PDF.js را با Uint8Array بارگذاری کن
+        return pdfjsLib.getDocument({ data: bytes }).promise;
     })
     .then(function(pdf) {
         pdfDoc = pdf;
