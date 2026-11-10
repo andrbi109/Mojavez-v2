@@ -97,7 +97,8 @@ AddDefaultCharset UTF-8
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
 
     # Content-Security-Policy
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+    # frame-src 'self' برای اجازهٔ نمایش PDF در iframe از همان دامنه
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; object-src 'self'; frame-src 'self'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
 
     # Cross-Origin Protection
     Header always set Cross-Origin-Opener-Policy "same-origin"

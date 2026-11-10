@@ -126,14 +126,33 @@ class DocumentController extends Controller
             $this->deny(415, 'نوع فایل قابل نمایش نیست.');
         }
 
-        $safeName = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', (string)$document['original_name']);
+        // پاک‌سازی هدرهای سراسری که نمایش inline را مختل می‌کنند
+        if (!headers_sent()) {
+            header_remove('X-Frame-Options');
+            header_remove('Content-Security-Policy');
+            header_remove('Cache-Control');
+            header_remove('Pragma');
+        }
 
         header('Content-Type: ' . $mime);
-        header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
+
+        if ($disposition === 'inline') {
+            // برای نمایش inline (iframe/img):
+            // — filename حذف می‌شود تا مرورگر دانلود نکند
+            // — X-Frame-Options: SAMEORIGIN برای اجازهٔ نمایش در iframe
+            header('Content-Disposition: inline');
+            header('X-Frame-Options: SAMEORIGIN');
+            header('Cache-Control: private, max-age=3600');
+        } else {
+            // برای دانلود: filename مشخص می‌شود
+            $safeName = preg_replace('/[^\p{L}\p{N}._ -]+/u', '_', (string)$document['original_name']);
+            header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
+            header('Cache-Control: no-store, no-cache, must-revalidate');
+            header('Pragma: no-cache');
+        }
+
         header('Content-Length: ' . filesize($filePath));
         header('X-Content-Type-Options: nosniff');
-        header('Cache-Control: no-store, no-cache, must-revalidate');
-        header('Pragma: no-cache');
         readfile($filePath);
         exit;
     }
