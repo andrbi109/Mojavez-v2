@@ -181,7 +181,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             <div class="info-value">
                                 <?php if (str_starts_with((string)$dv['field_value'], 'doc:')): ?>
                                     <?php $docId = (int)substr($dv['field_value'], 4); ?>
-                                    <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn" data-id="<?= $docId ?>" data-applicant="<?= (int)$applicant['id'] ?>">
+                                    <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn" data-id="<?= $docId ?>" data-applicant="<?= (int)$applicant['id'] ?>" data-ext="<?= htmlspecialchars(safe_file_extension((string)$doc['file_name'] ?? '')) ?>">
                                         <?= icon('image', '', 14) ?> مشاهدهٔ فایل پیوست
                                     </button>
                                 <?php elseif ($dv['field_value'] === '' || $dv['field_value'] === null): ?>
@@ -219,7 +219,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                                 <span class="badge bg-info mb-1"><?= $e($dl) ?></span>
                                 <small class="text-muted text-truncate d-block" dir="ltr"><?= $e($doc['original_name']) ?></small>
                                 <small class="text-muted" style="font-size:.68rem"><?= persianDate((string)$doc['uploaded_at']) ?></small>
-                                <button class="btn btn-sm btn-outline-primary mt-auto view-doc-btn" data-id="<?= (int)$doc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>">
+                                <button class="btn btn-sm btn-outline-primary mt-auto view-doc-btn" data-id="<?= (int)$doc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>" data-ext="<?= htmlspecialchars(safe_file_extension((string)$doc['file_name'])) ?>">
                                     <?= icon('eye', '', 14) ?> مشاهده
                                 </button>
                             </div>
@@ -273,7 +273,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             <?php else: ?>
                                 <div class="text-center py-3 border rounded"><?= icon('file-text', '', 24) ?></div>
                             <?php endif; ?>
-                            <button class="btn btn-sm btn-outline-primary w-100 mt-1 view-doc-btn py-0" data-id="<?= (int)$doc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>"><?= icon('eye', '', 13) ?></button>
+                            <button class="btn btn-sm btn-outline-primary w-100 mt-1 view-doc-btn py-0" data-id="<?= (int)$doc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>" data-ext="<?= htmlspecialchars(safe_file_extension((string)$doc['file_name'])) ?>"><?= icon('eye', '', 13) ?></button>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -489,7 +489,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             <?php if (!empty($pay['reject_reason'])): ?> • دلیل رد: <?= htmlspecialchars($pay['reject_reason']) ?><?php endif; ?>
                             <?php if (!empty($pay['discount_reason'])): ?> • دلیل تخفیف: <?= htmlspecialchars($pay['discount_reason']) ?><?php endif; ?>
                             <?php if (!empty($pay['receipt_document_id'])): ?>
-                                • <button type="button" class="btn btn-link btn-sm p-0 align-baseline view-doc-btn" data-id="<?= (int)$pay['receipt_document_id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>">مشاهدهٔ رسید</button>
+                                • <button type="button" class="btn btn-link btn-sm p-0 align-baseline view-doc-btn" data-id="<?= (int)$pay['receipt_document_id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>" data-ext="">مشاهدهٔ رسید</button>
                             <?php endif; ?>
                         </div>
                     </li>
@@ -648,7 +648,7 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
                             <div>بارگذاری‌شده — دفعات دریافت: <strong><?= (int)$licenseFile['download_count'] ?></strong></div>
                             <div class="text-muted">اولین دریافت: <?= $licenseFile['first_accessed_at'] ? persianDate((string)$licenseFile['first_accessed_at']) : '—' ?></div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn ms-auto" data-id="<?= (int)$licenseDoc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>"><?= icon('eye', '', 14) ?> مشاهده</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary view-doc-btn ms-auto" data-id="<?= (int)$licenseDoc['id'] ?>" data-applicant="<?= (int)$applicant['id'] ?>" data-ext="<?= htmlspecialchars(safe_file_extension((string)$licenseDoc['file_name'])) ?>"><?= icon('eye', '', 14) ?> مشاهده</button>
                     </div>
                 <?php else: ?>
                     <p class="small text-muted">تصویر مجوز هنوز بارگذاری نشده. پس از «صدور مجوز»، تصویر را اینجا بارگذاری کنید تا لینک دریافت برای متقاضی فعال شود.</p>
@@ -760,52 +760,45 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 
 <script>
 document.querySelectorAll('.view-doc-btn').forEach(btn => {
-    btn.addEventListener('click', async function () {
+    btn.addEventListener('click', function () {
         const docId = this.dataset.id;
-        const applicantId = this.dataset.applicant;
         const box = document.getElementById('docContent');
         box.innerHTML = '<div class="py-5 text-muted">در حال بارگذاری…</div>';
+        new bootstrap.Modal(document.getElementById('docModal')).show();
 
-        // ابتدا متادیتای فایل را از طریق POST دریافت کن (برای تشخیص نوع)
-        const formData = new FormData();
-        formData.append('document_id', docId);
-        formData.append('applicant_id', applicantId);
-        formData.append('_csrf', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        // مسیر مستقیم GET برای نمایش فایل
+        const fileUrl = '<?= $base ?>document/inline/' + docId;
 
-        try {
-            const response = await fetch('<?= $base ?>document/view', { method: 'POST', body: formData });
-            if (!response.ok) {
-                box.innerHTML = '<div class="py-5 text-danger">خطا در بارگذاری فایل</div>';
-                new bootstrap.Modal(document.getElementById('docModal')).show();
-                return;
-            }
-            const contentType = response.headers.get('Content-Type') || '';
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
+        // تشخیص نوع فایل از روی نام فایل — از data-ext استفاده می‌کنیم
+        // اگر data-ext موجود نبود، تصویر را امتحان می‌کنیم و اگر کار نکرد PDF
+        const ext = (this.dataset.ext || '').toLowerCase();
 
-            if (contentType.startsWith('image/')) {
-                // تصاویر — نمایش مستقیم در تگ img
-                box.innerHTML = `<img src="${url}" class="img-fluid" style="max-height:75vh;">`;
-            } else if (contentType === 'application/pdf') {
-                // PDF — استفاده از iframe با مسیر مستقیم GET (قابل اعتمادتر از blob)
-                URL.revokeObjectURL(url); // blob لازم نیست — از مسیر مستقیم استفاده می‌کنیم
-                box.innerHTML = `
-                    <iframe src="<?= $base ?>document/inline/${docId}"
+        if (ext === 'pdf') {
+            // PDF — نمایش در iframe
+            box.innerHTML = `
+                <iframe src="${fileUrl}"
+                        style="width:100%;height:75vh;border:0;"
+                        title="پیش‌نمایش PDF">
+                </iframe>
+                <div class="mt-2 text-muted small">
+                    💡 اگر PDF نمایش داده نشد،
+                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
+                </div>`;
+        } else {
+            // تصویر یا سایر — تلاش با img و fallback به iframe
+            box.innerHTML = `
+                <img src="${fileUrl}" class="img-fluid" style="max-height:75vh;"
+                     onerror="this.style.display='none'; document.getElementById('pdfFallback${docId}').style.display='block';">
+                <div id="pdfFallback${docId}" style="display:none;">
+                    <iframe src="${fileUrl}"
                             style="width:100%;height:75vh;border:0;"
-                            title="پیش‌نمایش PDF">
+                            title="پیش‌نمایش فایل">
                     </iframe>
                     <div class="mt-2 text-muted small">
-                        💡 اگر PDF نمایش داده نشد،
-                        <a href="<?= $base ?>document/inline/${docId}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
-                    </div>`;
-            } else {
-                // سایر فایل‌ها — دکمهٔ دانلود
-                box.innerHTML = `<a href="${url}" class="btn btn-primary" download>دانلود فایل</a>`;
-            }
-            new bootstrap.Modal(document.getElementById('docModal')).show();
-        } catch (e) {
-            box.innerHTML = '<div class="py-5 text-danger">خطا در ارتباط با سرور</div>';
-            new bootstrap.Modal(document.getElementById('docModal')).show();
+                        💡 اگر فایل نمایش داده نشد،
+                        <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
+                    </div>
+                </div>`;
         }
     });
 });

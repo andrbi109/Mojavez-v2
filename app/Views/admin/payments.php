@@ -299,39 +299,28 @@ document.querySelectorAll('.edit-ch').forEach(function (btn) {
 });
 // پیش‌نمایش رسید
 document.querySelectorAll('.view-receipt-btn').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
+    btn.addEventListener('click', function () {
         const docId = this.dataset.id;
-        const fd = new FormData();
-        fd.append('document_id', docId);
-        fd.append('applicant_id', this.dataset.applicant);
-        fd.append('_csrf', document.querySelector('meta[name="csrf-token"]')?.content || '');
         const box = document.getElementById('docContent');
         box.innerHTML = '<div class="py-5 text-muted">در حال بارگذاری…</div>';
-        try {
-            const res = await fetch('<?= $base ?>document/view', { method: 'POST', body: fd });
-            if (!res.ok) { box.innerHTML = '<div class="py-5 text-danger">خطا در بارگذاری</div>'; new bootstrap.Modal(document.getElementById('docModal')).show(); return; }
-            const ct = res.headers.get('Content-Type') || '';
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
+        new bootstrap.Modal(document.getElementById('docModal')).show();
 
-            if (ct.startsWith('image/')) {
-                box.innerHTML = `<img src="${url}" class="img-fluid" style="max-height:75vh;">`;
-            } else if (ct === 'application/pdf') {
-                URL.revokeObjectURL(url);
-                box.innerHTML = `
-                    <iframe src="<?= $base ?>document/inline/${docId}"
-                            style="width:100%;height:75vh;border:0;"
-                            title="پیش‌نمایش PDF">
-                    </iframe>
-                    <div class="mt-2 text-muted small">
-                        💡 اگر PDF نمایش داده نشد،
-                        <a href="<?= $base ?>document/inline/${docId}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
-                    </div>`;
-            } else {
-                box.innerHTML = `<a href="${url}" download class="btn btn-primary">دانلود</a>`;
-            }
-            new bootstrap.Modal(document.getElementById('docModal')).show();
-        } catch (e) { box.innerHTML = '<div class="py-5 text-danger">خطا در ارتباط با سرور</div>'; new bootstrap.Modal(document.getElementById('docModal')).show(); }
+        const fileUrl = '<?= $base ?>document/inline/' + docId;
+
+        // تلاش با img و fallback به iframe
+        box.innerHTML = `
+            <img src="${fileUrl}" class="img-fluid" style="max-height:75vh;"
+                 onerror="this.style.display='none'; document.getElementById('pdfFallback_${docId}').style.display='block';">
+            <div id="pdfFallback_${docId}" style="display:none;">
+                <iframe src="${fileUrl}"
+                        style="width:100%;height:75vh;border:0;"
+                        title="پیش‌نمایش فایل">
+                </iframe>
+                <div class="mt-2 text-muted small">
+                    💡 اگر فایل نمایش داده نشد،
+                    <a href="${fileUrl}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
+                </div>
+            </div>`;
     });
 });
 </script>
