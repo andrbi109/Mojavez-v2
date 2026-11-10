@@ -12,8 +12,15 @@ $v = fn(string $key, string $def = '') => htmlspecialchars($fd[$key] ?? $setting
     <div class="alert alert-success py-2"><?= htmlspecialchars($message) ?></div>
 <?php endif; ?>
 
-<form method="post" action="<?= $base ?>admin/settings/save">
+<?php if (!empty($errors['system'])): ?>
+    <div class="alert alert-danger py-2"><?= htmlspecialchars($errors['system']) ?></div>
+<?php endif; ?>
+
+<!-- ===== فرم بارگذاری/حذف تصویر مدیر (مستقل — نباید داخل فرم اصلی باشد) ===== -->
+<?php $img = setting('owner_image', ''); ?>
+<form method="post" action="<?= $base ?>admin/settings/upload-image" enctype="multipart/form-data" id="imageForm">
     <?= Session::csrfField() ?>
+    <input type="hidden" name="remove_image" id="removeImageFlag" value="">
 
     <div class="row g-4">
         <!-- ===== هویت سامانه ===== -->
@@ -50,7 +57,6 @@ $v = fn(string $key, string $def = '') => htmlspecialchars($fd[$key] ?? $setting
                 <div class="card-header">🖼️ تصویر مدیر سامانه</div>
                 <div class="card-body">
                     <div class="d-flex align-items-center gap-4 flex-wrap">
-                        <?php $img = setting('owner_image', ''); ?>
                         <div class="owner-avatar" style="background:<?= $img ? 'none' : 'linear-gradient(135deg,var(--turquoise),var(--saffron))' ?>;">
                             <?php if ($img !== ''): ?>
                                 <img src="<?= $base . htmlspecialchars($img) ?>" alt="تصویر مدیر سامانه">
@@ -59,23 +65,17 @@ $v = fn(string $key, string $def = '') => htmlspecialchars($fd[$key] ?? $setting
                             <?php endif; ?>
                         </div>
                         <div class="flex-grow-1">
-                            <form method="post" action="<?= $base ?>admin/settings/upload-image" enctype="multipart/form-data" class="mb-2">
-                                <?= Session::csrfField() ?>
-                                <label class="form-label small mb-1">بارگذاری تصویر جدید (JPG یا PNG — حداکثر ۲ مگابایت)</label>
-                                <div class="input-group input-group-sm">
-                                    <input type="file" class="form-control" name="owner_image" accept=".jpg,.jpeg,.png" required>
-                                    <button type="submit" class="btn btn-primary"><?= icon('upload', '', 15) ?> بارگذاری</button>
-                                </div>
-                            </form>
+                            <label class="form-label small mb-1">بارگذاری تصویر جدید (JPG یا PNG — حداکثر ۲ مگابایت)</label>
+                            <div class="input-group input-group-sm">
+                                <input type="file" class="form-control" name="owner_image" accept=".jpg,.jpeg,.png" id="ownerImageInput">
+                                <button type="submit" class="btn btn-primary" onclick="document.getElementById('removeImageFlag').value=''; return true;"><?= icon('upload', '', 15) ?> بارگذاری</button>
+                            </div>
                             <?php if ($img !== ''): ?>
-                            <form method="post" action="<?= $base ?>admin/settings/upload-image"
-                                  onsubmit="return confirm('تصویر مدیر حذف و آیکون پیش‌فرض نمایش داده شود؟');">
-                                <?= Session::csrfField() ?>
-                                <input type="hidden" name="remove_image" value="1">
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><?= icon('trash', '', 14) ?> حذف تصویر</button>
-                            </form>
+                            <div class="mt-2">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="event.preventDefault(); if(confirm('تصویر مدیر حذف و آیکون پیش‌فرض نمایش داده شود؟')) { document.getElementById('removeImageFlag').value='1'; document.getElementById('ownerImageInput').removeAttribute('required'); document.getElementById('imageForm').submit(); }"><?= icon('trash', '', 14) ?> حذف تصویر</button>
+                            </div>
                             <?php endif; ?>
-                            <div class="form-text">این تصویر در صفحهٔ «دربارهٔ ما»، کارت معرفی مدیر در صفحهٔ اصلی و صفحهٔ ورود نمایش داده می‌شود. در صورت عدم بارگذاری، آیکون پیش‌فرض استفاده می‌شود.</div>
+                            <div class="form-text">این تصویر در صفحهٔ «دربارهٔ ما»، کارت معریق مدیر در صفحهٔ اصلی و صفحهٔ ورود نمایش داده می‌شود. در صورت عدم بارگذاری، آیکون پیش‌فرض استفاده می‌شود.</div>
                         </div>
                     </div>
                 </div>
@@ -189,9 +189,25 @@ $v = fn(string $key, string $def = '') => htmlspecialchars($fd[$key] ?? $setting
     </div>
 
     <div class="d-flex gap-2 mt-4 mb-2">
-        <button type="submit" class="btn btn-success px-4">💾 ذخیرهٔ تنظیمات</button>
+        <button type="submit" class="btn btn-success px-4" onclick="submitSettingsForm(event)">💾 ذخیرهٔ تنظیمات</button>
         <a href="<?= $base ?>admin/dashboard" class="btn btn-outline-secondary">بازگشت به داشبورد</a>
     </div>
+</form>
+
+<!-- ===== فرم اصلی ذخیرهٔ تنظیمات (مستقل) ===== -->
+<form method="post" action="<?= $base ?>admin/settings/save" id="settingsForm" style="display:none;">
+    <?= Session::csrfField() ?>
+    <input type="hidden" name="site_name" id="f_site_name">
+    <input type="hidden" name="owner_name" id="f_owner_name">
+    <input type="hidden" name="owner_username" id="f_owner_username">
+    <input type="hidden" name="social_eitaa" id="f_social_eitaa">
+    <input type="hidden" name="social_rubika" id="f_social_rubika">
+    <input type="hidden" name="social_bale" id="f_social_bale">
+    <input type="hidden" name="registration_fee_amount" id="f_registration_fee_amount">
+    <input type="hidden" name="license_reissue_fee_amount" id="f_license_reissue_fee_amount">
+    <input type="hidden" name="success_message_template" id="f_success_message_template">
+    <input type="hidden" name="about_title" id="f_about_title">
+    <input type="hidden" name="about_content" id="f_about_content">
 </form>
 
 <script>
@@ -206,4 +222,27 @@ function updateTplPreview() {
 }
 document.querySelector('textarea[name="success_message_template"]')?.addEventListener('input', updateTplPreview);
 updateTplPreview();
+
+// دکمهٔ «ذخیرهٔ تنظیمات» مقادیر فیلدها را در فرم مخفی کپی کرده و آن را submit می‌کند
+function submitSettingsForm(event) {
+    event.preventDefault();
+
+    // کپی مقادیر از فرم تصویر به فرم مخفی ذخیرهٔ تنظیمات
+    const fields = [
+        'site_name', 'owner_name', 'owner_username',
+        'social_eitaa', 'social_rubika', 'social_bale',
+        'registration_fee_amount', 'license_reissue_fee_amount',
+        'success_message_template', 'about_title', 'about_content'
+    ];
+    fields.forEach(function(name) {
+        const src = document.querySelector('[name="' + name + '"]');
+        const dst = document.getElementById('f_' + name);
+        if (src && dst) {
+            dst.value = src.value;
+        }
+    });
+
+    // submit فرم مخفی
+    document.getElementById('settingsForm').submit();
+}
 </script>
