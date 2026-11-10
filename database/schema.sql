@@ -375,7 +375,7 @@ CREATE TABLE IF NOT EXISTS payments (
     fee_group_id INT NULL,
     is_rural_exempt TINYINT(1) NOT NULL DEFAULT 0,
     fallback_used TINYINT(1) NOT NULL DEFAULT 0,
-    suspicion_flag VARCHAR(255) NULL,
+    suspicion_flags VARCHAR(255) NULL,
     reference_code VARCHAR(50) NULL,
     paid_at DATE NULL,
     receipt_document_id INT NULL,
@@ -396,7 +396,7 @@ CREATE TABLE IF NOT EXISTS payments (
     INDEX idx_pay_purpose (purpose),
     INDEX idx_pay_user (user_account_id),
     INDEX idx_pay_group (fee_group_id),
-    INDEX idx_pay_suspicion (suspicion_flag(50))
+    INDEX idx_pay_suspicion (suspicion_flags(50))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ================================================================
