@@ -93,7 +93,7 @@ class DocumentController extends Controller
             // برای PDF: هدایت به PDF viewer که با PDF.js رندر می‌کند
             // (کاملاً inline — بدون امکان دانلود)
             $base = rtrim(BASE_URL, '/') . '/';
-            header('Location: ' . $base . 'pdf-viewer.php?id=' . (int)$id);
+            header('Location: ' . $base . 'document/pdf-viewer?id=' . (int)$id);
             exit;
         }
 
