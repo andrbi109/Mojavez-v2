@@ -74,7 +74,8 @@ class DocumentController extends Controller
     /**
      * نمایش فایل با درخواست GET (برای استفاده در iframe/embed)
      * URL: /document/inline/{id}
-     * این متد برای نمایش PDF در iframe استفاده می‌شود.
+     * برای PDF: به صفحهٔ PDF viewer هدایت می‌شود (رندر با PDF.js)
+     * برای تصاویر: مستقیماً inline سرو می‌شود
      */
     public function inline(int|string $id): void
     {
@@ -85,7 +86,82 @@ class DocumentController extends Controller
             $this->deny(404, 'فایل یافت نشد.');
         }
 
+        // تشخیص نوع فایل
+        $ext = strtolower(safe_file_extension((string)$document['file_name']));
+
+        if ($ext === 'pdf') {
+            // برای PDF: هدایت به PDF viewer که با PDF.js رندر می‌کند
+            // (کاملاً inline — بدون امکان دانلود)
+            $base = rtrim(BASE_URL, '/') . '/';
+            header('Location: ' . $base . 'pdf-viewer.php?id=' . (int)$id);
+            exit;
+        }
+
+        // برای تصاویر و سایر فایل‌ها: مستقیم inline سرو کن
         $this->stream($document, 'inline');
+    }
+
+    /**
+     * نمایش PDF با PDF.js (رندر در مرورگر — بدون دانلود)
+     * URL: /document/pdf-viewer?id=21
+     */
+    public function pdfViewer(): void
+    {
+        $this->requireLogin();
+
+        $docId = (int)($_GET['id'] ?? 0);
+        if ($docId <= 0) {
+            $this->deny(404, 'شناسهٔ فایل نامعتبر.');
+        }
+
+        $document = $this->documentModel->findById($docId);
+        if (!$document) {
+            $this->deny(404, 'فایل یافت نشد.');
+        }
+
+        // این متد فقط PDF viewer را نمایش می‌دهد
+        // خود فایل PDF از طریق /document/inline/{id} دریافت می‌شود
+        // (که در inline() هدایت به اینجا می‌شود)
+
+        // نمایش صفحهٔ PDF viewer
+        $base = rtrim(BASE_URL, '/') . '/';
+        $docId = (int)$docId;
+
+        // پاک‌سازی هدرهای مختل‌کننده
+        if (!headers_sent()) {
+            header_remove('X-Frame-Options');
+            header_remove('Content-Security-Policy');
+            header_remove('Cross-Origin-Resource-Policy');
+            header_remove('Cross-Origin-Opener-Policy');
+            header_remove('Cache-Control');
+            header_remove('Pragma');
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Frame-Options: SAMEORIGIN');
+        header('Cache-Control: private, max-age=3600');
+
+        // خروجی HTML صفحهٔ PDF viewer
+        echo $this->renderPdfViewerHtml($base, $docId, (string)$document['original_name']);
+        exit;
+    }
+
+    /**
+     * سرو کردن فایل خام PDF برای PDF.js (بدون redirect)
+     * URL: /document/raw/{id}
+     * این متد فقط برای fetch از داخل PDF.js استفاده می‌شود.
+     */
+    public function raw(int|string $id): void
+    {
+        $this->requireLogin();
+
+        $document = is_numeric($id) ? $this->documentModel->findById((int)$id) : null;
+        if (!$document) {
+            $this->deny(404, 'فایل یافت نشد.');
+        }
+
+        // سرو کردن مستقیم فایل (بدون redirect)
+        $this->streamRaw($document);
     }
 
     /**
@@ -163,5 +239,160 @@ class DocumentController extends Controller
         header('Content-Type: text/plain; charset=utf-8');
         echo $message;
         exit;
+    }
+
+    /**
+     * سرو کردن فایل خام (برای fetch از JavaScript) — بدون Content-Disposition
+     * فقط Content-Type و CORS مناسب برای fetch.
+     */
+    private function streamRaw(array $document): void
+    {
+        $clean = str_replace(['..', "\0"], '', (string)$document['file_path']);
+        $filePath = realpath(UPLOAD_DIR . $clean);
+        $base = realpath(UPLOAD_DIR);
+
+        if ($filePath === false || $base === false || !str_starts_with($filePath, $base) || !is_file($filePath)) {
+            $this->deny(404, 'فایل موجود نیست.');
+        }
+
+        $mime = (string)(new finfo(FILEINFO_MIME_TYPE))->file($filePath);
+        if (!array_key_exists($mime, self::SAFE_MIMES)) {
+            $this->deny(415, 'نوع فایل قابل نمایش نیست.');
+        }
+
+        // پاک‌سازی هدرهای مختل‌کننده
+        if (!headers_sent()) {
+            header_remove('X-Frame-Options');
+            header_remove('Content-Security-Policy');
+            header_remove('Cross-Origin-Resource-Policy');
+            header_remove('Cross-Origin-Opener-Policy');
+            header_remove('Cache-Control');
+            header_remove('Pragma');
+            // حذف Content-Disposition اگر قبلاً تنظیم شده
+            header_remove('Content-Disposition');
+        }
+
+        // هدرهای مناسب برای fetch از JavaScript
+        header('Content-Type: ' . $mime);
+        header('Content-Length: ' . filesize($filePath));
+        header('Accept-Ranges: bytes');
+        header('Cache-Control: private, max-age=3600');
+        // بدون Content-Disposition — مرورگر دانلود نمی‌کند
+
+        readfile($filePath);
+        exit;
+    }
+
+    /**
+     * تولید HTML صفحهٔ PDF viewer با PDF.js
+     */
+    private function renderPdfViewerHtml(string $base, int $docId, string $originalName): string
+    {
+        $safeName = htmlspecialchars($originalName, ENT_QUOTES, 'UTF-8');
+        $pdfUrl = $base . 'document/raw/' . $docId;
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>پیش‌نمایش {$safeName}</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #525659; font-family: Tahoma, sans-serif; overflow: auto; }
+#pdfContainer { width: 100%; text-align: center; }
+#pdfContainer canvas { max-width: 100%; margin: 10px auto; display: block;
+    box-shadow: 0 2px 10px rgba(0,0,0,.3); background: #fff; }
+#loading { color: #fff; text-align: center; padding: 40px; font-size: 16px; }
+#error { color: #ff6b6b; text-align: center; padding: 40px; font-size: 16px; }
+.toolbar { background: #323639; padding: 8px 16px; display: flex;
+    justify-content: center; align-items: center; gap: 12px; color: #fff;
+    font-size: 13px; position: sticky; top: 0; z-index: 100; }
+.toolbar button { background: #00B4D8; color: #fff; border: none;
+    padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.toolbar button:hover { background: #0096B8; }
+.toolbar span { min-width: 60px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+    <button onclick="prevPage()">→ قبلی</button>
+    <span id="pageInfo">صفحهٔ ? از ?</span>
+    <button onclick="nextPage()">بعدی ←</button>
+    <button onclick="zoomOut()">−</button>
+    <span id="zoomLevel">۱۰۰٪</span>
+    <button onclick="zoomIn()">+</button>
+</div>
+<div id="loading">در حال بارگذاری PDF…</div>
+<div id="error" style="display:none;"></div>
+<div id="pdfContainer"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+let pdfDoc = null;
+let currentPage = 1;
+let scale = 1.5;
+let rendering = false;
+let pendingPage = null;
+
+const url = '{$pdfUrl}';
+const container = document.getElementById('pdfContainer');
+const loading = document.getElementById('loading');
+const errorDiv = document.getElementById('error');
+const pageInfo = document.getElementById('pageInfo');
+const zoomLevel = document.getElementById('zoomLevel');
+
+function toPersianDigits(str) {
+    return String(str).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+}
+
+function renderPage(num) {
+    rendering = true;
+    pdfDoc.getPage(num).then(function(page) {
+        const viewport = page.getViewport({ scale: scale });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        container.innerHTML = '';
+        container.appendChild(canvas);
+        page.render({ canvasContext: ctx, viewport: viewport }).promise.then(function() {
+            rendering = false;
+            if (pendingPage !== null) {
+                const p = pendingPage; pendingPage = null; renderPage(p);
+            }
+        });
+        pageInfo.textContent = toPersianDigits('صفحهٔ ' + num + ' از ' + pdfDoc.numPages);
+    }).catch(function(err) {
+        rendering = false;
+        console.error('Render error:', err);
+    });
+}
+
+function queueRenderPage(num) {
+    if (rendering) { pendingPage = num; } else { renderPage(num); }
+}
+function prevPage() { if (currentPage <= 1) return; currentPage--; queueRenderPage(currentPage); }
+function nextPage() { if (currentPage >= pdfDoc.numPages) return; currentPage++; queueRenderPage(currentPage); }
+function zoomIn() { scale += 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
+function zoomOut() { if (scale <= 0.5) return; scale -= 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
+
+pdfjsLib.getDocument(url).promise.then(function(pdf) {
+    pdfDoc = pdf;
+    loading.style.display = 'none';
+    renderPage(currentPage);
+}).catch(function(err) {
+    loading.style.display = 'none';
+    errorDiv.style.display = 'block';
+    errorDiv.textContent = 'خطا در بارگذاری PDF: ' + (err.message || 'نامشخص');
+    console.error('PDF.js error:', err);
+});
+</script>
+</body>
+</html>
+HTML;
     }
 }

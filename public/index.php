@@ -344,6 +344,10 @@ $router->get('/document/avatar', ['DocumentController', 'avatar']);
 $router->get('/document/thumb/{id}', ['DocumentController', 'thumb']);
 // نمایش مستقیم فایل (برای iframe نمایش PDF)
 $router->get('/document/inline/{id}', ['DocumentController', 'inline']);
+// نمایش PDF با PDF.js (رندر در مرورگر)
+$router->get('/document/pdf-viewer', ['DocumentController', 'pdfViewer']);
+// سرو فایل خام برای fetch از PDF.js
+$router->get('/document/raw/{id}', ['DocumentController', 'raw']);
 
 // Check cancel — نیاز به رمز مشترک (CRON_SECRET) دارد
 // برای فراخوانی: GET /check-cancel?key=SECRET یا با هدر X-Cron-Secret
