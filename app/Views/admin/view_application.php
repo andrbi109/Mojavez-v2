@@ -761,29 +761,51 @@ $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 <script>
 document.querySelectorAll('.view-doc-btn').forEach(btn => {
     btn.addEventListener('click', async function () {
-        const formData = new FormData();
-        formData.append('document_id', this.dataset.id);
-        formData.append('applicant_id', this.dataset.applicant);
-        // توکن CSRF از متاتگ قالب
-        formData.append('_csrf', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        const docId = this.dataset.id;
+        const applicantId = this.dataset.applicant;
         const box = document.getElementById('docContent');
         box.innerHTML = '<div class="py-5 text-muted">در حال بارگذاری…</div>';
+
+        // ابتدا متادیتای فایل را از طریق POST دریافت کن (برای تشخیص نوع)
+        const formData = new FormData();
+        formData.append('document_id', docId);
+        formData.append('applicant_id', applicantId);
+        formData.append('_csrf', document.querySelector('meta[name="csrf-token"]')?.content || '');
+
         try {
             const response = await fetch('<?= $base ?>document/view', { method: 'POST', body: formData });
-            if (!response.ok) { box.innerHTML = '<div class="py-5 text-danger">خطا در بارگذاری فایل</div>'; return; }
+            if (!response.ok) {
+                box.innerHTML = '<div class="py-5 text-danger">خطا در بارگذاری فایل</div>';
+                new bootstrap.Modal(document.getElementById('docModal')).show();
+                return;
+            }
+            const contentType = response.headers.get('Content-Type') || '';
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
-            const contentType = response.headers.get('Content-Type') || '';
+
             if (contentType.startsWith('image/')) {
+                // تصاویر — نمایش مستقیم در تگ img
                 box.innerHTML = `<img src="${url}" class="img-fluid" style="max-height:75vh;">`;
             } else if (contentType === 'application/pdf') {
-                box.innerHTML = `<embed src="${url}" type="application/pdf" width="100%" height="560px">`;
+                // PDF — استفاده از iframe با مسیر مستقیم GET (قابل اعتمادتر از blob)
+                URL.revokeObjectURL(url); // blob لازم نیست — از مسیر مستقیم استفاده می‌کنیم
+                box.innerHTML = `
+                    <iframe src="<?= $base ?>document/inline/${docId}"
+                            style="width:100%;height:75vh;border:0;"
+                            title="پیش‌نمایش PDF">
+                    </iframe>
+                    <div class="mt-2 text-muted small">
+                        💡 اگر PDF نمایش داده نشد،
+                        <a href="<?= $base ?>document/inline/${docId}" target="_blank" class="btn btn-sm btn-outline-primary">در تب جدید باز کنید</a>
+                    </div>`;
             } else {
+                // سایر فایل‌ها — دکمهٔ دانلود
                 box.innerHTML = `<a href="${url}" class="btn btn-primary" download>دانلود فایل</a>`;
             }
             new bootstrap.Modal(document.getElementById('docModal')).show();
         } catch (e) {
             box.innerHTML = '<div class="py-5 text-danger">خطا در ارتباط با سرور</div>';
+            new bootstrap.Modal(document.getElementById('docModal')).show();
         }
     });
 });

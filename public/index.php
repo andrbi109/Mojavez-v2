@@ -342,6 +342,8 @@ $router->post('/document/view', ['DocumentController', 'view']);
 $router->get('/document/avatar', ['DocumentController', 'avatar']);
 // بندانگشتی مدرک
 $router->get('/document/thumb/{id}', ['DocumentController', 'thumb']);
+// نمایش مستقیم فایل (برای iframe نمایش PDF)
+$router->get('/document/inline/{id}', ['DocumentController', 'inline']);
 
 // Check cancel — نیاز به رمز مشترک (CRON_SECRET) دارد
 // برای فراخوانی: GET /check-cancel?key=SECRET یا با هدر X-Cron-Secret

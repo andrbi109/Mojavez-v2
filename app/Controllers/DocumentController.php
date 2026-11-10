@@ -72,6 +72,23 @@ class DocumentController extends Controller
     }
 
     /**
+     * نمایش فایل با درخواست GET (برای استفاده در iframe/embed)
+     * URL: /document/inline/{id}
+     * این متد برای نمایش PDF در iframe استفاده می‌شود.
+     */
+    public function inline(int|string $id): void
+    {
+        $this->requireLogin();
+
+        $document = is_numeric($id) ? $this->documentModel->findById((int)$id) : null;
+        if (!$document) {
+            $this->deny(404, 'فایل یافت نشد.');
+        }
+
+        $this->stream($document, 'inline');
+    }
+
+    /**
      * بندانگشتی مدرک (در فهرست پرونده) — فعلاً همان فایل اصلی با هدرهای محدودکنندهٔ کش
      */
     public function thumb(int|string $id): void

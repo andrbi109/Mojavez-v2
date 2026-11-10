@@ -357,11 +357,11 @@ $productPhotos = array_filter($documents, fn($d) => $d['doc_type'] === 'product_
                 <div class="col-6 col-md-3 col-xl-2">
                     <div class="card h-100 p-2 text-center" style="border-style:dashed;">
                         <?php if ($isImage): ?>
-                            <a href="<?= $base ?>document/view/<?= (int)$doc['id'] ?>" target="_blank">
+                            <a href="<?= $base ?>document/inline/<?= (int)$doc['id'] ?>" target="_blank">
                                 <img src="<?= $base ?>document/thumb/<?= (int)$doc['id'] ?>" class="rounded mb-1" style="height:70px;width:100%;object-fit:cover;" alt="">
                             </a>
                         <?php else: ?>
-                            <a href="<?= $base ?>document/view/<?= (int)$doc['id'] ?>" target="_blank" class="d-block py-3" style="color:var(--terracotta);">
+                            <a href="<?= $base ?>document/inline/<?= (int)$doc['id'] ?>" target="_blank" class="d-block py-3" style="color:var(--terracotta);">
                                 <?= icon('file-text','',28) ?>
                             </a>
                         <?php endif; ?>
@@ -390,11 +390,11 @@ $productPhotos = array_filter($documents, fn($d) => $d['doc_type'] === 'product_
                 <div class="col-4 col-md-2">
                     <div class="card h-100 p-1 text-center" style="border-style:dashed;">
                         <?php if ($isImage): ?>
-                            <a href="<?= $base ?>document/view/<?= (int)$doc['id'] ?>" target="_blank">
+                            <a href="<?= $base ?>document/inline/<?= (int)$doc['id'] ?>" target="_blank">
                                 <img src="<?= $base ?>document/thumb/<?= (int)$doc['id'] ?>" class="img-thumbnail w-100" style="height:60px;object-fit:cover;" alt="">
                             </a>
                         <?php else: ?>
-                            <a href="<?= $base ?>document/view/<?= (int)$doc['id'] ?>" target="_blank" class="d-block py-2" style="color:var(--terracotta);"><?= icon('file-text','',20) ?></a>
+                            <a href="<?= $base ?>document/inline/<?= (int)$doc['id'] ?>" target="_blank" class="d-block py-2" style="color:var(--terracotta);"><?= icon('file-text','',20) ?></a>
                         <?php endif; ?>
                         <form method="post" action="<?= $base ?>admin/delete-document" onsubmit="return confirm('حذف شود؟');" class="mt-1">
                             <?= Session::csrfField() ?>
