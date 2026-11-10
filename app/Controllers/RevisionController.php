@@ -181,26 +181,18 @@ class RevisionController extends Controller
         }
 
         /* ---------- ذخیرهٔ مدارک موقت + ساخت payload ---------- */
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-
+        $storage = new FileStorage();
         $payloadDocs = [];
         foreach ($newDocs as $d) {
             $file = $d['file'];
-            $ext = $d['ext']; // پسوند تأیید شده از اعتبارسنجی بالا
-            $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-            if (!move_uploaded_file($file['tmp_name'], $uploadDir . '/' . $uniqueName)) {
-                Session::set('revision_error', 'خطا در ذخیرهٔ یکی از فایل‌ها.');
+            $docType = 'revision_' . $d['type']; // نوع موقت تا زمان تأیید مدیر
+
+            $result = $storage->storeUpload($file, $aid, $applicant['tracking_code'], $docType);
+            if (!$result['success']) {
+                Session::set('revision_error', $result['error'] ?? 'خطا در ذخیرهٔ یکی از فایل‌ها.');
                 $this->redirect('/tracking/revision/' . rawurlencode($applicant['tracking_code']));
             }
-            @chmod($uploadDir . '/' . $uniqueName, 0640);
-            $docId = $this->documentModel->create([
-                'applicant_id' => $aid,
-                'doc_type' => 'revision_doc',   // نوع موقت تا زمان تأیید مدیر
-                'file_name' => $uniqueName,
-                'original_name' => sanitize_upload_filename((string)$file['name']),
-                'file_path' => '/' . date('Y/m') . '/' . $uniqueName,
-            ]);
+            $docId = $result['document_id'];
             $payloadDocs[] = ['doc_id' => $docId, 'doc_type' => $d['type'], 'name' => sanitize_upload_filename((string)$file['name'])];
         }
 
@@ -491,12 +483,11 @@ class RevisionController extends Controller
         // حذف فایل‌ها و رکوردهای موقت مدارک
         foreach ($rev['payload_data']['docs'] ?? [] as $d) {
             $doc = $this->documentModel->findById((int)$d['doc_id']);
-            if ($doc && $doc['doc_type'] === 'revision_doc') {
-                $fp = realpath(UPLOAD_DIR . str_replace(['..', "\0"], '', (string)$doc['file_path']));
-                $base = realpath(UPLOAD_DIR);
-                if ($fp && $base && str_starts_with($fp, $base) && is_file($fp)) @unlink($fp);
+            if ($doc && str_starts_with($doc['doc_type'], 'revision_')) {
+                $storage = new FileStorage();
+                $storage->deleteFile($doc['file_path']);
                 Database::getInstance()->getConnection()
-                    ->prepare("DELETE FROM documents WHERE id = :id AND doc_type = 'revision_doc'")
+                    ->prepare("DELETE FROM documents WHERE id = :id AND doc_type LIKE 'revision_%'")
                     ->execute(['id' => (int)$doc['id']]);
             }
         }

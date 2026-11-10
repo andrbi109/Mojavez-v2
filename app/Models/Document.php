@@ -54,12 +54,10 @@ class Document
         $stmt->execute(['id' => $id]);
         $deleted = $stmt->rowCount() > 0;
 
-        // حذف فایل فیزیکی از دیسک
+        // حذف فایل فیزیکی از دیسک (با FileStorage برای امنیت مسیر)
         if ($deleted && !empty($doc['file_path'])) {
-            $fullPath = UPLOAD_DIR . '/' . ltrim($doc['file_path'], '/');
-            if (is_file($fullPath)) {
-                @unlink($fullPath);
-            }
+            $storage = new FileStorage();
+            $storage->deleteFile($doc['file_path']);
         }
         return $deleted;
     }

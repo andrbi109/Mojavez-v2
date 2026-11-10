@@ -187,10 +187,12 @@ class ApplicantRegistrationService
     /* ==================== ذخیرهٔ فایل آپلودشده ==================== */
 
     /**
-     * ذخیرهٔ یک فایل آپلودشده — قبلاً در ۸ جا به‌صورت کلوژر کپی شده بود.
+     * ذخیرهٔ یک فایل آپلودشده — با ساختار جدید و فشرده‌سازی.
      *
-     * الگوی یکسان: validate_uploaded_file → bin2hex(16).ext → move_uploaded_file
-     * → chmod 0640 → Document::create.
+     * الگوی جدید: FileStorage::storeUpload()
+     *   → uploads/{tracking_code}/{doc_type}_{random6}.ext
+     *   → فشرده‌سازی خودکار تصاویر (JPEG 85%، resize 1920px)
+     *   → Document::create
      *
      * @param array       $file       ورودی $_FILES[name]
      * @param int         $applicantId شناسهٔ متقاضی
@@ -203,34 +205,24 @@ class ApplicantRegistrationService
             return ['success' => false, 'error' => null, 'document_id' => null];
         }
 
-        $validation = validate_uploaded_file($file);
-        if (!$validation['valid']) {
-            return ['success' => false, 'error' => $validation['error'] ?? 'فایل نامعتبر', 'document_id' => null];
+        // دریافت کد رهگیری متقاضی برای ساختار پوشه‌بندی
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("SELECT tracking_code FROM applicants WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $applicantId]);
+        $trackingCode = $stmt->fetchColumn();
+
+        if (!$trackingCode) {
+            return ['success' => false, 'error' => 'کد رهگیری متقاضی یافت نشد', 'document_id' => null];
         }
 
-        $ext = $validation['ext'];
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
+        $storage = new FileStorage();
+        $result = $storage->storeUpload($file, $applicantId, $trackingCode, $docType);
 
-        $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $destPath = $uploadDir . '/' . $uniqueName;
-
-        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-            return ['success' => false, 'error' => 'خطا در ذخیرهٔ فایل', 'document_id' => null];
-        }
-        @chmod($destPath, 0640);
-
-        $docId = $this->documentModel->create([
-            'applicant_id'  => $applicantId,
-            'doc_type'       => $docType,
-            'file_name'      => $uniqueName,
-            'original_name'  => sanitize_upload_filename((string)$file['name']),
-            'file_path'      => str_replace(UPLOAD_DIR, '', $destPath),
-        ]);
-
-        return ['success' => true, 'error' => null, 'document_id' => $docId];
+        return [
+            'success'      => $result['success'],
+            'error'        => $result['error'],
+            'document_id'  => $result['document_id'],
+        ];
     }
 
     /**

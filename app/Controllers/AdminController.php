@@ -902,7 +902,7 @@ class AdminController extends Controller
 
     /**
      * ذخیرهٔ مدارک آپلودشده در فرم ویرایش متقاضی.
-     * فایل‌ها در UPLOAD_DIR/Y/m با نام تصادفی ذخیره می‌شوند.
+     * فایل‌ها در uploads/{tracking_code}/{doc_type}_{random6}.ext با فشرده‌سازی ذخیره می‌شوند.
      *
      * @param int $applicantId شناسهٔ متقاضی
      * @return array<string> لیست پیام‌های خطا (خالی = بدون خطا)
@@ -910,46 +910,37 @@ class AdminController extends Controller
     private function saveUploadedDocuments(int $applicantId): array
     {
         $errors = [];
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+
+        // دریافت کد رهگیری متقاضی
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("SELECT tracking_code FROM applicants WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $applicantId]);
+        $trackingCode = $stmt->fetchColumn();
+        if (!$trackingCode) {
+            return ['کد رهگیری متقاضی یافت نشد'];
         }
+
+        $storage = new FileStorage();
 
         // نگاشت نام ورودی فایل → نوع مدرک
         $fileMap = [
-            'national_card_front' => 'national_card',
-            'national_card_back'  => 'national_card',
+            'national_card_front' => 'national_card_front',
+            'national_card_back'  => 'national_card_back',
             'birth_cert'          => 'birth_cert',
             'ownership_doc'       => 'ownership_doc',
             'vocational_cert'     => 'vocational_cert',
             'education_degree'    => 'education_degree',
-            'optional_1'          => 'optional',
-            'optional_2'          => 'optional',
-            'optional_3'          => 'optional',
+            'optional_1'          => 'optional_1',
+            'optional_2'          => 'optional_2',
+            'optional_3'          => 'optional_3',
         ];
 
-        $saveSingleFile = function (array $file, string $docType) use ($applicantId, $uploadDir, &$errors) {
+        $saveSingleFile = function (array $file, string $docType) use ($applicantId, $trackingCode, $storage, &$errors) {
             if (!$file || $file['error'] !== UPLOAD_ERR_OK) return;
-            $validation = validate_uploaded_file($file);
-            if (!$validation['valid']) {
-                $errors[] = ($file['name'] ?? 'فایل') . ': ' . ($validation['error'] ?? 'نامعتبر');
-                return;
+            $result = $storage->storeUpload($file, $applicantId, $trackingCode, $docType);
+            if (!$result['success']) {
+                $errors[] = ($file['name'] ?? 'فایل') . ': ' . ($result['error'] ?? 'نامعتبر');
             }
-            $ext = $validation['ext'];
-            $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-            $destPath = $uploadDir . '/' . $uniqueName;
-            if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-                $errors[] = 'خطا در ذخیرهٔ فایل: ' . sanitize_upload_filename((string)$file['name']);
-                return;
-            }
-            @chmod($destPath, 0640);
-            $this->documentModel->create([
-                'applicant_id' => $applicantId,
-                'doc_type' => $docType,
-                'file_name' => $uniqueName,
-                'original_name' => sanitize_upload_filename((string)$file['name']),
-                'file_path' => str_replace(UPLOAD_DIR, '', $destPath),
-            ]);
         };
 
         // فایل‌های تکی
@@ -1039,35 +1030,27 @@ class AdminController extends Controller
             $this->redirect('/admin/view/' . $applicantId);
         }
 
-        // اعتبارسنجی چندلایه‌ای (نام + MIME واقعی + تطبیق)
-        $validation = validate_uploaded_file($file);
-        if (!$validation['valid']) {
-            Session::set('errors', ['document' => $validation['error'] ?? 'فایل نامعتبر است.']);
-            $this->redirect('/admin/view/' . $applicantId);
-        }
-        $ext = $validation['ext'];
+        // دریافت کد رهگیری متقاضی
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("SELECT tracking_code FROM applicants WHERE id = :id LIMIT 1");
+        $stmt->execute(['id' => $applicantId]);
+        $trackingCode = $stmt->fetchColumn();
 
-        $uploadDir = UPLOAD_DIR . '/' . date('Y/m');
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
-        $uniqueName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $destPath = $uploadDir . '/' . $uniqueName;
-        if (!move_uploaded_file($file['tmp_name'], $destPath)) {
-            Session::set('errors', ['document' => 'خطا در ذخیره فایل.']);
+        if (!$trackingCode) {
+            Session::set('errors', ['document' => 'متقاضی یافت نشد.']);
             $this->redirect('/admin/view/' . $applicantId);
         }
-        @chmod($destPath, 0640); // حداقل دسترسی ممکن روی فایل ذخیره‌شده
+
+        // ذخیره با FileStorage (فشرده‌سازی خودکار + ساختار جدید)
+        $storage = new FileStorage();
+        $result = $storage->storeUpload($file, $applicantId, $trackingCode, $docType);
+
+        if (!$result['success']) {
+            Session::set('errors', ['document' => $result['error'] ?? 'خطا در ذخیره فایل.']);
+            $this->redirect('/admin/view/' . $applicantId);
+        }
 
         $safeOriginalName = sanitize_upload_filename((string)$file['name']);
-        $this->documentModel->create([
-            'applicant_id' => $applicantId,
-            'doc_type' => $docType,
-            'file_name' => $uniqueName,
-            'original_name' => $safeOriginalName,
-            'file_path' => str_replace(UPLOAD_DIR, '', $destPath)
-        ]);
-
         $this->statusLogModel->create([
             'applicant_id' => $applicantId,
             'status_name' => 'افزودن مدرک توسط مدیر',
