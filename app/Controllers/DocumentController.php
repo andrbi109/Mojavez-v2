@@ -304,9 +304,10 @@ class DocumentController extends Controller
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>پیش‌نمایش {$safeName}</title>
+<link rel="stylesheet" href="{$base}assets/font.css">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #525659; font-family: Tahoma, sans-serif; overflow: auto; }
+body { background: #525659; font-family: Vazir, Tahoma, Arial, sans-serif; overflow: auto; }
 #pdfContainer { width: 100%; text-align: center; }
 #pdfContainer canvas { max-width: 100%; margin: 10px auto; display: block;
     box-shadow: 0 2px 10px rgba(0,0,0,.3); background: #fff; }
@@ -405,11 +406,16 @@ fetch(rawUrl)
             bytes[i] = binaryStr.charCodeAt(i);
         }
         // مرحله ۳: PDF.js را با Uint8Array بارگذاری کن
+        // useSystemFonts: true — اجازهٔ استفاده از فونت‌های سیستمی برای رندر بهتر
+        // disableFontFace: false — اجازهٔ استفاده از @font-face در canvas
         return pdfjsLib.getDocument({
             data: bytes,
             cMapUrl: '{$base}assets/js/cmaps/',
             cMapPacked: true,
-            standardFontDataUrl: '{$base}assets/js/standard_fonts/'
+            standardFontDataUrl: '{$base}assets/js/standard_fonts/',
+            useSystemFonts: true,
+            disableFontFace: false,
+            isEvalSupported: false
         }).promise;
     })
     .then(function(pdf) {
