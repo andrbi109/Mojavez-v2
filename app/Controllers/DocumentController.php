@@ -336,6 +336,10 @@ body { background: #525659; font-family: Tahoma, sans-serif; overflow: auto; }
 <script src="{$base}assets/js/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = '{$base}assets/js/pdf.worker.min.js';
+// تنظیمات برای پشتیبانی از فونت‌های فارسی/عربی
+pdfjsLib.cMapUrl = '{$base}assets/js/cmaps/';
+pdfjsLib.cMapPacked = true;
+pdfjsLib.standardFontDataUrl = '{$base}assets/js/standard_fonts/';
 
 let pdfDoc = null;
 let currentPage = 1;
@@ -401,7 +405,12 @@ fetch(rawUrl)
             bytes[i] = binaryStr.charCodeAt(i);
         }
         // مرحله ۳: PDF.js را با Uint8Array بارگذاری کن
-        return pdfjsLib.getDocument({ data: bytes }).promise;
+        return pdfjsLib.getDocument({
+            data: bytes,
+            cMapUrl: '{$base}assets/js/cmaps/',
+            cMapPacked: true,
+            standardFontDataUrl: '{$base}assets/js/standard_fonts/'
+        }).promise;
     })
     .then(function(pdf) {
         pdfDoc = pdf;

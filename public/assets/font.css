@@ -36,7 +36,7 @@
 
 @font-face {
     font-family: 'Vazir';
-    src: url('font/VazirMatn/Vazirmatn-black.woff2') format('woff2');
+    src: url('font/VazirMatn/Vazirmatn-Black.woff2') format('woff2');
     font-weight: 900;
     font-display: swap;
 }
@@ -80,7 +80,7 @@
 
 @font-face {
     font-family: 'VazirFN';
-    src: url('font/VazirMatn/Vazirmatn-black.woff2') format('woff2');
+    src: url('font/VazirMatn/Vazirmatn-Black.woff2') format('woff2');
     font-weight: 900;
     font-display: swap;
 }
