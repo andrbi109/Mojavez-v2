@@ -333,9 +333,9 @@ body { background: #525659; font-family: Tahoma, sans-serif; overflow: auto; }
 <div id="loading">در حال بارگذاری PDF…</div>
 <div id="error" style="display:none;"></div>
 <div id="pdfContainer"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="{$base}assets/js/pdf.min.js"></script>
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = '{$base}assets/js/pdf.worker.min.js';
 
 let pdfDoc = null;
 let currentPage = 1;
