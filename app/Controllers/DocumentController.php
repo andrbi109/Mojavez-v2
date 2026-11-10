@@ -260,7 +260,14 @@ class DocumentController extends Controller
             $this->deny(415, 'نوع فایل قابل نمایش نیست.');
         }
 
-        // پاک‌سازی هدرهای مختل‌کننده
+        // خواندن محتوای فایل و تبدیل به base64 data URL
+        // این روش از fetch مستقیم استفاده نمی‌کند — Apache headers مشکلی ایجاد نمی‌کنند
+        $fileContent = file_get_contents($filePath);
+        if ($fileContent === false) {
+            $this->deny(500, 'خطا در خواندن فایل.');
+        }
+
+        // خروجی به‌صورت JSON با data URL
         if (!headers_sent()) {
             header_remove('X-Frame-Options');
             header_remove('Content-Security-Policy');
@@ -268,18 +275,22 @@ class DocumentController extends Controller
             header_remove('Cross-Origin-Opener-Policy');
             header_remove('Cache-Control');
             header_remove('Pragma');
-            // حذف Content-Disposition اگر قبلاً تنظیم شده
             header_remove('Content-Disposition');
+            header_remove('Expires');
         }
 
-        // هدرهای مناسب برای fetch از JavaScript
-        header('Content-Type: ' . $mime);
-        header('Content-Length: ' . filesize($filePath));
-        header('Accept-Ranges: bytes');
-        header('Cache-Control: private, max-age=3600');
-        // بدون Content-Disposition — مرورگر دانلود نمی‌کند
+        $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($fileContent);
 
-        readfile($filePath);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: private, max-age=3600');
+        header('X-Content-Type-Options: nosniff');
+
+        echo json_encode([
+            'success' => true,
+            'data' => $dataUrl,
+            'mime' => $mime,
+            'size' => filesize($filePath),
+        ]);
         exit;
     }
 
@@ -289,7 +300,7 @@ class DocumentController extends Controller
     private function renderPdfViewerHtml(string $base, int $docId, string $originalName): string
     {
         $safeName = htmlspecialchars($originalName, ENT_QUOTES, 'UTF-8');
-        $pdfUrl = $base . 'document/raw/' . $docId;
+        $rawUrl = $base . 'document/raw/' . $docId;
 
         return <<<HTML
 <!DOCTYPE html>
@@ -338,7 +349,7 @@ let scale = 1.5;
 let rendering = false;
 let pendingPage = null;
 
-const url = '{$pdfUrl}';
+const rawUrl = '{$rawUrl}';
 const container = document.getElementById('pdfContainer');
 const loading = document.getElementById('loading');
 const errorDiv = document.getElementById('error');
@@ -380,16 +391,29 @@ function nextPage() { if (currentPage >= pdfDoc.numPages) return; currentPage++;
 function zoomIn() { scale += 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 function zoomOut() { if (scale <= 0.5) return; scale -= 0.25; zoomLevel.textContent = toPersianDigits(Math.round(scale * 100 / 1.5) + '٪'); queueRenderPage(currentPage); }
 
-pdfjsLib.getDocument(url).promise.then(function(pdf) {
-    pdfDoc = pdf;
-    loading.style.display = 'none';
-    renderPage(currentPage);
-}).catch(function(err) {
-    loading.style.display = 'none';
-    errorDiv.style.display = 'block';
-    errorDiv.textContent = 'خطا در بارگذاری PDF: ' + (err.message || 'نامشخص');
-    console.error('PDF.js error:', err);
-});
+// مرحله ۱: فایل PDF را به‌صورت JSON دریافت کن (شامل base64 data URL)
+// این روش از CORS/CORP مشکلی ندارد چون fetch از همان دامنه است
+fetch(rawUrl)
+    .then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+    })
+    .then(function(data) {
+        if (!data.success) throw new Error(data.error || 'خطا در دریافت فایل');
+        // مرحله ۲: PDF.js را با data URL بارگذاری کن
+        return pdfjsLib.getDocument(data.data).promise;
+    })
+    .then(function(pdf) {
+        pdfDoc = pdf;
+        loading.style.display = 'none';
+        renderPage(currentPage);
+    })
+    .catch(function(err) {
+        loading.style.display = 'none';
+        errorDiv.style.display = 'block';
+        errorDiv.textContent = 'خطا در بارگذاری PDF: ' + (err.message || 'نامشخص');
+        console.error('PDF.js error:', err);
+    });
 </script>
 </body>
 </html>
